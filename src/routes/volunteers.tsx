@@ -61,18 +61,18 @@ function VolunteersPage() {
   const allAreas = useMemo(() => {
     const set = new Set<string>();
     volunteers.forEach((v: Volunteer) =>
-      v.serving_areas.forEach((a) => set.add(a))
+      (v.serving_areas || []).forEach((a) => set.add(a))
     );
     return Array.from(set).sort();
   }, [volunteers]);
 
   const filtered = useMemo(() => {
     return volunteers.filter((v: Volunteer) => {
-      const matchesSearch = v.full_name
+      const matchesSearch = (v.full_name || "")
         .toLowerCase()
         .includes(search.toLowerCase());
       const matchesArea =
-        selectedArea === "all" || v.serving_areas.includes(selectedArea);
+        selectedArea === "all" || (v.serving_areas && v.serving_areas.includes(selectedArea));
       return matchesSearch && matchesArea;
     });
   }, [volunteers, search, selectedArea]);
@@ -144,13 +144,13 @@ function VolunteersPage() {
           </thead>
           <tbody className="divide-y">
             {filtered.map((v) => (
-              <tr key={v.id} className="hover:bg-muted/30">
+              <tr key={`${v.id}-${v.full_name}`} className="hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium text-foreground">
                   {v.full_name}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {v.serving_areas.map((area) => (
+                    {(v.serving_areas || []).map((area) => (
                       <span
                         key={area}
                         className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
