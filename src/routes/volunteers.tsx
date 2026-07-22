@@ -189,7 +189,6 @@ export function VolunteersPage() {
           );
           const vBlackouts = getBlackoutDates(vName);
 
-          // Defensive array check for serving_areas / teams
           const safeAreas: string[] = Array.isArray(v.serving_areas)
             ? v.serving_areas
             : Array.isArray((v as any).teams)
@@ -223,7 +222,6 @@ export function VolunteersPage() {
                 )}
               </div>
 
-              {/* Safe Badges Rendering */}
               <div className="mt-3 flex flex-wrap gap-1">
                 {safeAreas.map((area) => (
                   <Badge key={area} variant="secondary" className="text-[10px] font-normal">
