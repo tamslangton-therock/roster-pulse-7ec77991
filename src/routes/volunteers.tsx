@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, Component, type ReactNode } from "react";
+import { useState, useMemo } from "react";
 import { format, parseISO, isValid } from "date-fns";
 import {
   Users,
@@ -10,7 +10,6 @@ import {
   PauseCircle,
   PlayCircle,
   Trash2,
-  AlertTriangle,
 } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
@@ -34,33 +33,6 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-// Simple inline boundary to capture render crashes locally
-class SafeBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-8 text-center space-y-4">
-          <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
-          <h2 className="text-lg font-semibold">Unable to display volunteer list</h2>
-          <p className="text-sm text-muted-foreground">
-            Some volunteer data is incomplete or corrupted.
-          </p>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Reload Page
-          </Button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
     meta: [
@@ -72,19 +44,11 @@ export const Route = createFileRoute("/volunteers")({
       },
     ],
   }),
-  component: VolunteersRouteWrapper,
+  component: VolunteersPage,
 });
 
-function VolunteersRouteWrapper() {
-  return (
-    <SafeBoundary>
-      <VolunteersPage />
-    </SafeBoundary>
-  );
-}
-
-function safeFormatDate(dateStr?: string, formatPattern?: string): string {
-  if (!dateStr || !formatPattern) return "";
+function safeFormatDate(dateStr: string, formatPattern: string): string {
+  if (!dateStr) return "";
   try {
     const parsed = parseISO(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`);
     if (isValid(parsed)) {
@@ -99,14 +63,10 @@ function safeFormatDate(dateStr?: string, formatPattern?: string): string {
 export function VolunteersPage() {
   const store = useRoster();
 
-  // Protect store getters against null/undefined
-  const rawVolunteers = store?.volunteers;
-  const volunteers = Array.isArray(rawVolunteers) ? rawVolunteers : [];
-
-  const rawAssignments = store?.assignments;
-  const assignments = Array.isArray(rawAssignments) ? rawAssignments : [];
-
-  const updateVolunteer = store?.updateVolunteer || (() => {});
+  // Guard against missing store arrays
+  const volunteers = store?.volunteers ?? [];
+  const assignments = store?.assignments ?? [];
+  const updateVolunteer = store?.updateVolunteer ?? (() => {});
 
   const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -119,7 +79,7 @@ export function VolunteersPage() {
     const key = volunteerName.toLowerCase();
 
     const vol = volunteers.find((v) => v?.full_name?.toLowerCase() === key);
-    if (vol?.blackout_dates && Array.isArray(vol.blackout_dates)) {
+    if (Array.isArray(vol?.blackout_dates)) {
       return vol.blackout_dates;
     }
 
@@ -127,8 +87,7 @@ export function VolunteersPage() {
       return store.blackoutsMap[key];
     }
 
-    const local = localBlackouts[key];
-    return Array.isArray(local) ? local : [];
+    return localBlackouts[key] ?? [];
   };
 
   const toggleBlackout = (volunteerName: string, dateStr: string) => {
@@ -139,7 +98,7 @@ export function VolunteersPage() {
       store.toggleBlackoutDate(volunteerName, dateStr);
     } else {
       setLocalBlackouts((prev) => {
-        const current = Array.isArray(prev[key]) ? prev[key] : [];
+        const current = prev[key] ?? [];
         const updated = current.includes(dateStr)
           ? current.filter((d) => d !== dateStr)
           : [...current, dateStr].sort();
@@ -149,23 +108,21 @@ export function VolunteersPage() {
   };
 
   const filteredVolunteers = useMemo(() => {
-    if (!Array.isArray(volunteers)) return [];
-
     return volunteers.filter((v) => {
       if (!v) return false;
-      const q = (searchQuery || "").toLowerCase();
-      const nameMatch = v?.full_name ? v.full_name.toLowerCase().includes(q) : false;
-      const emailMatch = v?.email ? v.email.toLowerCase().includes(q) : false;
-      const phoneMatch = v?.phone ? v.phone.toLowerCase().includes(q) : false;
+      const q = searchQuery.toLowerCase();
+      const nameMatch = v.full_name ? v.full_name.toLowerCase().includes(q) : false;
+      const emailMatch = v.email ? v.email.toLowerCase().includes(q) : false;
+      const phoneMatch = v.phone ? v.phone.toLowerCase().includes(q) : false;
 
-      const areas = Array.isArray(v?.serving_areas)
+      const areas = Array.isArray(v.serving_areas)
         ? v.serving_areas
         : Array.isArray((v as any)?.teams)
         ? (v as any).teams
         : [];
 
       const areaMatch = areas.some((area: string) =>
-        typeof area === "string" ? area.toLowerCase().includes(q) : false
+        area ? area.toLowerCase().includes(q) : false
       );
 
       return nameMatch || emailMatch || phoneMatch || areaMatch;
@@ -173,17 +130,16 @@ export function VolunteersPage() {
   }, [volunteers, searchQuery]);
 
   const activeAssignments = useMemo(() => {
-    if (!selectedVolunteer?.full_name || !Array.isArray(assignments)) return [];
+    if (!selectedVolunteer?.full_name) return [];
     const target = selectedVolunteer.full_name.toLowerCase();
     return assignments.filter(
-      (a) => a?.person_name && typeof a.person_name === "string" && a.person_name.toLowerCase() === target
+      (a) => a?.person_name && a.person_name.toLowerCase() === target
     );
   }, [assignments, selectedVolunteer]);
 
   const activeBlackouts = useMemo(() => {
     if (!selectedVolunteer?.full_name) return [];
-    const dates = getBlackoutDates(selectedVolunteer.full_name);
-    return Array.isArray(dates) ? dates : [];
+    return getBlackoutDates(selectedVolunteer.full_name);
   }, [selectedVolunteer, localBlackouts, store?.blackoutsMap, volunteers]);
 
   const handleToggleBlackoutDate = (dateStr: string) => {
@@ -198,8 +154,6 @@ export function VolunteersPage() {
       toast.success(`Blocked out ${dateStr} for ${selectedVolunteer.full_name}.`);
     }
   };
-
-  const safeList = Array.isArray(filteredVolunteers) ? filteredVolunteers : [];
 
   return (
     <div className="p-6 space-y-6">
@@ -228,33 +182,22 @@ export function VolunteersPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {safeList.map((v) => {
+        {filteredVolunteers.map((v) => {
           if (!v) return null;
-          const vName = v?.full_name || "Volunteer";
-
+          const vName = v.full_name || "Volunteer";
           const vAssignments = assignments.filter(
-            (a) =>
-              a?.person_name &&
-              typeof a.person_name === "string" &&
-              a.person_name.toLowerCase() === vName.toLowerCase()
+            (a) => a?.person_name?.toLowerCase() === vName.toLowerCase()
           );
-
           const vBlackouts = getBlackoutDates(vName);
-          const safeBlackouts = Array.isArray(vBlackouts) ? vBlackouts : [];
-
-          const safeAreas: string[] = Array.isArray(v?.serving_areas)
-            ? v.serving_areas
-            : Array.isArray((v as any)?.teams)
-            ? (v as any).teams
-            : [];
+          const safeAreas = Array.isArray(v.serving_areas) ? v.serving_areas : [];
 
           return (
             <div
-              key={v?.id || vName}
+              key={v.id || vName}
               onClick={() => setSelectedVolunteer(v)}
               className={cn(
                 "group relative rounded-xl border bg-card p-4 shadow-xs transition-all hover:border-primary/50 hover:shadow-md cursor-pointer",
-                v?.is_paused && "opacity-60 bg-muted/30"
+                v.is_paused && "opacity-60 bg-muted/30"
               )}
             >
               <div className="flex items-start justify-between gap-2">
@@ -262,9 +205,9 @@ export function VolunteersPage() {
                   <h3 className="font-semibold text-base group-hover:text-primary transition-colors">
                     {vName}
                   </h3>
-                  <p className="text-xs text-muted-foreground">{v?.email || v?.phone || ""}</p>
+                  <p className="text-xs text-muted-foreground">{v.email || v.phone || ""}</p>
                 </div>
-                {v?.is_paused ? (
+                {v.is_paused ? (
                   <Badge variant="outline" className="border-amber-500/40 text-amber-700 bg-amber-500/10 text-[10px]">
                     <PauseCircle className="h-3 w-3 mr-1" /> Paused
                   </Badge>
@@ -288,10 +231,10 @@ export function VolunteersPage() {
                   <Calendar className="h-3.5 w-3.5" />
                   {vAssignments.length} shifts
                 </span>
-                {safeBlackouts.length > 0 && (
+                {vBlackouts.length > 0 && (
                   <span className="flex items-center gap-1 text-purple-700 font-medium">
                     <CalendarX className="h-3.5 w-3.5" />
-                    {safeBlackouts.length} blocked date{safeBlackouts.length > 1 ? "s" : ""}
+                    {vBlackouts.length} blocked date{vBlackouts.length > 1 ? "s" : ""}
                   </span>
                 )}
               </div>
@@ -366,13 +309,12 @@ export function VolunteersPage() {
                       </div>
                     ) : (
                       activeAssignments.map((a) => {
-                        if (!a) return null;
                         const isBlackedOut = activeBlackouts.includes(a.date);
                         const formattedDate = safeFormatDate(a.date, "EEEE, d MMM yyyy");
 
                         return (
                           <div
-                            key={a.id || a.date}
+                            key={a.id}
                             className={cn(
                               "flex items-center justify-between p-3 rounded-lg border text-xs",
                               isBlackedOut
@@ -445,7 +387,6 @@ export function VolunteersPage() {
                         </div>
                       ) : (
                         [...activeBlackouts].sort().map((dateStr) => {
-                          if (!dateStr) return null;
                           const formattedLabel = safeFormatDate(dateStr, "EEEE, d MMMM yyyy");
 
                           return (
