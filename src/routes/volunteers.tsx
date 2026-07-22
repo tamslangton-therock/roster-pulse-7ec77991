@@ -116,7 +116,7 @@ export function VolunteersPage() {
 
       const areas = Array.isArray(v.serving_areas)
         ? v.serving_areas
-        : Array.isArray((v as any).teams)
+        : Array.isArray((v as any)?.teams)
         ? (v as any).teams
         : [];
 
@@ -189,9 +189,9 @@ export function VolunteersPage() {
           );
           const vBlackouts = getBlackoutDates(vName);
 
-          const safeAreas: string[] = Array.isArray(v.serving_areas)
+          const safeAreas: string[] = Array.isArray(v?.serving_areas)
             ? v.serving_areas
-            : Array.isArray((v as any).teams)
+            : Array.isArray((v as any)?.teams)
             ? (v as any).teams
             : [];
 
@@ -223,7 +223,7 @@ export function VolunteersPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1">
-                {safeAreas.map((area) => (
+                {(safeAreas || []).map((area) => (
                   <Badge key={area} variant="secondary" className="text-[10px] font-normal">
                     {area}
                   </Badge>
@@ -307,12 +307,12 @@ export function VolunteersPage() {
                   </TabsList>
 
                   <TabsContent value="shifts" className="mt-4 space-y-3">
-                    {activeAssignments.length === 0 ? (
+                    {(activeAssignments || []).length === 0 ? (
                       <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg">
                         No upcoming rostered shifts.
                       </div>
                     ) : (
-                      activeAssignments.map((a) => {
+                      (activeAssignments || []).map((a) => {
                         const isBlackedOut = activeBlackouts.includes(a.date);
                         const formattedDate = safeFormatDate(a.date, "EEEE, d MMM yyyy");
 
@@ -385,12 +385,12 @@ export function VolunteersPage() {
                         Currently Blocked Out Dates:
                       </div>
 
-                      {activeBlackouts.length === 0 ? (
+                      {(activeBlackouts || []).length === 0 ? (
                         <div className="text-xs text-center py-6 text-muted-foreground border border-dashed rounded-lg">
                           No blackout dates set for {selectedVolunteer.full_name}.
                         </div>
                       ) : (
-                        [...activeBlackouts].sort().map((dateStr) => {
+                        [...(activeBlackouts || [])].sort().map((dateStr) => {
                           const formattedLabel = safeFormatDate(dateStr, "EEEE, d MMMM yyyy");
 
                           return (
