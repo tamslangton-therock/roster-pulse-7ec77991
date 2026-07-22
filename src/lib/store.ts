@@ -110,6 +110,14 @@ interface State {
   addTeam: (team_name: string, area: string) => void;
   removeTeam: (id: string) => void;
   reseed: () => void;
+  updateTeam: (teamId: string, updates: Partial<Team>) => void;
+  // Implementation inside store creator:
+updateTeam: (teamId, updates) =>
+  set((state) => ({
+    teams: state.teams.map((t) =>
+      t.id === teamId ? { ...t, ...updates } : t
+    ),
+  })),
 }
 
 export const useRoster = create<State>()(
