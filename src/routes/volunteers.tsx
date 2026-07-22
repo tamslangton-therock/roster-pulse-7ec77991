@@ -47,7 +47,7 @@ export const Route = createFileRoute("/volunteers")({
   component: VolunteersPage,
 });
 
-// Helper function to safely format dates without throwing runtime render exceptions
+// Safe date parser to avoid runtime crashes from invalid date strings
 function safeFormatDate(dateStr: string, formatPattern: string): string {
   if (!dateStr) return "";
   try {
@@ -56,7 +56,7 @@ function safeFormatDate(dateStr: string, formatPattern: string): string {
       return format(parsed, formatPattern);
     }
   } catch (e) {
-    // Return raw date string if parsing fails
+    // Ignore error and return string as-is
   }
   return dateStr;
 }
@@ -64,43 +64,34 @@ function safeFormatDate(dateStr: string, formatPattern: string): string {
 export function VolunteersPage() {
   const store = useRoster();
 
-  // Safely extract properties from store
+  // Safely fallback arrays if store values are undefined
   const volunteers = store?.volunteers || [];
   const assignments = store?.assignments || [];
   const updateVolunteer = store?.updateVolunteer || (() => {});
 
-  // Fallback local blackout state
-  const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({
-    "tamara langton": ["2026-08-02", "2026-08-16"],
-  });
-
-  // UI State
+  // Local state fallbacks
+  const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [activeTab, setActiveTab] = useState("shifts");
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
 
-  // Helper to retrieve blackout dates safely
   const getBlackoutDates = (volunteerName?: string): string[] => {
     if (!volunteerName) return [];
     const key = volunteerName.toLowerCase();
 
-    // 1. Check if dates exist directly on volunteer object
     const vol = volunteers.find((v) => v?.full_name?.toLowerCase() === key);
     if (vol?.blackout_dates && Array.isArray(vol.blackout_dates)) {
       return vol.blackout_dates;
     }
 
-    // 2. Check store's blackoutsMap if present
     if (store?.blackoutsMap && store.blackoutsMap[key]) {
       return store.blackoutsMap[key];
     }
 
-    // 3. Local fallback
     return localBlackouts[key] || [];
   };
 
-  // Helper to toggle a blackout date
   const toggleBlackout = (volunteerName: string, dateStr: string) => {
     if (!volunteerName || !dateStr) return;
     const key = volunteerName.toLowerCase();
@@ -118,7 +109,7 @@ export function VolunteersPage() {
     }
   };
 
-  // Filtered Volunteers List with safe checks
+  // Safe search filter preventing undefined .map() / .some() errors
   const filteredVolunteers = useMemo(() => {
     return (volunteers || []).filter((v) => {
       if (!v) return false;
@@ -127,19 +118,21 @@ export function VolunteersPage() {
       const emailMatch = v.email ? v.email.toLowerCase().includes(q) : false;
       const phoneMatch = v.phone ? v.phone.toLowerCase().includes(q) : false;
 
-      // Safe area check (handles missing serving_areas array)
-      const servingAreas = Array.isArray(v.serving_areas) ? v.serving_areas : [];
-      const areaMatch = servingAreas.some((area) => area && area.toLowerCase().includes(q));
+      // Safe array extraction
+      const areas = Array.isArray(v.serving_areas)
+        ? v.serving_areas
+        : Array.isArray((v as any).teams)
+        ? (v as any).teams
+        : [];
 
-      // Safe team check (handles missing teams array)
-      const teamsList = Array.isArray((v as any).teams) ? (v as any).teams : [];
-      const teamMatch = teamsList.some((t: string) => t && t.toLowerCase().includes(q));
+      const areaMatch = areas.some((area: string) =>
+        area ? area.toLowerCase().includes(q) : false
+      );
 
-      return nameMatch || emailMatch || phoneMatch || areaMatch || teamMatch;
+      return nameMatch || emailMatch || phoneMatch || areaMatch;
     });
   }, [volunteers, searchQuery]);
 
-  // Assignments for selected volunteer
   const activeAssignments = useMemo(() => {
     if (!selectedVolunteer?.full_name) return [];
     const target = selectedVolunteer.full_name.toLowerCase();
@@ -148,7 +141,6 @@ export function VolunteersPage() {
     );
   }, [assignments, selectedVolunteer]);
 
-  // Blackout dates for selected volunteer
   const activeBlackouts = useMemo(() => {
     if (!selectedVolunteer?.full_name) return [];
     return getBlackoutDates(selectedVolunteer.full_name);
@@ -169,7 +161,7 @@ export function VolunteersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
@@ -194,7 +186,7 @@ export function VolunteersPage() {
         </div>
       </div>
 
-      {/* Volunteer Grid */}
+      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVolunteers.map((v) => {
           const vName = v.full_name || "Volunteer";
@@ -203,12 +195,9 @@ export function VolunteersPage() {
           );
           const vBlackouts = getBlackoutDates(vName);
 
-          // Safely resolve serving areas or teams without crashing if undefined
-          const badgesList: string[] = Array.isArray(v.serving_areas) && v.serving_areas.length > 0
-            ? v.serving_areas
-            : Array.isArray((v as any).teams)
-            ? (v as any).teams
-            : [];
+          // SAFE RESOLUTION FOR SERVING AREAS / TEAMS
+          const rawAreas = v?.serving_areas ?? (v as any)?.teams;
+          const safeAreas: string[] = Array.isArray(rawAreas) ? rawAreas : [];
 
           return (
             <div
@@ -237,11 +226,11 @@ export function VolunteersPage() {
                 )}
               </div>
 
-              {/* Serving Areas / Badges */}
+              {/* Safe Badges Rendering */}
               <div className="mt-3 flex flex-wrap gap-1">
-                {(badgesList || []).map((badgeText) => (
-                  <Badge key={badgeText} variant="secondary" className="text-[10px] font-normal">
-                    {badgeText}
+                {safeAreas.map((area) => (
+                  <Badge key={area} variant="secondary" className="text-[10px] font-normal">
+                    {area}
                   </Badge>
                 ))}
               </div>
@@ -263,7 +252,7 @@ export function VolunteersPage() {
         })}
       </div>
 
-      {/* Volunteer Details Sheet */}
+      {/* Details Sheet */}
       <Sheet
         open={!!selectedVolunteer}
         onOpenChange={(open) => !open && setSelectedVolunteer(null)}
@@ -279,7 +268,6 @@ export function VolunteersPage() {
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
-                {/* Roster Pause/Resume Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
                   <div className="space-y-0.5">
                     <div className="text-sm font-medium">Roster Status</div>
@@ -314,7 +302,6 @@ export function VolunteersPage() {
                   </Button>
                 </div>
 
-                {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="shifts" className="text-xs">
@@ -325,7 +312,6 @@ export function VolunteersPage() {
                     </TabsTrigger>
                   </TabsList>
 
-                  {/* Shifts Tab */}
                   <TabsContent value="shifts" className="mt-4 space-y-3">
                     {activeAssignments.length === 0 ? (
                       <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg">
@@ -367,7 +353,6 @@ export function VolunteersPage() {
                     )}
                   </TabsContent>
 
-                  {/* Blackouts Tab */}
                   <TabsContent value="blackouts" className="mt-4 space-y-4">
                     <div className="p-3 rounded-lg border bg-purple-500/5 space-y-3">
                       <Label className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
