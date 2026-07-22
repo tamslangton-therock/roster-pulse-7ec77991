@@ -6,6 +6,8 @@ export type FatigueStatus =
   | "paused"
   | "inactive";
 
+export type RosterStatus = "approved" | "declined" | "pending" | "tentative";
+
 export interface Volunteer {
   id: string;
   full_name: string;
@@ -38,4 +40,5 @@ export interface Assignment {
   team_name?: string;
   is_override: boolean;
   notes?: string;
+  status?: RosterStatus; // <-- Added to persist status changes on the roster
 }
