@@ -80,7 +80,7 @@ export function VolunteersPage() {
   const [activeTab, setActiveTab] = useState("shifts");
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
 
-  // Helper to retrieve blackout dates for a volunteer name safely
+  // Helper to retrieve blackout dates safely
   const getBlackoutDates = (volunteerName?: string): string[] => {
     if (!volunteerName) return [];
     const key = volunteerName.toLowerCase();
@@ -118,21 +118,24 @@ export function VolunteersPage() {
     }
   };
 
-  // Filtered Volunteers List
+  // Filtered Volunteers List with safe checks
   const filteredVolunteers = useMemo(() => {
-    return volunteers.filter((v) => {
+    return (volunteers || []).filter((v) => {
       if (!v) return false;
       const q = searchQuery.toLowerCase();
       const nameMatch = v.full_name ? v.full_name.toLowerCase().includes(q) : false;
       const emailMatch = v.email ? v.email.toLowerCase().includes(q) : false;
       const phoneMatch = v.phone ? v.phone.toLowerCase().includes(q) : false;
 
-      // Safe area check
-      const areaMatch = Array.isArray(v.serving_areas)
-        ? v.serving_areas.some((area) => area.toLowerCase().includes(q))
-        : false;
+      // Safe area check (handles missing serving_areas array)
+      const servingAreas = Array.isArray(v.serving_areas) ? v.serving_areas : [];
+      const areaMatch = servingAreas.some((area) => area && area.toLowerCase().includes(q));
 
-      return nameMatch || emailMatch || phoneMatch || areaMatch;
+      // Safe team check (handles missing teams array)
+      const teamsList = Array.isArray((v as any).teams) ? (v as any).teams : [];
+      const teamMatch = teamsList.some((t: string) => t && t.toLowerCase().includes(q));
+
+      return nameMatch || emailMatch || phoneMatch || areaMatch || teamMatch;
     });
   }, [volunteers, searchQuery]);
 
@@ -140,7 +143,7 @@ export function VolunteersPage() {
   const activeAssignments = useMemo(() => {
     if (!selectedVolunteer?.full_name) return [];
     const target = selectedVolunteer.full_name.toLowerCase();
-    return assignments.filter(
+    return (assignments || []).filter(
       (a) => a?.person_name && a.person_name.toLowerCase() === target
     );
   }, [assignments, selectedVolunteer]);
@@ -195,11 +198,17 @@ export function VolunteersPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVolunteers.map((v) => {
           const vName = v.full_name || "Volunteer";
-          const vAssignments = assignments.filter(
+          const vAssignments = (assignments || []).filter(
             (a) => a?.person_name?.toLowerCase() === vName.toLowerCase()
           );
           const vBlackouts = getBlackoutDates(vName);
-          const servingAreas = Array.isArray(v.serving_areas) ? v.serving_areas : [];
+
+          // Safely resolve serving areas or teams without crashing if undefined
+          const badgesList: string[] = Array.isArray(v.serving_areas) && v.serving_areas.length > 0
+            ? v.serving_areas
+            : Array.isArray((v as any).teams)
+            ? (v as any).teams
+            : [];
 
           return (
             <div
@@ -228,11 +237,11 @@ export function VolunteersPage() {
                 )}
               </div>
 
-              {/* Serving Areas */}
+              {/* Serving Areas / Badges */}
               <div className="mt-3 flex flex-wrap gap-1">
-                {servingAreas.map((area) => (
-                  <Badge key={area} variant="secondary" className="text-[10px] font-normal">
-                    {area}
+                {(badgesList || []).map((badgeText) => (
+                  <Badge key={badgeText} variant="secondary" className="text-[10px] font-normal">
+                    {badgeText}
                   </Badge>
                 ))}
               </div>
