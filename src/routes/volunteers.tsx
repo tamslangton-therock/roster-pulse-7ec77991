@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Component, type ReactNode } from "react";
 import { format, parseISO, isValid } from "date-fns";
 import {
   Users,
@@ -10,6 +10,7 @@ import {
   PauseCircle,
   PlayCircle,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
@@ -33,6 +34,33 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+// Simple inline boundary to capture render crashes locally
+class SafeBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center space-y-4">
+          <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
+          <h2 className="text-lg font-semibold">Unable to display volunteer list</h2>
+          <p className="text-sm text-muted-foreground">
+            Some volunteer data is incomplete or corrupted.
+          </p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Reload Page
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
     meta: [
@@ -44,8 +72,16 @@ export const Route = createFileRoute("/volunteers")({
       },
     ],
   }),
-  component: VolunteersPage,
+  component: VolunteersRouteWrapper,
 });
+
+function VolunteersRouteWrapper() {
+  return (
+    <SafeBoundary>
+      <VolunteersPage />
+    </SafeBoundary>
+  );
+}
 
 function safeFormatDate(dateStr?: string, formatPattern?: string): string {
   if (!dateStr || !formatPattern) return "";
@@ -63,6 +99,7 @@ function safeFormatDate(dateStr?: string, formatPattern?: string): string {
 export function VolunteersPage() {
   const store = useRoster();
 
+  // Protect store getters against null/undefined
   const rawVolunteers = store?.volunteers;
   const volunteers = Array.isArray(rawVolunteers) ? rawVolunteers : [];
 
@@ -116,7 +153,7 @@ export function VolunteersPage() {
 
     return volunteers.filter((v) => {
       if (!v) return false;
-      const q = searchQuery.toLowerCase();
+      const q = (searchQuery || "").toLowerCase();
       const nameMatch = v?.full_name ? v.full_name.toLowerCase().includes(q) : false;
       const emailMatch = v?.email ? v.email.toLowerCase().includes(q) : false;
       const phoneMatch = v?.phone ? v.phone.toLowerCase().includes(q) : false;
@@ -194,11 +231,14 @@ export function VolunteersPage() {
         {safeList.map((v) => {
           if (!v) return null;
           const vName = v?.full_name || "Volunteer";
-          
+
           const vAssignments = assignments.filter(
-            (a) => a?.person_name && typeof a.person_name === "string" && a.person_name.toLowerCase() === vName.toLowerCase()
+            (a) =>
+              a?.person_name &&
+              typeof a.person_name === "string" &&
+              a.person_name.toLowerCase() === vName.toLowerCase()
           );
-          
+
           const vBlackouts = getBlackoutDates(vName);
           const safeBlackouts = Array.isArray(vBlackouts) ? vBlackouts : [];
 
