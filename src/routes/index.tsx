@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
-import { AlertTriangle, Filter, Pause, RefreshCcw, UserPlus, Users } from "lucide-react";
+import { format, parseISO, isBefore, startOfDay } from "date-fns";
+import { AlertTriangle, Filter, Pause, RefreshCcw, UserPlus, Users, Eye, EyeOff } from "lucide-react";
 
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
@@ -55,6 +55,7 @@ function LiveRosterPage() {
   const { volunteers, assignments, dates } = useRoster();
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [showClashesOnly, setShowClashesOnly] = useState(false);
+  const [hidePastWeeks, setHidePastWeeks] = useState(true);
   const [swapTarget, setSwapTarget] = useState<Assignment | null>(null);
   const [clashDetail, setClashDetail] = useState<{
     date: string;
@@ -84,7 +85,21 @@ function LiveRosterPage() {
     return Array.from(s).sort();
   }, [dates]);
 
-  const shownDates = dates.filter((d) => filterMonth === "all" || d.startsWith(filterMonth));
+  const today = useMemo(() => startOfDay(new Date()), []);
+
+  const shownDates = useMemo(() => {
+    return dates.filter((d) => {
+      const matchesMonth = filterMonth === "all" || d.startsWith(filterMonth);
+      if (!matchesMonth) return false;
+
+      if (hidePastWeeks) {
+        const dateObj = parseISO(d);
+        if (isBefore(dateObj, today)) return false;
+      }
+
+      return true;
+    });
+  }, [dates, filterMonth, hidePastWeeks, today]);
 
   const pausedNames = new Set(
     volunteers.filter((v) => v.is_paused).map((v) => v.full_name.toLowerCase()),
@@ -100,7 +115,7 @@ function LiveRosterPage() {
             <span className="text-status-red-foreground font-medium">{clashes.length} clashes</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={filterMonth} onValueChange={setFilterMonth}>
@@ -117,7 +132,19 @@ function LiveRosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <label className="flex items-center gap-2 text-sm">
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <Checkbox
+              checked={hidePastWeeks}
+              onCheckedChange={(v) => setHidePastWeeks(!!v)}
+            />
+            <span className="flex items-center gap-1">
+              {hidePastWeeks ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
+              Hide past weeks
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <Checkbox
               checked={showClashesOnly}
               onCheckedChange={(v) => setShowClashesOnly(!!v)}
@@ -146,95 +173,103 @@ function LiveRosterPage() {
               </tr>
             </thead>
             <tbody>
-              {shownDates.map((d) => {
-                const rowHasClash = clashes.some((c) => c.date === d);
-                if (showClashesOnly && !rowHasClash) return null;
-                return (
-                  <tr key={d} className="hover:bg-muted/30">
-                    <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span>{format(parseISO(d), "d MMM")}</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {format(parseISO(d), "EEEE")}
-                        </span>
-                      </div>
-                    </td>
-                    {columns.map((c) => {
-                      const list = cellMap.get(`${d}||${c.label}`) || [];
-                      return (
-                        <td key={c.label} className="border-b p-2 align-top">
-                          <div className="flex flex-col gap-1">
-                            {list.map((a) => {
-                              const paused = pausedNames.has(a.person_name.toLowerCase());
-                              const isClash = clashKey.has(
-                                `${a.date}||${a.person_name.toLowerCase()}`,
-                              );
-                              const overridden = clashKey.get(
-                                `${a.date}||${a.person_name.toLowerCase()}`,
-                              );
-                              return (
-                                <button
-                                  key={a.id}
-                                  onClick={() => {
-                                    if (isClash) {
-                                      const items = assignments.filter(
-                                        (x) =>
-                                          x.date === a.date &&
-                                          x.person_name.toLowerCase() ===
-                                            a.person_name.toLowerCase(),
-                                      );
-                                      setClashDetail({
-                                        date: a.date,
-                                        person: a.person_name,
-                                        items,
-                                      });
-                                    } else {
-                                      setSwapTarget(a);
+              {shownDates.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="text-center py-8 text-muted-foreground">
+                    No Sundays match the current filters.
+                  </td>
+                </tr>
+              ) : (
+                shownDates.map((d) => {
+                  const rowHasClash = clashes.some((c) => c.date === d);
+                  if (showClashesOnly && !rowHasClash) return null;
+                  return (
+                    <tr key={d} className="hover:bg-muted/30">
+                      <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span>{format(parseISO(d), "d MMM")}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {format(parseISO(d), "EEEE")}
+                          </span>
+                        </div>
+                      </td>
+                      {columns.map((c) => {
+                        const list = cellMap.get(`${d}||${c.label}`) || [];
+                        return (
+                          <td key={c.label} className="border-b p-2 align-top">
+                            <div className="flex flex-col gap-1">
+                              {list.map((a) => {
+                                const paused = pausedNames.has(a.person_name.toLowerCase());
+                                const isClash = clashKey.has(
+                                  `${a.date}||${a.person_name.toLowerCase()}`,
+                                );
+                                const overridden = clashKey.get(
+                                  `${a.date}||${a.person_name.toLowerCase()}`,
+                                );
+                                return (
+                                  <button
+                                    key={a.id}
+                                    onClick={() => {
+                                      if (isClash) {
+                                        const items = assignments.filter(
+                                          (x) =>
+                                            x.date === a.date &&
+                                            x.person_name.toLowerCase() ===
+                                              a.person_name.toLowerCase(),
+                                        );
+                                        setClashDetail({
+                                          date: a.date,
+                                          person: a.person_name,
+                                          items,
+                                        });
+                                      } else {
+                                        setSwapTarget(a);
+                                      }
+                                    }}
+                                    className={cn(
+                                      "text-left rounded-md px-2 py-1 text-xs transition border border-transparent",
+                                      paused
+                                        ? "bg-status-amber text-status-amber-foreground"
+                                        : isClash && !overridden
+                                          ? "bg-status-red text-status-red-foreground"
+                                          : isClash && overridden
+                                            ? "bg-status-blue text-status-blue-foreground"
+                                            : "bg-muted hover:bg-accent",
+                                    )}
+                                    title={
+                                      paused
+                                        ? "Paused — needs replacement"
+                                        : isClash
+                                          ? "Clash detected"
+                                          : "Click to swap"
                                     }
-                                  }}
-                                  className={cn(
-                                    "text-left rounded-md px-2 py-1 text-xs transition border border-transparent",
-                                    paused
-                                      ? "bg-status-amber text-status-amber-foreground"
-                                      : isClash && !overridden
-                                        ? "bg-status-red text-status-red-foreground"
-                                        : isClash && overridden
-                                          ? "bg-status-blue text-status-blue-foreground"
-                                          : "bg-muted hover:bg-accent",
-                                  )}
-                                  title={
-                                    paused
-                                      ? "Paused — needs replacement"
-                                      : isClash
-                                        ? "Clash detected"
-                                        : "Click to swap"
-                                  }
-                                >
-                                  <div className="flex items-center gap-1 font-medium">
-                                    {paused && <Pause className="h-3 w-3" />}
-                                    {isClash && <AlertTriangle className="h-3 w-3" />}
-                                    <span className="truncate">{a.person_name}</span>
-                                  </div>
-                                  {paused && (
-                                    <div className="text-[10px] opacity-80 mt-0.5">
-                                      Needs replacement
+                                  >
+                                    <div className="flex items-center gap-1 font-medium">
+                                      {paused && <Pause className="h-3 w-3" />}
+                                      {isClash && <AlertTriangle className="h-3 w-3" />}
+                                      <span className="truncate">{a.person_name}</span>
                                     </div>
-                                  )}
-                                  {isClash && (
-                                    <div className="text-[10px] opacity-80 mt-0.5">
-                                      {overridden ? "Exception allowed" : "Clash alert"}
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+                                    {paused && (
+                                      <div className="text-[10px] opacity-80 mt-0.5">
+                                        Needs replacement
+                                      </div>
+                                    )}
+                                    {isClash && (
+                                      <div className="text-[10px] opacity-80 mt-0.5">
+                                        {overridden ? "Exception allowed" : "Clash alert"}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
