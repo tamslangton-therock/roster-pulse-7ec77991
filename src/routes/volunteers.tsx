@@ -83,7 +83,7 @@ export function VolunteersPage() {
     }
 
     if (store?.blackoutsMap && store.blackoutsMap[key]) {
-      return store.blackoutsMap[key];
+      return store.blackoutsMap[key] || [];
     }
 
     return localBlackouts[key] || [];
@@ -107,7 +107,9 @@ export function VolunteersPage() {
   };
 
   const filteredVolunteers = useMemo(() => {
-    return (volunteers || []).filter((v) => {
+    if (!Array.isArray(volunteers)) return [];
+    
+    return volunteers.filter((v) => {
       if (!v) return false;
       const q = searchQuery.toLowerCase();
       const nameMatch = v.full_name ? v.full_name.toLowerCase().includes(q) : false;
@@ -129,9 +131,9 @@ export function VolunteersPage() {
   }, [volunteers, searchQuery]);
 
   const activeAssignments = useMemo(() => {
-    if (!selectedVolunteer?.full_name) return [];
+    if (!selectedVolunteer?.full_name || !Array.isArray(assignments)) return [];
     const target = selectedVolunteer.full_name.toLowerCase();
-    return (assignments || []).filter(
+    return assignments.filter(
       (a) => a?.person_name && a.person_name.toLowerCase() === target
     );
   }, [assignments, selectedVolunteer]);
@@ -184,10 +186,19 @@ export function VolunteersPage() {
         {(filteredVolunteers || []).map((v) => {
           if (!v) return null;
           const vName = v.full_name || "Volunteer";
-          const vAssignments = (assignments || []).filter(
+          
+          const safeAssignments = Array.isArray(assignments) ? assignments : [];
+          const vAssignments = safeAssignments.filter(
             (a) => a?.person_name?.toLowerCase() === vName.toLowerCase()
           );
-          const vBlackouts = getBlackoutDates(vName);
+          
+          const vBlackouts = getBlackoutDates(vName) || [];
+
+          const safeAreas: string[] = Array.isArray(v.serving_areas)
+            ? v.serving_areas
+            : Array.isArray((v as any)?.teams)
+            ? (v as any).teams
+            : [];
 
           return (
             <div
@@ -217,7 +228,7 @@ export function VolunteersPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1">
-                {(v?.serving_areas || []).map((area) => (
+                {safeAreas.map((area) => (
                   <Badge key={area} variant="secondary" className="text-[10px] font-normal">
                     {area}
                   </Badge>
