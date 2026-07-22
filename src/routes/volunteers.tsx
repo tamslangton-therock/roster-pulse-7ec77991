@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Check, Edit2, Plus, Trash2, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
@@ -202,6 +202,12 @@ function VolunteerCard({
   const [editName, setEditName] = useState(volunteer.full_name);
   const [editMax, setEditMax] = useState(volunteer.max_serves_per_month);
   const [newAreaPick, setNewAreaPick] = useState("");
+
+  // Sync internal edit state if volunteer prop changes
+  useEffect(() => {
+    setEditName(volunteer.full_name);
+    setEditMax(volunteer.max_serves_per_month);
+  }, [volunteer.full_name, volunteer.max_serves_per_month]);
 
   const handleSave = () => {
     if (!editName.trim()) return;
