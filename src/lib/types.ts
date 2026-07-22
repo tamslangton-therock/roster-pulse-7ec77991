@@ -18,7 +18,6 @@ export interface Volunteer {
   priority_area: string;
   is_paused: boolean;
   notes: string;
-  blackout_dates?: string[];
 }
 
 export interface Team {
@@ -30,8 +29,12 @@ export interface Team {
 
 export interface Assignment {
   id: string;
-  date: string; // "YYYY-MM-DD"
+  date: string; // ISO YYYY-MM-DD
   area: string;
-  label: string;
+  role: string; // sub-role label
+  label: string; // combined area — role
   person_name: string;
+  team_name?: string;
+  is_override: boolean;
+  notes?: string;
 }
