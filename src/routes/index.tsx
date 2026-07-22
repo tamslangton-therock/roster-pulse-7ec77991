@@ -54,20 +54,14 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Interactive Sunday roster grid with clash detection, status badges, paused-member alerts, and smart swaps.",
-      },
-      { property: "og:title", content: "Live Roster — Roster Pulse" },
-      {
-        property: "og:description",
-        content:
-          "Interactive Sunday roster grid with clash detection, status badges, paused-member alerts, and smart swaps.",
+          "Interactive Sunday roster grid with status switcher, clash detection, and smart swaps.",
       },
     ],
   }),
   component: LiveRosterPage,
 });
 
-type AssignmentStatus = "pending" | "reminder_sent" | "declined" | "confirmed";
+export type AssignmentStatus = "pending" | "reminder_sent" | "declined" | "confirmed";
 
 function LiveRosterPage() {
   const { volunteers, assignments, dates } = useRoster();
@@ -81,18 +75,18 @@ function LiveRosterPage() {
     items: Assignment[];
   } | null>(null);
 
-  // Local state map to track assignment status updates per assignment ID
-  const [statuses, setStatuses] = useState<Record<string, AssignmentStatus>>({});
+  // Status mapping stored by assignment ID
+  const [statusMap, setStatusMap] = useState<Record<string, AssignmentStatus>>({});
 
-  const handleStatusChange = (assignmentId: string, status: AssignmentStatus) => {
-    setStatuses((prev) => ({ ...prev, [assignmentId]: status }));
+  const setAssignmentStatus = (id: string, status: AssignmentStatus) => {
+    setStatusMap((prev) => ({ ...prev, [id]: status }));
     const labels: Record<AssignmentStatus, string> = {
       pending: "Pending",
       reminder_sent: "Reminder Sent",
       declined: "Declined",
       confirmed: "Confirmed",
     };
-    toast.info(`Updated status to ${labels[status]}`);
+    toast.success(`Set status to ${labels[status]}`);
   };
 
   const cellMap = useMemo(() => assignmentsByCell(assignments), [assignments]);
@@ -142,7 +136,7 @@ function LiveRosterPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Live Roster</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {shownDates.length} Sundays · {assignments.length} assignments ·{" "}
-            <span className="text-status-red-foreground font-medium">{clashes.length} clashes</span>
+            <span className="text-red-500 font-medium">{clashes.length} clashes</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -191,15 +185,15 @@ function LiveRosterPage() {
       <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 bg-muted/60 backdrop-blur z-10">
+            <thead className="sticky top-0 bg-muted/80 backdrop-blur z-10">
               <tr>
-                <th className="sticky left-0 z-20 bg-muted/80 backdrop-blur border-b border-r p-3 text-left font-medium w-[140px]">
+                <th className="sticky left-0 z-20 bg-muted border-b border-r p-3 text-left font-medium w-[140px]">
                   Date
                 </th>
                 {columns.map((c) => (
                   <th
                     key={c.label}
-                    className="border-b p-2 text-left font-medium text-xs text-muted-foreground min-w-[150px] whitespace-nowrap"
+                    className="border-b p-2 text-left font-medium text-xs text-muted-foreground min-w-[160px] whitespace-nowrap"
                   >
                     {c.label}
                   </th>
@@ -218,7 +212,7 @@ function LiveRosterPage() {
                   const rowHasClash = clashes.some((c) => c.date === d);
                   if (showClashesOnly && !rowHasClash) return null;
                   return (
-                    <tr key={d} className="hover:bg-muted/30">
+                    <tr key={d} className="hover:bg-muted/20">
                       <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
                         <div className="flex flex-col">
                           <span>{format(parseISO(`${d}T12:00:00`), "d MMM")}</span>
@@ -240,19 +234,19 @@ function LiveRosterPage() {
                                 const overridden = clashKey.get(
                                   `${a.date}||${a.person_name.toLowerCase()}`,
                                 );
-                                const status = statuses[a.id] || "pending";
+                                // Read status from local state or fallback to assignment.status if present
+                                const currentStatus: AssignmentStatus =
+                                  statusMap[a.id] || (a as any).status || "pending";
 
                                 return (
-                                  <RosterCellBadge
+                                  <StatusCellBadge
                                     key={a.id}
                                     assignment={a}
-                                    status={status}
+                                    status={currentStatus}
                                     paused={paused}
                                     isClash={isClash}
                                     overridden={overridden}
-                                    onStatusChange={(newStatus) =>
-                                      handleStatusChange(a.id, newStatus)
-                                    }
+                                    onStatusChange={(s) => setAssignmentStatus(a.id, s)}
                                     onSelectSwap={() => setSwapTarget(a)}
                                     onSelectClash={() => {
                                       const items = assignments.filter(
@@ -290,11 +284,10 @@ function LiveRosterPage() {
 }
 
 /**
- * Custom Roster Cell Badge Component
- * Handles status color switching (Gray, Yellow, Red, Green)
- * and direct replacement triggers.
+ * High-Visibility Status Badge
+ * Explicit colors ensure the state visually changes immediately on switch.
  */
-function RosterCellBadge({
+function StatusCellBadge({
   assignment,
   status,
   paused,
@@ -313,52 +306,55 @@ function RosterCellBadge({
   onSelectSwap: () => void;
   onSelectClash: () => void;
 }) {
-  // Determine badge styling based on priority: Paused / Clash > Status
+  // Explicit background & text colors for clear contrast
   const getBadgeStyle = () => {
-    if (paused) return "bg-status-amber text-status-amber-foreground border-amber-300";
-    if (isClash && !overridden)
-      return "bg-status-red text-status-red-foreground border-red-300";
-    if (isClash && overridden)
-      return "bg-status-blue text-status-blue-foreground border-blue-300";
+    if (paused) {
+      return "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40";
+    }
+    if (isClash && !overridden) {
+      return "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/40";
+    }
+    if (isClash && overridden) {
+      return "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/40";
+    }
 
     switch (status) {
       case "reminder_sent":
-        return "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200";
+        return "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200";
       case "declined":
-        return "bg-red-100 text-red-900 border-red-300 dark:bg-red-950 dark:text-red-200";
+        return "bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-200";
       case "confirmed":
-        return "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200";
+        return "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200";
       case "pending":
       default:
-        return "bg-muted text-muted-foreground border-border hover:bg-accent/80";
+        return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300";
     }
   };
 
-  const getStatusIcon = () => {
-    if (paused) return <Pause className="h-3 w-3" />;
-    if (isClash) return <AlertTriangle className="h-3 w-3" />;
+  const getIcon = () => {
+    if (paused) return <Pause className="h-3 w-3 text-amber-600" />;
+    if (isClash) return <AlertTriangle className="h-3 w-3 text-red-600" />;
 
     switch (status) {
       case "reminder_sent":
-        return <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />;
+        return <Clock className="h-3 w-3 text-amber-600" />;
       case "declined":
-        return <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />;
+        return <XCircle className="h-3 w-3 text-red-600" />;
       case "confirmed":
-        return <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />;
+        return <CheckCircle2 className="h-3 w-3 text-emerald-600" />;
       case "pending":
       default:
-        return <HelpCircle className="h-3 w-3 opacity-60" />;
+        return <HelpCircle className="h-3 w-3 text-gray-400" />;
     }
   };
 
   return (
     <div
       className={cn(
-        "group relative flex items-center justify-between rounded-md border px-2 py-1 text-xs transition shadow-xs",
+        "group flex items-center justify-between rounded-md border px-2 py-1 text-xs transition-colors shadow-xs",
         getBadgeStyle(),
       )}
     >
-      {/* Click main body to swap or inspect clash */}
       <button
         type="button"
         onClick={() => {
@@ -368,44 +364,44 @@ function RosterCellBadge({
             onSelectSwap();
           }
         }}
-        className="flex-1 text-left font-medium truncate flex items-center gap-1.5 focus:outline-hidden"
+        className="flex-1 text-left font-medium truncate flex items-center gap-1.5 focus:outline-hidden cursor-pointer"
       >
-        {getStatusIcon()}
+        {getIcon()}
         <span className="truncate">{assignment.person_name}</span>
       </button>
 
-      {/* Quick Status Switcher Dropdown */}
+      {/* Dropdown Menu for Status Switcher */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-1 p-0.5 rounded-xs hover:bg-black/10 dark:hover:bg-white/10"
+            className="ml-1 p-0.5 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-opacity cursor-pointer"
             title="Change status"
           >
-            <ChevronDown className="h-3 w-3" />
+            <ChevronDown className="h-3 w-3 opacity-60 group-hover:opacity-100" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuContent align="end" className="w-40 z-50">
           <DropdownMenuItem onClick={() => onStatusChange("pending")}>
-            <HelpCircle className="h-3.5 w-3.5 mr-2 opacity-60" />
-            Pending (Gray)
+            <HelpCircle className="h-3.5 w-3.5 mr-2 text-gray-400" />
+            <span>Gray: Pending</span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onStatusChange("reminder_sent")}>
             <Clock className="h-3.5 w-3.5 mr-2 text-amber-500" />
-            Reminder (Yellow)
+            <span>Yellow: Reminder</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => {
               onStatusChange("declined");
-              onSelectSwap(); // Prompt smart swap automatically if declined
+              onSelectSwap(); // Open swap dialog automatically when declined
             }}
           >
             <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
-            Declined (Red)
+            <span>Red: Declined</span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onStatusChange("confirmed")}>
             <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-500" />
-            Confirmed (Green)
+            <span>Green: Confirmed</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -443,7 +439,7 @@ function SwapDialog({
             </DialogHeader>
 
             {partnerNames.length > 0 && (
-              <div className="rounded-lg bg-status-blue/50 text-status-blue-foreground p-3 text-xs">
+              <div className="rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 p-3 text-xs">
                 Partner link: <b>{partnerNames.join(", ")}</b> — consider rostering together.
               </div>
             )}
@@ -535,7 +531,7 @@ function ClashDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-status-red-foreground" />
+                <AlertTriangle className="h-4 w-4 text-red-500" />
                 Clash — {detail.person}
               </DialogTitle>
               <DialogDescription>
