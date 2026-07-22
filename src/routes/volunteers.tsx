@@ -1,25 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { format, parseISO, isAfter, startOfDay } from "date-fns";
-import { Search, UserCheck, Calendar, ShieldAlert } from "lucide-react";
-
-import { useRoster } from "@/lib/store";
-import { computeFatigue, upcomingForPerson } from "@/lib/roster-engine";
-import type { Volunteer } from "@/lib/types";
-import { StatusBadge } from "@/components/status-badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Users,
+  Search,
+  Plus,
+  Calendar,
+  CalendarX,
+  Clock,
+  Shield,
+  PauseCircle,
+  PlayCircle,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  X,
+  Edit2,
+} from "lucide-react";
+import { useRoster } from "@/lib/store";
+import type { Volunteer, Assignment } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -27,441 +35,361 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-const AREAS = [
-  "Welcome", "Car Park", "Count", "Tea", "Hosting", "Hang Tight", "Host",
-  "Barista", "Milk", "Shots", "Cashier", "Media", "Camera", "Sound",
-  "Egg & Bacon", "Kids", "Teens", "Worship", "Preach", "MC", "Lift",
-];
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
     meta: [
-      { title: "Volunteer Directory — Roster Pulse" },
+      { title: "Volunteers — Roster Pulse" },
       {
         name: "description",
         content:
-          "Searchable directory of volunteers with profiles, serving preferences, pause toggles, and upcoming assignments.",
-      },
-      { property: "og:title", content: "Volunteer Directory — Roster Pulse" },
-      {
-        property: "og:description",
-        content:
-          "Manage profiles, partners, serving areas, frequency preferences, and pause status.",
+          "Manage volunteer directory, skills, availability, and block out unavailable dates.",
       },
     ],
   }),
   component: VolunteersPage,
 });
 
-function VolunteersPage() {
-  const { volunteers, assignments } = useRoster();
-  const [q, setQ] = useState("");
-  const [areaFilter, setAreaFilter] = useState("all");
-  const [memberView, setMemberView] = useState(false);
-  const [selectedMemberId, setSelectedMemberId] = useState<string>("all");
-  const [selected, setSelected] = useState<Volunteer | null>(null);
+export function VolunteersPage() {
+  const { volunteers, assignments, dates, addVolunteer, updateVolunteer } =
+    useRoster();
 
-  const sortedVolunteers = useMemo(() => {
-    return [...volunteers].sort((a, b) => a.full_name.localeCompare(b.full_name));
-  }, [volunteers]);
+  // Local State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(
+    null
+  );
+  const [activeTab, setActiveTab] = useState("shifts");
+  const [newBlackoutDate, setNewBlackoutDate] = useState("");
 
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
+  // Filtered Volunteers
+  const filteredVolunteers = useMemo(() => {
     return volunteers.filter((v) => {
-      if (memberView && selectedMemberId !== "all" && v.id !== selectedMemberId) {
-        return false;
-      }
-      if (query && !v.full_name.toLowerCase().includes(query)) return false;
-      if (
-        areaFilter !== "all" &&
-        !v.serving_areas.some((a) => a.toLowerCase() === areaFilter.toLowerCase())
-      ) {
-        return false;
-      }
-      return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        v.full_name.toLowerCase().includes(q) ||
+        v.email.toLowerCase().includes(q) ||
+        v.teams.some((t) => t.toLowerCase().includes(q))
+      );
     });
-  }, [volunteers, q, areaFilter, memberView, selectedMemberId]);
+  }, [volunteers, searchQuery]);
+
+  // Assignments for active selected volunteer
+  const activeAssignments = useMemo(() => {
+    if (!selectedVolunteer) return [];
+    return assignments.filter(
+      (a) =>
+        a.person_name.toLowerCase() === selectedVolunteer.full_name.toLowerCase()
+    );
+  }, [assignments, selectedVolunteer]);
+
+  // Handle toggling blackout dates
+  const handleToggleBlackoutDate = (dateStr: string) => {
+    if (!selectedVolunteer) return;
+
+    const currentBlackouts = selectedVolunteer.blackout_dates || [];
+    const exists = currentBlackouts.includes(dateStr);
+
+    let updatedBlackouts: string[];
+    if (exists) {
+      updatedBlackouts = currentBlackouts.filter((d) => d !== dateStr);
+      toast.info(`Removed ${dateStr} from blocked out dates.`);
+    } else {
+      updatedBlackouts = [...currentBlackouts, dateStr].sort();
+      toast.success(`Blocked out ${dateStr} for ${selectedVolunteer.full_name}.`);
+    }
+
+    const updated = {
+      ...selectedVolunteer,
+      blackout_dates: updatedBlackouts,
+    };
+
+    updateVolunteer(updated);
+    setSelectedVolunteer(updated);
+  };
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Volunteers</h1>
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Users className="h-6 w-6 text-primary" />
+            Volunteer Directory
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {filtered.length} of {volunteers.length} people
+            Manage volunteer profiles, teams, workload, and block out unavailable dates.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-          {/* Member View Toggle */}
-          <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-card">
-            <UserCheck className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium">Member View</span>
-            <Switch
-              checked={memberView}
-              onCheckedChange={(val) => {
-                setMemberView(val);
-                if (!val) setSelectedMemberId("all");
-              }}
-            />
-          </div>
-
-          {memberView && (
-            <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select team member" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Members</SelectItem>
-                {sortedVolunteers.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <div className="relative flex-1 sm:w-[200px]">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="pl-9"
+              placeholder="Search volunteers or teams..."
+              className="pl-9 h-9 text-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-
-          <Select value={areaFilter} onValueChange={setAreaFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Serving area" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All areas</SelectItem>
-              {AREAS.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {a}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {filtered.map((v) => {
-          const f = computeFatigue(v, assignments);
-          const upcomingSlots = upcomingForPerson(v.full_name, assignments);
+      {/* Volunteer Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredVolunteers.map((v) => {
+          const vAssignments = assignments.filter(
+            (a) => a.person_name.toLowerCase() === v.full_name.toLowerCase()
+          );
+          const blackoutCount = v.blackout_dates?.length || 0;
+
           return (
-            <button
+            <div
               key={v.id}
-              onClick={() => setSelected(v)}
-              className="text-left rounded-xl border bg-card p-4 hover:shadow-md hover:border-ring/40 transition flex flex-col justify-between"
+              onClick={() => setSelectedVolunteer(v)}
+              className={cn(
+                "group relative rounded-xl border bg-card p-4 shadow-xs transition-all hover:border-primary/50 hover:shadow-md cursor-pointer",
+                v.is_paused && "opacity-60 bg-muted/30"
+              )}
             >
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{v.full_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {v.serving_areas.slice(0, 3).join(" · ") || "—"}
-                    </div>
-                  </div>
-                  <StatusBadge status={f.status} showEmoji />
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold text-base group-hover:text-primary transition-colors">
+                    {v.full_name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{v.email}</p>
                 </div>
-
-                {memberView && (
-                  <div className="mt-3 p-2 rounded-lg bg-muted/60 text-xs space-y-1">
-                    <div className="font-medium text-foreground flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-primary" />
-                      Next Serving:
-                    </div>
-                    {upcomingSlots.length > 0 ? (
-                      <div className="text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          {format(parseISO(upcomingSlots[0].date), "d MMM")}:
-                        </span>{" "}
-                        {upcomingSlots[0].label}
-                      </div>
-                    ) : (
-                      <div className="text-muted-foreground italic">No upcoming dates</div>
-                    )}
-                  </div>
+                {v.is_paused ? (
+                  <Badge variant="outline" className="border-amber-500/40 text-amber-700 bg-amber-500/10 text-[10px]">
+                    <PauseCircle className="h-3 w-3 mr-1" /> Paused
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px]">
+                    Active
+                  </Badge>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground pt-2 border-t border-border/40">
-                <span>4w: {f.last4}</span>
-                <span>8w: {f.last8}</span>
-                {v.partners.length > 0 && (
-                  <span className="truncate">💞 {v.partners[0]}</span>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {v.teams.map((t) => (
+                  <Badge key={t} variant="secondary" className="text-[10px] font-normal">
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+
+              <div className="mt-4 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {vAssignments.length} shifts
+                </span>
+                {blackoutCount > 0 && (
+                  <span className="flex items-center gap-1 text-purple-700 font-medium">
+                    <CalendarX className="h-3.5 w-3.5" />
+                    {blackoutCount} blocked date{blackoutCount > 1 ? "s" : ""}
+                  </span>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
 
-      <VolunteerSheet volunteer={selected} onClose={() => setSelected(null)} />
-    </div>
-  );
-}
+      {/* Volunteer Detail Sheet */}
+      <Sheet
+        open={!!selectedVolunteer}
+        onOpenChange={(open) => !open && setSelectedVolunteer(null)}
+      >
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          {selectedVolunteer && (
+            <>
+              <SheetHeader className="pb-4 border-b">
+                <SheetTitle className="text-xl font-bold flex items-center justify-between">
+                  <span>{selectedVolunteer.full_name}</span>
+                </SheetTitle>
+                <SheetDescription>{selectedVolunteer.email}</SheetDescription>
+              </SheetHeader>
 
-function VolunteerSheet({
-  volunteer,
-  onClose,
-}: {
-  volunteer: Volunteer | null;
-  onClose: () => void;
-}) {
-  const { assignments, updateVolunteer, togglePause, volunteers } = useRoster();
-  if (!volunteer) return null;
-
-  const upcoming = upcomingForPerson(volunteer.full_name, assignments);
-  const today = startOfDay(new Date());
-
-  const history = assignments
-    .filter((a) => a.person_name.toLowerCase() === volunteer.full_name.toLowerCase())
-    .filter((a) => !isAfter(parseISO(a.date), today))
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-  const fatigue = computeFatigue(volunteer, assignments);
-
-  return (
-    <Sheet open={!!volunteer} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg overflow-auto p-6">
-        <SheetHeader className="px-0">
-          <SheetTitle className="flex items-center gap-2">
-            {volunteer.full_name}
-            <StatusBadge status={fatigue.status} />
-          </SheetTitle>
-          <SheetDescription>Volunteer profile & serving schedule</SheetDescription>
-        </SheetHeader>
-
-        <div className="space-y-5 mt-4">
-          {/* Highlighted Schedule Card */}
-          <div className="rounded-xl border bg-card p-4 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-primary" />
-                Upcoming Schedule ({upcoming.length})
-              </span>
-              {volunteer.is_paused && (
-                <span className="text-xs bg-status-amber text-status-amber-foreground px-2 py-0.5 rounded font-medium flex items-center gap-1">
-                  <ShieldAlert className="h-3 w-3" />
-                  Paused
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              {upcoming.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-1">
-                  No upcoming assignments scheduled.
-                </div>
-              ) : (
-                upcoming.slice(0, 8).map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between text-xs rounded-lg border bg-muted/40 px-3 py-2"
-                  >
-                    <span className="font-medium">
-                      {format(parseISO(a.date), "EEE, d MMM yyyy")}
-                    </span>
-                    <span className="text-primary font-semibold truncate ml-2">
-                      {a.label}
-                    </span>
+              <div className="mt-6 space-y-6">
+                {/* Status Toggle */}
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium">Roster Status</div>
+                    <div className="text-xs text-muted-foreground">
+                      {selectedVolunteer.is_paused
+                        ? "Currently paused from automatic rostering"
+                        : "Active for rostering"}
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <section className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Email</Label>
-              <Input
-                value={volunteer.email || ""}
-                onChange={(e) => updateVolunteer(volunteer.id, { email: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Phone</Label>
-              <Input
-                value={volunteer.phone || ""}
-                onChange={(e) => updateVolunteer(volunteer.id, { phone: e.target.value })}
-              />
-            </div>
-          </section>
-
-          <section>
-            <Label className="text-xs">Partner link</Label>
-            <Select
-              value={volunteer.partners[0] || "__none"}
-              onValueChange={(val) =>
-                updateVolunteer(volunteer.id, {
-                  partners: val === "__none" ? [] : [val],
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select partner" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">— None —</SelectItem>
-                {volunteers
-                  .filter((v) => v.id !== volunteer.id)
-                  .map((v) => (
-                    <SelectItem key={v.id} value={v.full_name}>
-                      {v.full_name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </section>
-
-          <section>
-            <Label className="text-xs mb-2 block">Serving areas</Label>
-            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 border rounded-lg">
-              {AREAS.map((a) => {
-                const on = volunteer.serving_areas.some(
-                  (x) => x.toLowerCase() === a.toLowerCase(),
-                );
-                return (
-                  <label
-                    key={a}
-                    className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-muted/50 cursor-pointer"
+                  <Button
+                    size="sm"
+                    variant={selectedVolunteer.is_paused ? "default" : "outline"}
+                    onClick={() => {
+                      const updated = {
+                        ...selectedVolunteer,
+                        is_paused: !selectedVolunteer.is_paused,
+                      };
+                      updateVolunteer(updated);
+                      setSelectedVolunteer(updated);
+                      toast.success(
+                        `Updated status for ${selectedVolunteer.full_name}`
+                      );
+                    }}
                   >
-                    <Checkbox
-                      checked={on}
-                      onCheckedChange={() => {
-                        const areas = on
-                          ? volunteer.serving_areas.filter(
-                              (x) => x.toLowerCase() !== a.toLowerCase(),
-                            )
-                          : [...volunteer.serving_areas, a];
-                        updateVolunteer(volunteer.id, { serving_areas: areas });
-                      }}
-                    />
-                    <span className="truncate">{a}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Frequency preference</Label>
-              <Select
-                value={volunteer.frequency_preference}
-                onValueChange={(v) =>
-                  updateVolunteer(volunteer.id, { frequency_preference: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1x/month">1× per month</SelectItem>
-                  <SelectItem value="2x/month">2× per month</SelectItem>
-                  <SelectItem value="fortnight">Every fortnight</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Max per month</Label>
-              <Select
-                value={String(volunteer.max_serving_per_month)}
-                onValueChange={(v) =>
-                  updateVolunteer(volunteer.id, {
-                    max_serving_per_month: parseInt(v),
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </section>
-
-          <section>
-            <Label className="text-xs">Priority serving area</Label>
-            <Select
-              value={volunteer.priority_area || "__none"}
-              onValueChange={(v) =>
-                updateVolunteer(volunteer.id, {
-                  priority_area: v === "__none" ? "" : v,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select priority area" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">— None —</SelectItem>
-                {volunteer.serving_areas.map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {a}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </section>
-
-          <section className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
-            <div>
-              <div className="text-sm font-medium">Pause serving</div>
-              <div className="text-xs text-muted-foreground">
-                Away or sick — future slots get flagged as needing replacement.
-              </div>
-            </div>
-            <Switch
-              checked={volunteer.is_paused}
-              onCheckedChange={() => togglePause(volunteer.id)}
-            />
-          </section>
-
-          <section>
-            <Label className="text-xs">Notes</Label>
-            <Textarea
-              value={volunteer.notes}
-              onChange={(e) => updateVolunteer(volunteer.id, { notes: e.target.value })}
-              rows={2}
-            />
-          </section>
-
-          <section>
-            <div className="text-sm font-semibold mb-2">Past History ({history.length})</div>
-            <div className="space-y-1 max-h-36 overflow-auto">
-              {history.slice(0, 20).map((a) => (
-                <div
-                  key={a.id}
-                  className="flex justify-between text-xs rounded-md border px-2 py-1"
-                >
-                  <span>{format(parseISO(a.date), "d MMM yyyy")}</span>
-                  <span className="text-muted-foreground truncate">{a.label}</span>
+                    {selectedVolunteer.is_paused ? (
+                      <>
+                        <PlayCircle className="h-4 w-4 mr-1.5" /> Resume
+                      </>
+                    ) : (
+                      <>
+                        <PauseCircle className="h-4 w-4 mr-1.5" /> Pause
+                      </>
+                    )}
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </section>
 
-          <div className="flex justify-end pt-2">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+                {/* Tabs: Upcoming Dates & Block Out Dates */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="shifts" className="text-xs">
+                      Upcoming Shifts ({activeAssignments.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="blackouts" className="text-xs">
+                      Block Out Dates ({(selectedVolunteer.blackout_dates || []).length})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Upcoming Shifts Tab */}
+                  <TabsContent value="shifts" className="mt-4 space-y-3">
+                    {activeAssignments.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg">
+                        No upcoming rostered shifts.
+                      </div>
+                    ) : (
+                      activeAssignments.map((a) => {
+                        const isBlackedOut = (
+                          selectedVolunteer.blackout_dates || []
+                        ).includes(a.date);
+
+                        return (
+                          <div
+                            key={a.id}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-lg border text-xs",
+                              isBlackedOut
+                                ? "bg-purple-500/10 border-purple-500/30 text-purple-900"
+                                : "bg-card"
+                            )}
+                          >
+                            <div className="space-y-1">
+                              <div className="font-semibold flex items-center gap-1.5">
+                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                {format(parseISO(`${a.date}T12:00:00`), "EEEE, d MMM yyyy")}
+                              </div>
+                              <div className="text-muted-foreground">
+                                {a.area} — <span className="font-medium text-foreground">{a.label}</span>
+                              </div>
+                            </div>
+
+                            {isBlackedOut && (
+                              <Badge variant="outline" className="border-purple-500/40 text-purple-700 bg-purple-500/15">
+                                <CalendarX className="h-3 w-3 mr-1" /> Blackout Conflict
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </TabsContent>
+
+                  {/* Block Out Dates Tab */}
+                  <TabsContent value="blackouts" className="mt-4 space-y-4">
+                    <div className="p-3 rounded-lg border bg-purple-500/5 space-y-3">
+                      <Label className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
+                        <CalendarX className="h-4 w-4 text-purple-600" />
+                        Add Blackout Date
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Select dates {selectedVolunteer.full_name} cannot be rostered on. These will flag automatically on the live roster grid.
+                      </p>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Input
+                          type="date"
+                          value={newBlackoutDate}
+                          onChange={(e) => setNewBlackoutDate(e.target.value)}
+                          className="h-8 text-xs bg-background"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs shrink-0"
+                          disabled={!newBlackoutDate}
+                          onClick={() => {
+                            if (newBlackoutDate) {
+                              handleToggleBlackoutDate(newBlackoutDate);
+                              setNewBlackoutDate("");
+                            }
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Block Date
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* List of current Blackouts */}
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-muted-foreground">
+                        Currently Blocked Out Dates:
+                      </div>
+
+                      {(!selectedVolunteer.blackout_dates ||
+                        selectedVolunteer.blackout_dates.length === 0) ? (
+                        <div className="text-xs text-center py-6 text-muted-foreground border border-dashed rounded-lg">
+                          No blackout dates set for {selectedVolunteer.full_name}.
+                        </div>
+                      ) : (
+                        selectedVolunteer.blackout_dates.sort().map((dateStr) => (
+                          <div
+                            key={dateStr}
+                            className="flex items-center justify-between p-2.5 rounded-lg border bg-card text-xs"
+                          >
+                            <span className="font-medium">
+                              {format(
+                                parseISO(`${dateStr}T12:00:00`),
+                                "EEEE, d MMMM yyyy"
+                              )}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
+                              onClick={() => handleToggleBlackoutDate(dateStr)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
