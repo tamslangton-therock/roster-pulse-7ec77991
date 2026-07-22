@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
+import { z } from "zod";
 import {
   AlertTriangle,
   Filter,
@@ -14,7 +15,9 @@ import {
   HelpCircle,
   ChevronDown,
   Layers,
-  ShieldCheck,
+  Printer,
+  Share2,
+  Users,
 } from "lucide-react";
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
@@ -48,14 +51,22 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+// Zod schema for URL search parameters
+const rosterSearchSchema = z.object({
+  team: z.string().optional().default("all"),
+  month: z.string().optional().default("all"),
+  view: z.enum(["edit", "share"]).optional().default("edit"),
+});
+
 export const Route = createFileRoute("/")({
+  validateSearch: (search) => rosterSearchSchema.parse(search),
   head: () => ({
     meta: [
       { title: "Live Roster — Roster Pulse" },
       {
         name: "description",
         content:
-          "Interactive Sunday roster grid with status switcher, clash detection, and smart swaps.",
+          "Interactive Sunday roster grid with team filtering, shareable view, clash detection, and smart swaps.",
       },
     ],
   }),
@@ -74,8 +85,17 @@ interface VolunteerWorkloadStats {
 }
 
 function LiveRosterPage() {
+  const navigate = useNavigate({ from: Route.id });
+  const search = Route.useSearch();
+
   const { volunteers, assignments, dates } = useRoster();
-  const [filterMonth, setFilterMonth] = useState<string>("all");
+
+  // URL State
+  const selectedTeam = search.team || "all";
+  const filterMonth = search.month || "all";
+  const isShareView = search.view === "share";
+
+  // Local UI State
   const [showClashesOnly, setShowClashesOnly] = useState(false);
   const [hidePastWeeks, setHidePastWeeks] = useState(true);
   const [swapTarget, setSwapTarget] = useState<Assignment | null>(null);
@@ -90,6 +110,17 @@ function LiveRosterPage() {
     {}
   );
 
+  // Helper to update search params
+  const updateSearchParams = (updates: Partial<z.infer<typeof rosterSearchSchema>>) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        ...updates,
+      }),
+      replace: true,
+    });
+  };
+
   const setAssignmentStatus = (id: string, status: AssignmentStatus) => {
     setStatusMap((prev) => ({ ...prev, [id]: status }));
     const labels: Record<AssignmentStatus, string> = {
@@ -101,8 +132,31 @@ function LiveRosterPage() {
     toast.success(`Set status to ${labels[status]}`);
   };
 
-  const cellMap = useMemo(() => assignmentsByCell(assignments), [assignments]);
-  const clashes = useMemo(() => detectClashes(assignments), [assignments]);
+  // List of distinct teams/areas
+  const availableTeams = useMemo(() => {
+    const teams = new Set<string>();
+    for (const a of assignments) {
+      if (a.area) teams.add(a.area);
+    }
+    return Array.from(teams).sort();
+  }, [assignments]);
+
+  // Filter assignments by team first
+  const filteredAssignments = useMemo(() => {
+    if (selectedTeam === "all") return assignments;
+    return assignments.filter(
+      (a) => a.area.toLowerCase() === selectedTeam.toLowerCase()
+    );
+  }, [assignments, selectedTeam]);
+
+  const cellMap = useMemo(
+    () => assignmentsByCell(filteredAssignments),
+    [filteredAssignments]
+  );
+  const clashes = useMemo(
+    () => detectClashes(filteredAssignments),
+    [filteredAssignments]
+  );
 
   const clashKey = useMemo(() => {
     const m = new Map<string, boolean>();
@@ -113,13 +167,13 @@ function LiveRosterPage() {
 
   const columns = useMemo(() => {
     const seen = new Map<string, { area: string; label: string }>();
-    for (const a of assignments) {
+    for (const a of filteredAssignments) {
       if (!seen.has(a.label)) seen.set(a.label, { area: a.area, label: a.label });
     }
     return Array.from(seen.values()).sort((a, b) =>
       a.label.localeCompare(b.label)
     );
-  }, [assignments]);
+  }, [filteredAssignments]);
 
   const months = useMemo(() => {
     const s = new Set<string>();
@@ -138,13 +192,13 @@ function LiveRosterPage() {
     });
   }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
-  // Calculate volunteer workload stats and multi-row double-booking clashes across visible range
+  // Workload stats calculation
   const volunteerStatsMap = useMemo(() => {
     const map = new Map<string, VolunteerWorkloadStats>();
     const visibleDatesSet = new Set(shownDates);
     const volDateCounts = new Map<string, Map<string, number>>();
 
-    for (const a of assignments) {
+    for (const a of filteredAssignments) {
       if (!visibleDatesSet.has(a.date)) continue;
       const key = a.person_name.toLowerCase();
 
@@ -167,9 +221,9 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [assignments, shownDates]);
+  }, [filteredAssignments, shownDates]);
 
-  // Count distinct double-booked volunteers
+  // Double booked count
   const doubleBookedVolunteersCount = useMemo(() => {
     let count = 0;
     for (const stat of volunteerStatsMap.values()) {
@@ -188,7 +242,7 @@ function LiveRosterPage() {
     [volunteers]
   );
 
-  // Group clashes by date for quick lookup in the Clashes column
+  // Group clashes by date for Clashes column
   const dateClashesMap = useMemo(() => {
     const map = new Map<
       string,
@@ -196,7 +250,7 @@ function LiveRosterPage() {
     >();
 
     for (const d of dates) {
-      const dayAssignments = assignments.filter((a) => a.date === d);
+      const dayAssignments = filteredAssignments.filter((a) => a.date === d);
       const personMap = new Map<string, Assignment[]>();
 
       for (const a of dayAssignments) {
@@ -227,24 +281,109 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [assignments, dates]);
+  }, [filteredAssignments, dates]);
+
+  const copyShareableLink = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast.success("Shareable link copied to clipboard!");
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="p-6 space-y-6">
+      {/* CSS Print Stylesheet */}
+      <style>{`
+        @media print {
+          body {
+            background: white !important;
+            color: black !important;
+          }
+          .no-print, header, nav, sidebar, button, .print\\:hidden {
+            display: none !important;
+          }
+          .print\\:block {
+            display: block !important;
+          }
+          .print\\:p-0 {
+            padding: 0 !important;
+          }
+          .print\\:shadow-none {
+            box-shadow: none !important;
+          }
+          .print\\:border-none {
+            border: none !important;
+          }
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          th, td {
+            border: 1px solid #ccc !important;
+            padding: 6px !important;
+            page-break-inside: avoid;
+          }
+          thead {
+            display: table-header-group !important;
+          }
+          tr {
+            page-break-inside: avoid;
+          }
+        }
+      `}</style>
+
       {/* Top Header Section */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4 no-print">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Live Roster</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Live Roster</h1>
+            {isShareView && (
+              <span className="px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary rounded-full border border-primary/20">
+                Shareable View
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {shownDates.length} Sundays · {assignments.length} assignments ·{" "}
+            {shownDates.length} Sundays · {filteredAssignments.length} assignments
+            {selectedTeam !== "all" && ` (${selectedTeam})`} ·{" "}
             <span className="text-red-500 font-medium">{clashes.length} clashes</span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+
+        {/* Toolbar Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Team Filter */}
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedTeam}
+              onValueChange={(val) => updateSearchParams({ team: val })}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="All Teams" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {availableTeams.map((team) => (
+                  <SelectItem key={team} value={team}>
+                    {team}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Month Filter */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger className="w-[180px]">
+            <Select
+              value={filterMonth}
+              onValueChange={(val) => updateSearchParams({ month: val })}
+            >
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="All months" />
               </SelectTrigger>
               <SelectContent>
@@ -257,7 +396,37 @@ function LiveRosterPage() {
               </SelectContent>
             </Select>
           </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+
+          {/* Mode Toggle Button */}
+          <Button
+            variant={isShareView ? "default" : "outline"}
+            size="sm"
+            onClick={() =>
+              updateSearchParams({ view: isShareView ? "edit" : "share" })
+            }
+          >
+            <Eye className="h-4 w-4 mr-1.5" />
+            {isShareView ? "Interactive Mode" : "Share View Mode"}
+          </Button>
+
+          {/* Share Link Button */}
+          <Button variant="outline" size="sm" onClick={copyShareableLink}>
+            <Share2 className="h-4 w-4 mr-1.5" />
+            Share Link
+          </Button>
+
+          {/* Print/Download Button */}
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1.5" />
+            Print / PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Filter Checkboxes Bar (Interactive Mode Only) */}
+      {!isShareView && (
+        <div className="flex flex-wrap items-center justify-end gap-4 no-print text-sm">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
             <Checkbox
               checked={hidePastWeeks}
               onCheckedChange={(v) => setHidePastWeeks(!!v)}
@@ -271,7 +440,7 @@ function LiveRosterPage() {
               Hide past weeks
             </span>
           </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
             <Checkbox
               checked={showClashesOnly}
               onCheckedChange={(v) => setShowClashesOnly(!!v)}
@@ -279,10 +448,19 @@ function LiveRosterPage() {
             Clashes only
           </label>
         </div>
+      )}
+
+      {/* Printable Header Banner */}
+      <div className="hidden print:block mb-4">
+        <h1 className="text-xl font-bold">Roster Pulse — Service Schedule</h1>
+        <p className="text-sm text-gray-600">
+          Team: {selectedTeam === "all" ? "All Departments" : selectedTeam} | Range:{" "}
+          {filterMonth === "all" ? "Full Roster" : filterMonth}
+        </p>
       </div>
 
       {/* Roster Capacity & Health Summary Banner */}
-      <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-3">
           <div
             className={cn(
@@ -323,12 +501,12 @@ function LiveRosterPage() {
       </div>
 
       {/* Table Section */}
-      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-        <div className="overflow-auto max-h-[calc(100vh-280px)]">
+      <div className="rounded-xl border bg-card overflow-hidden shadow-sm print:border-none print:shadow-none print:p-0">
+        <div className="overflow-auto max-h-[calc(100vh-280px)] print:max-h-none">
           <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 bg-muted/80 backdrop-blur z-10">
+            <thead className="sticky top-0 bg-muted/80 backdrop-blur z-10 print:static print:bg-transparent">
               <tr>
-                <th className="sticky left-0 z-20 bg-muted border-b border-r p-3 text-left font-medium w-[140px]">
+                <th className="sticky left-0 z-20 bg-muted border-b border-r p-3 text-left font-medium w-[140px] print:static print:bg-transparent">
                   Date
                 </th>
                 {columns.map((c) => (
@@ -339,8 +517,8 @@ function LiveRosterPage() {
                     {c.label}
                   </th>
                 ))}
-                {/* Rightmost Clashes Column Header */}
-                <th className="border-b border-l bg-muted/90 p-2 text-left font-semibold text-xs text-foreground min-w-[220px] whitespace-nowrap">
+                {/* Clashes Header */}
+                <th className="border-b border-l bg-muted/90 p-2 text-left font-semibold text-xs text-foreground min-w-[220px] whitespace-nowrap print:bg-transparent">
                   Clashes
                 </th>
               </tr>
@@ -363,7 +541,7 @@ function LiveRosterPage() {
 
                   return (
                     <tr key={d} className="hover:bg-muted/20">
-                      <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
+                      <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap print:static print:bg-transparent">
                         <div className="flex flex-col">
                           <span>
                             {format(parseISO(`${d}T12:00:00`), "d MMM")}
@@ -404,12 +582,13 @@ function LiveRosterPage() {
                                     totalWorkload={stats.total}
                                     clashDatesCount={stats.clashDates.size}
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
+                                    isShareView={isShareView}
                                     onStatusChange={(s) =>
                                       setAssignmentStatus(a.id, s)
                                     }
                                     onSelectSwap={() => setSwapTarget(a)}
                                     onSelectClash={() => {
-                                      const items = assignments.filter(
+                                      const items = filteredAssignments.filter(
                                         (x) =>
                                           x.date === a.date &&
                                           x.person_name.toLowerCase() === key
@@ -428,8 +607,8 @@ function LiveRosterPage() {
                         );
                       })}
 
-                      {/* Rightmost Clashes Column Cell */}
-                      <td className="border-b border-l bg-muted/10 p-2 align-top">
+                      {/* Rightmost Clashes Cell */}
+                      <td className="border-b border-l bg-muted/10 p-2 align-top print:bg-transparent">
                         {dayClashesList.length === 0 ? (
                           <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -441,8 +620,10 @@ function LiveRosterPage() {
                               <button
                                 key={i}
                                 type="button"
+                                disabled={isShareView}
                                 onClick={() => {
-                                  const items = assignments.filter(
+                                  if (isShareView) return;
+                                  const items = filteredAssignments.filter(
                                     (x) =>
                                       x.date === d &&
                                       x.person_name.toLowerCase() ===
@@ -454,7 +635,10 @@ function LiveRosterPage() {
                                     items,
                                   });
                                 }}
-                                className="text-left rounded-md border border-red-500/40 bg-red-500/15 p-2 text-xs transition-colors hover:bg-red-500/25 cursor-pointer"
+                                className={cn(
+                                  "text-left rounded-md border border-red-500/40 bg-red-500/15 p-2 text-xs transition-colors",
+                                  !isShareView && "hover:bg-red-500/25 cursor-pointer"
+                                )}
                               >
                                 <div className="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-300">
                                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
@@ -484,8 +668,12 @@ function LiveRosterPage() {
         </div>
       </div>
 
-      <SwapDialog target={swapTarget} onClose={() => setSwapTarget(null)} />
-      <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
+      {!isShareView && (
+        <>
+          <SwapDialog target={swapTarget} onClose={() => setSwapTarget(null)} />
+          <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
+        </>
+      )}
     </div>
   );
 }
@@ -502,6 +690,7 @@ function StatusCellBadge({
   totalWorkload,
   clashDatesCount,
   isDoubleBookedOnDate,
+  isShareView,
   onStatusChange,
   onSelectSwap,
   onSelectClash,
@@ -514,6 +703,7 @@ function StatusCellBadge({
   totalWorkload: number;
   clashDatesCount: number;
   isDoubleBookedOnDate: boolean;
+  isShareView?: boolean;
   onStatusChange: (status: AssignmentStatus) => void;
   onSelectSwap: () => void;
   onSelectClash: () => void;
@@ -567,21 +757,26 @@ function StatusCellBadge({
     >
       <button
         type="button"
+        disabled={isShareView}
         onClick={() => {
+          if (isShareView) return;
           if (isClash && !overridden) {
             onSelectClash();
           } else {
             onSelectSwap();
           }
         }}
-        className="flex-1 text-left font-medium truncate flex items-center gap-1.5 focus:outline-hidden cursor-pointer"
+        className={cn(
+          "flex-1 text-left font-medium truncate flex items-center gap-1.5 focus:outline-hidden",
+          !isShareView && "cursor-pointer"
+        )}
       >
         {getIcon()}
         <span className="truncate">{assignment.person_name}</span>
 
         {clashDatesCount > 0 && (
           <span
-            className="flex items-center gap-0.5 px-1 py-0.2 text-[10px] rounded-full bg-red-600 text-white font-bold shrink-0"
+            className="flex items-center gap-0.5 px-1 py-0.2 text-[10px] rounded-full bg-red-600 text-white font-bold shrink-0 print:hidden"
             title={`Double-booked on ${clashDatesCount} date${
               clashDatesCount > 1 ? "s" : ""
             }`}
@@ -592,7 +787,7 @@ function StatusCellBadge({
         )}
 
         <span
-          className="flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] rounded-md bg-black/10 dark:bg-white/15 font-mono text-muted-foreground dark:text-gray-200 shrink-0"
+          className="flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] rounded-md bg-black/10 dark:bg-white/15 font-mono text-muted-foreground dark:text-gray-200 shrink-0 print:hidden"
           title={`Assigned ${totalWorkload} shift(s) across visible range`}
         >
           <Layers className="h-2.5 w-2.5 opacity-70" />
@@ -600,40 +795,43 @@ function StatusCellBadge({
         </span>
       </button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="ml-1 p-0.5 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-opacity cursor-pointer"
-            title="Change status"
-          >
-            <ChevronDown className="h-3 w-3 opacity-60 group-hover:opacity-100" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40 z-50">
-          <DropdownMenuItem onClick={() => onStatusChange("pending")}>
-            <HelpCircle className="h-3.5 w-3.5 mr-2 text-gray-400" />
-            <span>Gray: Pending</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onStatusChange("reminder_sent")}>
-            <Clock className="h-3.5 w-3.5 mr-2 text-amber-500" />
-            <span>Yellow: Reminder</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              onStatusChange("declined");
-              onSelectSwap();
-            }}
-          >
-            <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
-            <span>Red: Declined</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onStatusChange("confirmed")}>
-            <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-500" />
-            <span>Green: Confirmed</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Hide status menu dropdown in shareable view or print mode */}
+      {!isShareView && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="ml-1 p-0.5 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-opacity cursor-pointer print:hidden"
+              title="Change status"
+            >
+              <ChevronDown className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 z-50">
+            <DropdownMenuItem onClick={() => onStatusChange("pending")}>
+              <HelpCircle className="h-3.5 w-3.5 mr-2 text-gray-400" />
+              <span>Gray: Pending</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatusChange("reminder_sent")}>
+              <Clock className="h-3.5 w-3.5 mr-2 text-amber-500" />
+              <span>Yellow: Reminder</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                onStatusChange("declined");
+                onSelectSwap();
+              }}
+            >
+              <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
+              <span>Red: Declined</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onStatusChange("confirmed")}>
+              <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-500" />
+              <span>Green: Confirmed</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 }
