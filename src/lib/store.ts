@@ -27,6 +27,7 @@ function buildInitial() {
       priority_area: (v.serving_areas || [])[0] || "",
       is_paused: false,
       notes: v.notes || "",
+      unavailable_dates: [],
     });
   }
 
@@ -47,6 +48,7 @@ function buildInitial() {
       priority_area: area || "",
       is_paused: false,
       notes: "",
+      unavailable_dates: [],
     });
   };
 
@@ -99,6 +101,7 @@ interface State {
   hydrate: () => void;
   updateVolunteer: (id: string, patch: Partial<Volunteer>) => void;
   togglePause: (id: string) => void;
+  addVolunteer: (v: Omit<Volunteer, "id">) => void;
   addAssignment: (a: Omit<Assignment, "id">) => void;
   removeAssignment: (id: string) => void;
   swapAssignment: (id: string, newPerson: string) => void;
@@ -131,6 +134,12 @@ export const useRoster = create<State>()(
         set({
           volunteers: get().volunteers.map((v) =>
             v.id === id ? { ...v, is_paused: !v.is_paused } : v,
+          ),
+        }),
+      addVolunteer: (v) =>
+        set({
+          volunteers: [...get().volunteers, { ...v, id: uid() }].sort((a, b) =>
+            a.full_name.localeCompare(b.full_name),
           ),
         }),
       addAssignment: (a) => set({ assignments: [...get().assignments, { ...a, id: uid() }] }),
