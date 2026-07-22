@@ -189,12 +189,6 @@ export function VolunteersPage() {
           );
           const vBlackouts = getBlackoutDates(vName);
 
-          const safeAreas: string[] = Array.isArray(v?.serving_areas)
-            ? v.serving_areas
-            : Array.isArray((v as any)?.teams)
-            ? (v as any).teams
-            : [];
-
           return (
             <div
               key={v.id || vName}
@@ -223,7 +217,7 @@ export function VolunteersPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1">
-                {(safeAreas || []).map((area) => (
+                {(v?.serving_areas || []).map((area) => (
                   <Badge key={area} variant="secondary" className="text-[10px] font-normal">
                     {area}
                   </Badge>
