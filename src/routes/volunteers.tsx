@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { format, parseISO, isAfter, startOfDay } from "date-fns";
-import { Search, UserCheck, Calendar, ShieldAlert } from "lucide-react";
+import { Search, UserCheck, Calendar, ShieldAlert, Plus, CalendarX, Trash2 } from "lucide-react";
 
 import { useRoster } from "@/lib/store";
 import { computeFatigue, upcomingForPerson } from "@/lib/roster-engine";
@@ -27,6 +27,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 const AREAS = [
   "Welcome", "Car Park", "Count", "Tea", "Hosting", "Hang Tight", "Host",
@@ -55,12 +63,13 @@ export const Route = createFileRoute("/volunteers")({
 });
 
 function VolunteersPage() {
-  const { volunteers, assignments } = useRoster();
+  const { volunteers, assignments, addVolunteer } = useRoster();
   const [q, setQ] = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
   const [memberView, setMemberView] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("all");
   const [selected, setSelected] = useState<Volunteer | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const sortedVolunteers = useMemo(() => {
     return [...volunteers].sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -146,6 +155,14 @@ function VolunteersPage() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button
+            onClick={() => setShowAddDialog(true)}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add New
+          </Button>
         </div>
       </div>
 
@@ -203,7 +220,206 @@ function VolunteersPage() {
       </div>
 
       <VolunteerSheet volunteer={selected} onClose={() => setSelected(null)} />
+      <AddVolunteerDialog open={showAddDialog} onClose={() => setShowAddDialog(false)} onAdd={addVolunteer} />
     </div>
+  );
+}
+
+function AddVolunteerDialog({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (v: Omit<Volunteer, "id">) => void;
+}) {
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    serving_areas: [] as string[],
+    partners: [] as string[],
+    max_serving_per_month: "2",
+    frequency_preference: "2x/month",
+    priority_area: "",
+    notes: "",
+  });
+
+  const handleSubmit = () => {
+    if (!formData.full_name.trim()) {
+      toast.error("Please enter a volunteer name");
+      return;
+    }
+    onAdd({
+      full_name: formData.full_name,
+      email: formData.email,
+      phone: formData.phone,
+      serving_areas: formData.serving_areas,
+      partners: formData.partners,
+      max_serving_per_month: parseInt(formData.max_serving_per_month),
+      frequency_preference: formData.frequency_preference,
+      priority_area: formData.priority_area,
+      is_paused: false,
+      notes: formData.notes,
+      unavailable_dates: [],
+    });
+    toast.success(`${formData.full_name} added successfully!`);
+    setFormData({
+      full_name: "",
+      email: "",
+      phone: "",
+      serving_areas: [],
+      partners: [],
+      max_serving_per_month: "2",
+      frequency_preference: "2x/month",
+      priority_area: "",
+      notes: "",
+    });
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5 text-primary" />
+            Add New Volunteer
+          </DialogTitle>
+          <DialogDescription>
+            Create a new volunteer profile with all required information.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div>
+            <Label className="text-xs">Full Name *</Label>
+            <Input
+              placeholder="John Smith"
+              value={formData.full_name}
+              onChange={(e) =>
+                setFormData({ ...formData, full_name: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Email</Label>
+              <Input
+                type="email"
+                placeholder="john@example.com"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Phone</Label>
+              <Input
+                placeholder="+1 555-0123"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs mb-2 block">Serving Areas</Label>
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 border rounded-lg">
+              {AREAS.map((a) => {
+                const on = formData.serving_areas.includes(a);
+                return (
+                  <label
+                    key={a}
+                    className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-muted/50 cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={on}
+                      onCheckedChange={() => {
+                        const areas = on
+                          ? formData.serving_areas.filter((x) => x !== a)
+                          : [...formData.serving_areas, a];
+                        setFormData({ ...formData, serving_areas: areas });
+                      }}
+                    />
+                    <span className="truncate">{a}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Frequency</Label>
+              <Select
+                value={formData.frequency_preference}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, frequency_preference: v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1x/month">1× per month</SelectItem>
+                  <SelectItem value="2x/month">2× per month</SelectItem>
+                  <SelectItem value="fortnight">Every fortnight</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Max per month</Label>
+              <Select
+                value={formData.max_serving_per_month}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, max_serving_per_month: v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs">Notes</Label>
+            <Textarea
+              placeholder="Any special notes or preferences..."
+              value={formData.notes}
+              onChange={(e) =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Volunteer
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -214,7 +430,9 @@ function VolunteerSheet({
   volunteer: Volunteer | null;
   onClose: () => void;
 }) {
-  const { assignments, updateVolunteer, togglePause, volunteers } = useRoster();
+  const { assignments, updateVolunteer, togglePause, volunteers, dates } = useRoster();
+  const [newUnavailableDate, setNewUnavailableDate] = useState("");
+  
   if (!volunteer) return null;
 
   const upcoming = upcomingForPerson(volunteer.full_name, assignments);
@@ -226,6 +444,34 @@ function VolunteerSheet({
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const fatigue = computeFatigue(volunteer, assignments);
+  const unavailableDates = volunteer.unavailable_dates || [];
+
+  const toggleUnavailableDate = (dateStr: string) => {
+    const current = new Set(unavailableDates);
+    if (current.has(dateStr)) {
+      current.delete(dateStr);
+      toast.info(`Removed unavailable date ${dateStr}`);
+    } else {
+      current.add(dateStr);
+      toast.success(`Marked ${dateStr} as unavailable`);
+    }
+    updateVolunteer(volunteer.id, {
+      unavailable_dates: Array.from(current),
+    });
+  };
+
+  const addUnavailableDate = () => {
+    if (!newUnavailableDate) return;
+    const current = new Set(unavailableDates);
+    if (!current.has(newUnavailableDate)) {
+      current.add(newUnavailableDate);
+      updateVolunteer(volunteer.id, {
+        unavailable_dates: Array.from(current),
+      });
+      toast.success("Unavailable date added");
+      setNewUnavailableDate("");
+    }
+  };
 
   return (
     <Sheet open={!!volunteer} onOpenChange={(o) => !o && onClose()}>
@@ -260,20 +506,87 @@ function VolunteerSheet({
                   No upcoming assignments scheduled.
                 </div>
               ) : (
-                upcoming.slice(0, 8).map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between text-xs rounded-lg border bg-muted/40 px-3 py-2"
-                  >
-                    <span className="font-medium">
-                      {format(parseISO(a.date), "EEE, d MMM yyyy")}
-                    </span>
-                    <span className="text-primary font-semibold truncate ml-2">
-                      {a.label}
-                    </span>
-                  </div>
-                ))
+                upcoming.slice(0, 8).map((a) => {
+                  const isUnavailable = unavailableDates.includes(a.date);
+                  return (
+                    <div
+                      key={a.id}
+                      className={`flex items-center justify-between text-xs rounded-lg border px-3 py-2 ${
+                        isUnavailable
+                          ? "bg-red-500/15 border-red-500/40"
+                          : "bg-muted/40"
+                      }`}
+                    >
+                      <span className="font-medium">
+                        {format(parseISO(a.date), "EEE, d MMM yyyy")}
+                        {isUnavailable && (
+                          <span className="ml-2 text-red-600 font-semibold">
+                            ⚠ UNAVAILABLE
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-primary font-semibold truncate ml-2">
+                        {a.label}
+                      </span>
+                    </div>
+                  );
+                })
               )}
+            </div>
+          </div>
+
+          {/* Unavailable Dates Section */}
+          <div className="rounded-xl border bg-card p-4 space-y-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <CalendarX className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-semibold">Unavailable Dates</span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={newUnavailableDate}
+                  onChange={(e) => setNewUnavailableDate(e.target.value)}
+                  className="flex-1 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={addUnavailableDate}
+                  disabled={!newUnavailableDate}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-2 max-h-32 overflow-auto p-2 border rounded-lg bg-muted/20">
+                {unavailableDates.length === 0 ? (
+                  <div className="text-xs text-muted-foreground py-2 text-center">
+                    No unavailable dates set
+                  </div>
+                ) : (
+                  unavailableDates
+                    .sort()
+                    .map((dateStr) => (
+                      <div
+                        key={dateStr}
+                        className="flex items-center justify-between rounded-md border bg-card px-2 py-1.5 text-xs"
+                      >
+                        <span className="font-medium">
+                          {format(parseISO(`${dateStr}T12:00:00`), "EEE, d MMM")}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => toggleUnavailableDate(dateStr)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))
+                )}
+              </div>
             </div>
           </div>
 
