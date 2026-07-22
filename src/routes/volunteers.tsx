@@ -47,7 +47,6 @@ export const Route = createFileRoute("/volunteers")({
   component: VolunteersPage,
 });
 
-// Safe date parser to avoid runtime crashes from invalid date strings
 function safeFormatDate(dateStr: string, formatPattern: string): string {
   if (!dateStr) return "";
   try {
@@ -56,7 +55,7 @@ function safeFormatDate(dateStr: string, formatPattern: string): string {
       return format(parsed, formatPattern);
     }
   } catch (e) {
-    // Ignore error and return string as-is
+    // Return raw date string if parsing fails
   }
   return dateStr;
 }
@@ -64,12 +63,10 @@ function safeFormatDate(dateStr: string, formatPattern: string): string {
 export function VolunteersPage() {
   const store = useRoster();
 
-  // Safely fallback arrays if store values are undefined
   const volunteers = store?.volunteers || [];
   const assignments = store?.assignments || [];
   const updateVolunteer = store?.updateVolunteer || (() => {});
 
-  // Local state fallbacks
   const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
@@ -80,7 +77,7 @@ export function VolunteersPage() {
     if (!volunteerName) return [];
     const key = volunteerName.toLowerCase();
 
-    const vol = volunteers.find((v) => v?.full_name?.toLowerCase() === key);
+    const vol = (volunteers || []).find((v) => v?.full_name?.toLowerCase() === key);
     if (vol?.blackout_dates && Array.isArray(vol.blackout_dates)) {
       return vol.blackout_dates;
     }
@@ -109,7 +106,6 @@ export function VolunteersPage() {
     }
   };
 
-  // Safe search filter preventing undefined .map() / .some() errors
   const filteredVolunteers = useMemo(() => {
     return (volunteers || []).filter((v) => {
       if (!v) return false;
@@ -118,7 +114,6 @@ export function VolunteersPage() {
       const emailMatch = v.email ? v.email.toLowerCase().includes(q) : false;
       const phoneMatch = v.phone ? v.phone.toLowerCase().includes(q) : false;
 
-      // Safe array extraction
       const areas = Array.isArray(v.serving_areas)
         ? v.serving_areas
         : Array.isArray((v as any).teams)
@@ -161,7 +156,6 @@ export function VolunteersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
@@ -186,18 +180,21 @@ export function VolunteersPage() {
         </div>
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredVolunteers.map((v) => {
+        {(filteredVolunteers || []).map((v) => {
+          if (!v) return null;
           const vName = v.full_name || "Volunteer";
           const vAssignments = (assignments || []).filter(
             (a) => a?.person_name?.toLowerCase() === vName.toLowerCase()
           );
           const vBlackouts = getBlackoutDates(vName);
 
-          // SAFE RESOLUTION FOR SERVING AREAS / TEAMS
-          const rawAreas = v?.serving_areas ?? (v as any)?.teams;
-          const safeAreas: string[] = Array.isArray(rawAreas) ? rawAreas : [];
+          // Defensive array check for serving_areas / teams
+          const safeAreas: string[] = Array.isArray(v.serving_areas)
+            ? v.serving_areas
+            : Array.isArray((v as any).teams)
+            ? (v as any).teams
+            : [];
 
           return (
             <div
@@ -252,7 +249,6 @@ export function VolunteersPage() {
         })}
       </div>
 
-      {/* Details Sheet */}
       <Sheet
         open={!!selectedVolunteer}
         onOpenChange={(open) => !open && setSelectedVolunteer(null)}
