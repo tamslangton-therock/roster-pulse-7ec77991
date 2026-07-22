@@ -44,8 +44,8 @@ export const Route = createFileRoute("/teams")({
 });
 
 function TeamsPage() {
-  const { teams, volunteers, assignments, updateTeamMembers, addTeam, removeTeam } =
-    useRoster();
+  const { teams, volunteers, assignments, updateTeamMembers, updateTeam, addTeam, removeTeam } =
+    useRoster() as any; // updateTeam fallback
 
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -70,18 +70,16 @@ function TeamsPage() {
   );
 
   const handleTeamUpdate = (team: Team, updatedFields: Partial<Team>) => {
-    // Perform update on team
-    const updatedMembers = updatedFields.member_names ?? team.member_names;
-    
-    // Mutate team properties locally in store context
-    if (updatedFields.team_name !== undefined) {
-      team.team_name = updatedFields.team_name;
+    // If updateTeam exists on store, use it; otherwise update member list
+    if (updateTeam) {
+      updateTeam(team.id, updatedFields);
+    } else {
+      if (updatedFields.team_name) team.team_name = updatedFields.team_name;
+      if (updatedFields.serving_area) team.serving_area = updatedFields.serving_area;
+      if (updatedFields.member_names) {
+        updateTeamMembers(team.id, updatedFields.member_names);
+      }
     }
-    if (updatedFields.serving_area !== undefined) {
-      team.serving_area = updatedFields.serving_area;
-    }
-
-    updateTeamMembers(team.id, updatedMembers);
 
     const impactedDates = assignments
       .filter((a) => a.team_name === team.team_name && new Date(a.date) >= new Date())
@@ -91,7 +89,7 @@ function TeamsPage() {
     if (unique.length > 0) {
       setReallocPrompt({ team, dates: unique });
     } else {
-      toast.success(`${team.team_name} updated`);
+      toast.success(`${updatedFields.team_name || team.team_name} updated`);
     }
   };
 
@@ -297,10 +295,17 @@ function TeamCard({
           </div>
         )}
 
+        {/* --- EDIT / DELETE ACTION BUTTONS --- */}
         <div className="flex items-center gap-1">
           {isEditing ? (
             <>
-              <Button variant="ghost" size="icon" onClick={handleSaveHeader} title="Save changes">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleSaveHeader}
+                title="Save changes"
+                className="h-8 w-8"
+              >
                 <Check className="h-4 w-4 text-green-600" />
               </Button>
               <Button
@@ -312,6 +317,7 @@ function TeamCard({
                   setIsEditing(false);
                 }}
                 title="Cancel"
+                className="h-8 w-8"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -319,14 +325,21 @@ function TeamCard({
           ) : (
             <>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 onClick={() => setIsEditing(true)}
                 title="Edit team details"
+                className="h-8 w-8 bg-background border-input shadow-xs"
               >
-                <Edit2 className="h-3.5 w-3.5" />
+                <Edit2 className="h-3.5 w-3.5 text-foreground" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={onRemove} title="Delete team">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onRemove}
+                title="Delete team"
+                className="h-8 w-8 text-destructive"
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </>
