@@ -6,7 +6,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -14,6 +14,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { HydrateStore } from "@/components/hydrate-store";
 import { Toaster } from "@/components/ui/sonner";
+
+// CHANGE YOUR ACCESS CODE HERE
+const MASTER_PASSCODE = "1234";
 
 function NotFoundComponent() {
   return (
@@ -75,6 +78,108 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+function PasscodeGate({ children }: { children: ReactNode }) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [passcode, setPasscode] = useState("");
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const savedAuth = sessionStorage.getItem("roster_auth");
+    if (savedAuth === "true") {
+      setIsAuthenticated(true);
+    }
+    setLoading(false);
+  }, []);
+
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcode === MASTER_PASSCODE) {
+      sessionStorage.setItem("roster_auth", "true");
+      setIsAuthenticated(true);
+      setError(false);
+    } else {
+      setError(true);
+    }
+  };
+
+  const handleLock = () => {
+    sessionStorage.removeItem("roster_auth");
+    setIsAuthenticated(false);
+    setPasscode("");
+  };
+
+  if (loading) return null;
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 px-4">
+        <div className="w-full max-w-sm p-8 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 text-center">
+          <div className="w-12 h-12 bg-primary/20 text-primary rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
+            🔒
+          </div>
+          <h2 className="text-2xl font-bold mb-1 tracking-tight text-white">Roster Pulse</h2>
+          <p className="text-xs text-slate-400 mb-6">Enter master access code to view roster</p>
+
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                placeholder="Enter passcode"
+                value={passcode}
+                onChange={(e) => {
+                  setPasscode(e.target.value);
+                  setError(false);
+                }}
+                className={`w-full px-4 py-3 bg-slate-900 border rounded-lg text-center text-lg tracking-widest text-white focus:outline-none focus:ring-2 ${
+                  error
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-slate-700 focus:ring-primary focus:border-transparent"
+                }`}
+                autoFocus
+              />
+              {error && (
+                <p className="text-red-400 text-xs mt-2">Incorrect passcode. Try again.</p>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors duration-200 text-sm shadow-md"
+            >
+              Unlock Access
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 flex items-center justify-between border-b bg-background/80 backdrop-blur px-4 sticky top-0 z-30">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+              <div className="text-sm font-medium tracking-tight">Roster Pulse</div>
+            </div>
+            <button
+              onClick={handleLock}
+              className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-background hover:bg-accent text-muted-foreground transition-colors flex items-center gap-1.5"
+            >
+              🔒 Lock App
+            </button>
+          </header>
+          <main className="flex-1 min-w-0">
+            {children}
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -126,21 +231,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <HydrateStore>
-        <SidebarProvider>
-          <div className="min-h-screen flex w-full bg-background">
-            <AppSidebar />
-            <div className="flex-1 flex flex-col min-w-0">
-              <header className="h-14 flex items-center gap-2 border-b bg-background/80 backdrop-blur px-4 sticky top-0 z-30">
-                <SidebarTrigger />
-                <div className="text-sm font-medium tracking-tight">Roster Pulse</div>
-              </header>
-              <main className="flex-1 min-w-0">
-                <Outlet />
-              </main>
-            </div>
-          </div>
-          <Toaster position="top-right" />
-        </SidebarProvider>
+        <PasscodeGate>
+          <Outlet />
+        </PasscodeGate>
+        <Toaster position="top-right" />
       </HydrateStore>
     </QueryClientProvider>
   );
