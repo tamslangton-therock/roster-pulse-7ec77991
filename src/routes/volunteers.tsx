@@ -48,38 +48,50 @@ export const Route = createFileRoute("/volunteers")({
 });
 
 export function VolunteersPage() {
-  const rosterStore = useRoster();
+  const store = useRoster();
 
-  // Safely extract store properties with fallbacks to avoid crashing if properties are missing
-  const volunteers = rosterStore.volunteers || [];
-  const assignments = rosterStore.assignments || [];
-  const updateVolunteer = rosterStore.updateVolunteer || (() => {});
-  
-  // Local state for blackout dates in case the store property is omitted
+  // Defensive extractions from store
+  const volunteers = store?.volunteers || [];
+  const assignments = store?.assignments || [];
+  const updateVolunteer = store?.updateVolunteer || (() => {});
+
+  // Local fallback state for blackout dates if store method is missing
   const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({
     "tamara langton": ["2026-08-02", "2026-08-16"],
   });
 
-  // Local UI State
+  // UI State
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [activeTab, setActiveTab] = useState("shifts");
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
 
-  // Helper to read blackout dates for a volunteer
+  // Helper to read blackout dates
   const getBlackoutDates = (volunteerName: string): string[] => {
+    if (!volunteerName) return [];
     const key = volunteerName.toLowerCase();
-    if (rosterStore.blackoutsMap && rosterStore.blackoutsMap[key]) {
-      return rosterStore.blackoutsMap[key];
+
+    // Check volunteer object first
+    const vol = volunteers.find((v) => v?.full_name?.toLowerCase() === key);
+    if (vol?.blackout_dates && Array.isArray(vol.blackout_dates)) {
+      return vol.blackout_dates;
     }
+
+    // Check store blackouts map
+    if (store?.blackoutsMap && store.blackoutsMap[key]) {
+      return store.blackoutsMap[key];
+    }
+
     return localBlackouts[key] || [];
   };
 
-  // Helper to toggle a blackout date safely
+  // Helper to toggle blackout dates
   const toggleBlackout = (volunteerName: string, dateStr: string) => {
+    if (!volunteerName || !dateStr) return;
     const key = volunteerName.toLowerCase();
-    if (rosterStore.toggleBlackoutDate) {
-      rosterStore.toggleBlackoutDate(volunteerName, dateStr);
+
+    if (store?.toggleBlackoutDate) {
+      store.toggleBlackoutDate(volunteerName, dateStr);
     } else {
       setLocalBlackouts((prev) => {
         const current = prev[key] || [];
@@ -94,34 +106,39 @@ export function VolunteersPage() {
   // Filtered Volunteers list
   const filteredVolunteers = useMemo(() => {
     return volunteers.filter((v) => {
+      if (!v) return false;
       const q = searchQuery.toLowerCase();
-      return (
-        v.full_name.toLowerCase().includes(q) ||
-        v.email.toLowerCase().includes(q) ||
-        (v.teams && v.teams.some((t) => t.toLowerCase().includes(q)))
+      const nameMatch = v.full_name?.toLowerCase().includes(q) || false;
+      const emailMatch = v.email?.toLowerCase().includes(q) || false;
+      
+      // Match against serving_areas or teams safely
+      const areaMatch = (v.serving_areas || []).some((area) =>
+        area.toLowerCase().includes(q)
       );
+
+      return nameMatch || emailMatch || areaMatch;
     });
   }, [volunteers, searchQuery]);
 
   // Assignments for current active volunteer
   const activeAssignments = useMemo(() => {
-    if (!selectedVolunteer) return [];
+    if (!selectedVolunteer?.full_name) return [];
+    const name = selectedVolunteer.full_name.toLowerCase();
     return assignments.filter(
-      (a) =>
-        a.person_name.toLowerCase() === selectedVolunteer.full_name.toLowerCase()
+      (a) => a?.person_name && a.person_name.toLowerCase() === name
     );
   }, [assignments, selectedVolunteer]);
 
   // Active volunteer's blackout dates
-  const activeBlackoutDates = useMemo(() => {
-    if (!selectedVolunteer) return [];
+  const activeBlackouts = useMemo(() => {
+    if (!selectedVolunteer?.full_name) return [];
     return getBlackoutDates(selectedVolunteer.full_name);
-  }, [selectedVolunteer, localBlackouts, rosterStore.blackoutsMap]);
+  }, [selectedVolunteer, localBlackouts, store?.blackoutsMap, volunteers]);
 
   const handleToggleBlackoutDate = (dateStr: string) => {
-    if (!selectedVolunteer) return;
-    const exists = activeBlackoutDates.includes(dateStr);
-    
+    if (!selectedVolunteer?.full_name) return;
+    const exists = activeBlackouts.includes(dateStr);
+
     toggleBlackout(selectedVolunteer.full_name, dateStr);
 
     if (exists) {
@@ -149,7 +166,7 @@ export function VolunteersPage() {
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search volunteers or teams..."
+              placeholder="Search volunteers or areas..."
               className="pl-9 h-9 text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -161,14 +178,16 @@ export function VolunteersPage() {
       {/* Volunteer Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVolunteers.map((v) => {
+          const name = v.full_name || "Unnamed";
           const vAssignments = assignments.filter(
-            (a) => a.person_name.toLowerCase() === v.full_name.toLowerCase()
+            (a) => a?.person_name?.toLowerCase() === name.toLowerCase()
           );
-          const vBlackouts = getBlackoutDates(v.full_name);
+          const vBlackouts = getBlackoutDates(name);
+          const servingAreas = v.serving_areas || [];
 
           return (
             <div
-              key={v.id}
+              key={v.id || name}
               onClick={() => setSelectedVolunteer(v)}
               className={cn(
                 "group relative rounded-xl border bg-card p-4 shadow-xs transition-all hover:border-primary/50 hover:shadow-md cursor-pointer",
@@ -178,9 +197,9 @@ export function VolunteersPage() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-base group-hover:text-primary transition-colors">
-                    {v.full_name}
+                    {name}
                   </h3>
-                  <p className="text-xs text-muted-foreground">{v.email}</p>
+                  <p className="text-xs text-muted-foreground">{v.email || v.phone || ""}</p>
                 </div>
                 {v.is_paused ? (
                   <Badge variant="outline" className="border-amber-500/40 text-amber-700 bg-amber-500/10 text-[10px]">
@@ -193,10 +212,11 @@ export function VolunteersPage() {
                 )}
               </div>
 
+              {/* Serving Areas */}
               <div className="mt-3 flex flex-wrap gap-1">
-                {(v.teams || []).map((t) => (
-                  <Badge key={t} variant="secondary" className="text-[10px] font-normal">
-                    {t}
+                {servingAreas.map((area) => (
+                  <Badge key={area} variant="secondary" className="text-[10px] font-normal">
+                    {area}
                   </Badge>
                 ))}
               </div>
@@ -218,7 +238,7 @@ export function VolunteersPage() {
         })}
       </div>
 
-      {/* Volunteer Detail Sheet */}
+      {/* Volunteer Detail Drawer */}
       <Sheet
         open={!!selectedVolunteer}
         onOpenChange={(open) => !open && setSelectedVolunteer(null)}
@@ -230,7 +250,7 @@ export function VolunteersPage() {
                 <SheetTitle className="text-xl font-bold flex items-center justify-between">
                   <span>{selectedVolunteer.full_name}</span>
                 </SheetTitle>
-                <SheetDescription>{selectedVolunteer.email}</SheetDescription>
+                <SheetDescription>{selectedVolunteer.email || selectedVolunteer.phone}</SheetDescription>
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
@@ -254,9 +274,7 @@ export function VolunteersPage() {
                       };
                       updateVolunteer(updated);
                       setSelectedVolunteer(updated);
-                      toast.success(
-                        `Updated status for ${selectedVolunteer.full_name}`
-                      );
+                      toast.success(`Updated status for ${selectedVolunteer.full_name}`);
                     }}
                   >
                     {selectedVolunteer.is_paused ? (
@@ -278,7 +296,7 @@ export function VolunteersPage() {
                       Upcoming Shifts ({activeAssignments.length})
                     </TabsTrigger>
                     <TabsTrigger value="blackouts" className="text-xs">
-                      Block Out Dates ({activeBlackoutDates.length})
+                      Block Out Dates ({activeBlackouts.length})
                     </TabsTrigger>
                   </TabsList>
 
@@ -290,7 +308,11 @@ export function VolunteersPage() {
                       </div>
                     ) : (
                       activeAssignments.map((a) => {
-                        const isBlackedOut = activeBlackoutDates.includes(a.date);
+                        const isBlackedOut = activeBlackouts.includes(a.date);
+                        let dateFormatted = a.date;
+                        try {
+                          dateFormatted = format(parseISO(`${a.date}T12:00:00`), "EEEE, d MMM yyyy");
+                        } catch (e) {}
 
                         return (
                           <div
@@ -305,7 +327,7 @@ export function VolunteersPage() {
                             <div className="space-y-1">
                               <div className="font-semibold flex items-center gap-1.5">
                                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                {format(parseISO(`${a.date}T12:00:00`), "EEEE, d MMM yyyy")}
+                                {dateFormatted}
                               </div>
                               <div className="text-muted-foreground">
                                 {a.area} — <span className="font-medium text-foreground">{a.label}</span>
@@ -357,38 +379,40 @@ export function VolunteersPage() {
                       </div>
                     </div>
 
-                    {/* List of current Blackouts */}
+                    {/* List of current Blackout Dates */}
                     <div className="space-y-2">
                       <div className="text-xs font-semibold text-muted-foreground">
                         Currently Blocked Out Dates:
                       </div>
 
-                      {activeBlackoutDates.length === 0 ? (
+                      {activeBlackouts.length === 0 ? (
                         <div className="text-xs text-center py-6 text-muted-foreground border border-dashed rounded-lg">
                           No blackout dates set for {selectedVolunteer.full_name}.
                         </div>
                       ) : (
-                        [...activeBlackoutDates].sort().map((dateStr) => (
-                          <div
-                            key={dateStr}
-                            className="flex items-center justify-between p-2.5 rounded-lg border bg-card text-xs"
-                          >
-                            <span className="font-medium">
-                              {format(
-                                parseISO(`${dateStr}T12:00:00`),
-                                "EEEE, d MMMM yyyy"
-                              )}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
-                              onClick={() => handleToggleBlackoutDate(dateStr)}
+                        [...activeBlackouts].sort().map((dateStr) => {
+                          let formattedLabel = dateStr;
+                          try {
+                            formattedLabel = format(parseISO(`${dateStr}T12:00:00`), "EEEE, d MMMM yyyy");
+                          } catch (e) {}
+
+                          return (
+                            <div
+                              key={dateStr}
+                              className="flex items-center justify-between p-2.5 rounded-lg border bg-card text-xs"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))
+                              <span className="font-medium">{formattedLabel}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
+                                onClick={() => handleToggleBlackoutDate(dateStr)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </TabsContent>
