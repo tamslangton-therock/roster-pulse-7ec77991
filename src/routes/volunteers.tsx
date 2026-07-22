@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import {
   Users,
   Search,
@@ -47,15 +47,29 @@ export const Route = createFileRoute("/volunteers")({
   component: VolunteersPage,
 });
 
+// Helper function to safely format dates without throwing runtime render exceptions
+function safeFormatDate(dateStr: string, formatPattern: string): string {
+  if (!dateStr) return "";
+  try {
+    const parsed = parseISO(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`);
+    if (isValid(parsed)) {
+      return format(parsed, formatPattern);
+    }
+  } catch (e) {
+    // Return raw date string if parsing fails
+  }
+  return dateStr;
+}
+
 export function VolunteersPage() {
   const store = useRoster();
 
-  // Defensive extractions from store
+  // Safely extract properties from store
   const volunteers = store?.volunteers || [];
   const assignments = store?.assignments || [];
   const updateVolunteer = store?.updateVolunteer || (() => {});
 
-  // Local fallback state for blackout dates if store method is missing
+  // Fallback local blackout state
   const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({
     "tamara langton": ["2026-08-02", "2026-08-16"],
   });
@@ -66,26 +80,27 @@ export function VolunteersPage() {
   const [activeTab, setActiveTab] = useState("shifts");
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
 
-  // Helper to read blackout dates
-  const getBlackoutDates = (volunteerName: string): string[] => {
+  // Helper to retrieve blackout dates for a volunteer name safely
+  const getBlackoutDates = (volunteerName?: string): string[] => {
     if (!volunteerName) return [];
     const key = volunteerName.toLowerCase();
 
-    // Check volunteer object first
+    // 1. Check if dates exist directly on volunteer object
     const vol = volunteers.find((v) => v?.full_name?.toLowerCase() === key);
     if (vol?.blackout_dates && Array.isArray(vol.blackout_dates)) {
       return vol.blackout_dates;
     }
 
-    // Check store blackouts map
+    // 2. Check store's blackoutsMap if present
     if (store?.blackoutsMap && store.blackoutsMap[key]) {
       return store.blackoutsMap[key];
     }
 
+    // 3. Local fallback
     return localBlackouts[key] || [];
   };
 
-  // Helper to toggle blackout dates
+  // Helper to toggle a blackout date
   const toggleBlackout = (volunteerName: string, dateStr: string) => {
     if (!volunteerName || !dateStr) return;
     const key = volunteerName.toLowerCase();
@@ -103,33 +118,34 @@ export function VolunteersPage() {
     }
   };
 
-  // Filtered Volunteers list
+  // Filtered Volunteers List
   const filteredVolunteers = useMemo(() => {
     return volunteers.filter((v) => {
       if (!v) return false;
       const q = searchQuery.toLowerCase();
-      const nameMatch = v.full_name?.toLowerCase().includes(q) || false;
-      const emailMatch = v.email?.toLowerCase().includes(q) || false;
-      
-      // Match against serving_areas or teams safely
-      const areaMatch = (v.serving_areas || []).some((area) =>
-        area.toLowerCase().includes(q)
-      );
+      const nameMatch = v.full_name ? v.full_name.toLowerCase().includes(q) : false;
+      const emailMatch = v.email ? v.email.toLowerCase().includes(q) : false;
+      const phoneMatch = v.phone ? v.phone.toLowerCase().includes(q) : false;
 
-      return nameMatch || emailMatch || areaMatch;
+      // Safe area check
+      const areaMatch = Array.isArray(v.serving_areas)
+        ? v.serving_areas.some((area) => area.toLowerCase().includes(q))
+        : false;
+
+      return nameMatch || emailMatch || phoneMatch || areaMatch;
     });
   }, [volunteers, searchQuery]);
 
-  // Assignments for current active volunteer
+  // Assignments for selected volunteer
   const activeAssignments = useMemo(() => {
     if (!selectedVolunteer?.full_name) return [];
-    const name = selectedVolunteer.full_name.toLowerCase();
+    const target = selectedVolunteer.full_name.toLowerCase();
     return assignments.filter(
-      (a) => a?.person_name && a.person_name.toLowerCase() === name
+      (a) => a?.person_name && a.person_name.toLowerCase() === target
     );
   }, [assignments, selectedVolunteer]);
 
-  // Active volunteer's blackout dates
+  // Blackout dates for selected volunteer
   const activeBlackouts = useMemo(() => {
     if (!selectedVolunteer?.full_name) return [];
     return getBlackoutDates(selectedVolunteer.full_name);
@@ -150,7 +166,7 @@ export function VolunteersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
@@ -158,7 +174,7 @@ export function VolunteersPage() {
             Volunteer Directory
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage volunteer profiles, teams, workload, and block out unavailable dates.
+            Manage volunteer profiles, serving areas, workload, and blackout dates.
           </p>
         </div>
 
@@ -175,19 +191,19 @@ export function VolunteersPage() {
         </div>
       </div>
 
-      {/* Volunteer Cards Grid */}
+      {/* Volunteer Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVolunteers.map((v) => {
-          const name = v.full_name || "Unnamed";
+          const vName = v.full_name || "Volunteer";
           const vAssignments = assignments.filter(
-            (a) => a?.person_name?.toLowerCase() === name.toLowerCase()
+            (a) => a?.person_name?.toLowerCase() === vName.toLowerCase()
           );
-          const vBlackouts = getBlackoutDates(name);
-          const servingAreas = v.serving_areas || [];
+          const vBlackouts = getBlackoutDates(vName);
+          const servingAreas = Array.isArray(v.serving_areas) ? v.serving_areas : [];
 
           return (
             <div
-              key={v.id || name}
+              key={v.id || vName}
               onClick={() => setSelectedVolunteer(v)}
               className={cn(
                 "group relative rounded-xl border bg-card p-4 shadow-xs transition-all hover:border-primary/50 hover:shadow-md cursor-pointer",
@@ -197,7 +213,7 @@ export function VolunteersPage() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-base group-hover:text-primary transition-colors">
-                    {name}
+                    {vName}
                   </h3>
                   <p className="text-xs text-muted-foreground">{v.email || v.phone || ""}</p>
                 </div>
@@ -238,7 +254,7 @@ export function VolunteersPage() {
         })}
       </div>
 
-      {/* Volunteer Detail Drawer */}
+      {/* Volunteer Details Sheet */}
       <Sheet
         open={!!selectedVolunteer}
         onOpenChange={(open) => !open && setSelectedVolunteer(null)}
@@ -254,13 +270,13 @@ export function VolunteersPage() {
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
-                {/* Status Toggle */}
+                {/* Roster Pause/Resume Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
                   <div className="space-y-0.5">
                     <div className="text-sm font-medium">Roster Status</div>
                     <div className="text-xs text-muted-foreground">
                       {selectedVolunteer.is_paused
-                        ? "Currently paused from automatic rostering"
+                        ? "Paused from automatic rostering"
                         : "Active for rostering"}
                     </div>
                   </div>
@@ -289,18 +305,18 @@ export function VolunteersPage() {
                   </Button>
                 </div>
 
-                {/* Tabs: Upcoming Shifts & Block Out Dates */}
+                {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="shifts" className="text-xs">
-                      Upcoming Shifts ({activeAssignments.length})
+                      Shifts ({activeAssignments.length})
                     </TabsTrigger>
                     <TabsTrigger value="blackouts" className="text-xs">
                       Block Out Dates ({activeBlackouts.length})
                     </TabsTrigger>
                   </TabsList>
 
-                  {/* Upcoming Shifts Tab */}
+                  {/* Shifts Tab */}
                   <TabsContent value="shifts" className="mt-4 space-y-3">
                     {activeAssignments.length === 0 ? (
                       <div className="text-center py-6 text-sm text-muted-foreground border rounded-lg">
@@ -309,10 +325,7 @@ export function VolunteersPage() {
                     ) : (
                       activeAssignments.map((a) => {
                         const isBlackedOut = activeBlackouts.includes(a.date);
-                        let dateFormatted = a.date;
-                        try {
-                          dateFormatted = format(parseISO(`${a.date}T12:00:00`), "EEEE, d MMM yyyy");
-                        } catch (e) {}
+                        const formattedDate = safeFormatDate(a.date, "EEEE, d MMM yyyy");
 
                         return (
                           <div
@@ -327,7 +340,7 @@ export function VolunteersPage() {
                             <div className="space-y-1">
                               <div className="font-semibold flex items-center gap-1.5">
                                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                {dateFormatted}
+                                {formattedDate}
                               </div>
                               <div className="text-muted-foreground">
                                 {a.area} — <span className="font-medium text-foreground">{a.label}</span>
@@ -336,7 +349,7 @@ export function VolunteersPage() {
 
                             {isBlackedOut && (
                               <Badge variant="outline" className="border-purple-500/40 text-purple-700 bg-purple-500/15">
-                                <CalendarX className="h-3 w-3 mr-1" /> Blackout Conflict
+                                <CalendarX className="h-3 w-3 mr-1" /> Blackout
                               </Badge>
                             )}
                           </div>
@@ -345,7 +358,7 @@ export function VolunteersPage() {
                     )}
                   </TabsContent>
 
-                  {/* Block Out Dates Tab */}
+                  {/* Blackouts Tab */}
                   <TabsContent value="blackouts" className="mt-4 space-y-4">
                     <div className="p-3 rounded-lg border bg-purple-500/5 space-y-3">
                       <Label className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
@@ -353,7 +366,7 @@ export function VolunteersPage() {
                         Add Blocked Date
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Select dates {selectedVolunteer.full_name} cannot be rostered on. These will flag automatically on the live roster grid.
+                        Select dates {selectedVolunteer.full_name} cannot be rostered on.
                       </p>
 
                       <div className="flex items-center gap-2 pt-1">
@@ -379,7 +392,6 @@ export function VolunteersPage() {
                       </div>
                     </div>
 
-                    {/* List of current Blackout Dates */}
                     <div className="space-y-2">
                       <div className="text-xs font-semibold text-muted-foreground">
                         Currently Blocked Out Dates:
@@ -391,10 +403,7 @@ export function VolunteersPage() {
                         </div>
                       ) : (
                         [...activeBlackouts].sort().map((dateStr) => {
-                          let formattedLabel = dateStr;
-                          try {
-                            formattedLabel = format(parseISO(`${dateStr}T12:00:00`), "EEEE, d MMMM yyyy");
-                          } catch (e) {}
+                          const formattedLabel = safeFormatDate(dateStr, "EEEE, d MMMM yyyy");
 
                           return (
                             <div
