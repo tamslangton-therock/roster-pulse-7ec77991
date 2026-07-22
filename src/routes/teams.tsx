@@ -209,7 +209,7 @@ function TeamCard({
   onRemove,
 }: {
   team: Team;
-  volunteers: ReturnType<typeof useRoster>["volunteers"];
+  volunteers: import("@/lib/types").Volunteer[];
   onMembersChange: (members: string[]) => void;
   onRemove: () => void;
 }) {
