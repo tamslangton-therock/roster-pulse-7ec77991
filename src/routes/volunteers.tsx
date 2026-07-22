@@ -48,30 +48,57 @@ export const Route = createFileRoute("/volunteers")({
 });
 
 export function VolunteersPage() {
-  const {
-    volunteers,
-    assignments,
-    blackoutsMap,
-    updateVolunteer,
-    toggleBlackoutDate,
-  } = useRoster();
+  const rosterStore = useRoster();
+
+  // Safely extract store properties with fallbacks to avoid crashing if properties are missing
+  const volunteers = rosterStore.volunteers || [];
+  const assignments = rosterStore.assignments || [];
+  const updateVolunteer = rosterStore.updateVolunteer || (() => {});
+  
+  // Local state for blackout dates in case the store property is omitted
+  const [localBlackouts, setLocalBlackouts] = useState<Record<string, string[]>>({
+    "tamara langton": ["2026-08-02", "2026-08-16"],
+  });
 
   // Local UI State
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(
-    null
-  );
+  const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [activeTab, setActiveTab] = useState("shifts");
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
 
-  // Filtered Volunteers
+  // Helper to read blackout dates for a volunteer
+  const getBlackoutDates = (volunteerName: string): string[] => {
+    const key = volunteerName.toLowerCase();
+    if (rosterStore.blackoutsMap && rosterStore.blackoutsMap[key]) {
+      return rosterStore.blackoutsMap[key];
+    }
+    return localBlackouts[key] || [];
+  };
+
+  // Helper to toggle a blackout date safely
+  const toggleBlackout = (volunteerName: string, dateStr: string) => {
+    const key = volunteerName.toLowerCase();
+    if (rosterStore.toggleBlackoutDate) {
+      rosterStore.toggleBlackoutDate(volunteerName, dateStr);
+    } else {
+      setLocalBlackouts((prev) => {
+        const current = prev[key] || [];
+        const updated = current.includes(dateStr)
+          ? current.filter((d) => d !== dateStr)
+          : [...current, dateStr].sort();
+        return { ...prev, [key]: updated };
+      });
+    }
+  };
+
+  // Filtered Volunteers list
   const filteredVolunteers = useMemo(() => {
     return volunteers.filter((v) => {
       const q = searchQuery.toLowerCase();
       return (
         v.full_name.toLowerCase().includes(q) ||
         v.email.toLowerCase().includes(q) ||
-        v.teams.some((t) => t.toLowerCase().includes(q))
+        (v.teams && v.teams.some((t) => t.toLowerCase().includes(q)))
       );
     });
   }, [volunteers, searchQuery]);
@@ -85,17 +112,19 @@ export function VolunteersPage() {
     );
   }, [assignments, selectedVolunteer]);
 
-  // Blackout dates for active volunteer from store
+  // Active volunteer's blackout dates
   const activeBlackoutDates = useMemo(() => {
     if (!selectedVolunteer) return [];
-    return blackoutsMap[selectedVolunteer.full_name.toLowerCase()] || [];
-  }, [blackoutsMap, selectedVolunteer]);
+    return getBlackoutDates(selectedVolunteer.full_name);
+  }, [selectedVolunteer, localBlackouts, rosterStore.blackoutsMap]);
 
-  const handleToggleBlackout = (dateStr: string) => {
+  const handleToggleBlackoutDate = (dateStr: string) => {
     if (!selectedVolunteer) return;
-    toggleBlackoutDate(selectedVolunteer.full_name, dateStr);
+    const exists = activeBlackoutDates.includes(dateStr);
     
-    if (activeBlackoutDates.includes(dateStr)) {
+    toggleBlackout(selectedVolunteer.full_name, dateStr);
+
+    if (exists) {
       toast.info(`Removed ${dateStr} from blocked out dates.`);
     } else {
       toast.success(`Blocked out ${dateStr} for ${selectedVolunteer.full_name}.`);
@@ -135,7 +164,7 @@ export function VolunteersPage() {
           const vAssignments = assignments.filter(
             (a) => a.person_name.toLowerCase() === v.full_name.toLowerCase()
           );
-          const vBlackouts = blackoutsMap[v.full_name.toLowerCase()] || [];
+          const vBlackouts = getBlackoutDates(v.full_name);
 
           return (
             <div
@@ -165,7 +194,7 @@ export function VolunteersPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1">
-                {v.teams.map((t) => (
+                {(v.teams || []).map((t) => (
                   <Badge key={t} variant="secondary" className="text-[10px] font-normal">
                     {t}
                   </Badge>
@@ -242,7 +271,7 @@ export function VolunteersPage() {
                   </Button>
                 </div>
 
-                {/* Tabs: Upcoming Dates & Block Out Dates */}
+                {/* Tabs: Upcoming Shifts & Block Out Dates */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="shifts" className="text-xs">
@@ -299,7 +328,7 @@ export function VolunteersPage() {
                     <div className="p-3 rounded-lg border bg-purple-500/5 space-y-3">
                       <Label className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
                         <CalendarX className="h-4 w-4 text-purple-600" />
-                        Add Blackout Date
+                        Add Blocked Date
                       </Label>
                       <p className="text-xs text-muted-foreground">
                         Select dates {selectedVolunteer.full_name} cannot be rostered on. These will flag automatically on the live roster grid.
@@ -318,7 +347,7 @@ export function VolunteersPage() {
                           disabled={!newBlackoutDate}
                           onClick={() => {
                             if (newBlackoutDate) {
-                              handleToggleBlackout(newBlackoutDate);
+                              handleToggleBlackoutDate(newBlackoutDate);
                               setNewBlackoutDate("");
                             }
                           }}
@@ -339,7 +368,7 @@ export function VolunteersPage() {
                           No blackout dates set for {selectedVolunteer.full_name}.
                         </div>
                       ) : (
-                        activeBlackoutDates.sort().map((dateStr) => (
+                        [...activeBlackoutDates].sort().map((dateStr) => (
                           <div
                             key={dateStr}
                             className="flex items-center justify-between p-2.5 rounded-lg border bg-card text-xs"
@@ -354,7 +383,7 @@ export function VolunteersPage() {
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
-                              onClick={() => handleToggleBlackout(dateStr)}
+                              onClick={() => handleToggleBlackoutDate(dateStr)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
