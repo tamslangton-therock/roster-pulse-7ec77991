@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, Filter, Pause, RefreshCcw, Eye, EyeOff } from "lucide-react";
+import {
+  AlertTriangle,
+  Filter,
+  Pause,
+  RefreshCcw,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  HelpCircle,
+  ChevronDown,
+} from "lucide-react";
 
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
@@ -26,6 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -36,18 +54,20 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Interactive Sunday roster grid with clash detection, paused-member alerts, and one-click smart swaps.",
+          "Interactive Sunday roster grid with clash detection, status badges, paused-member alerts, and smart swaps.",
       },
       { property: "og:title", content: "Live Roster — Roster Pulse" },
       {
         property: "og:description",
         content:
-          "Interactive Sunday roster grid with clash detection, paused-member alerts, and one-click smart swaps.",
+          "Interactive Sunday roster grid with clash detection, status badges, paused-member alerts, and smart swaps.",
       },
     ],
   }),
   component: LiveRosterPage,
 });
+
+type AssignmentStatus = "pending" | "reminder_sent" | "declined" | "confirmed";
 
 function LiveRosterPage() {
   const { volunteers, assignments, dates } = useRoster();
@@ -60,6 +80,20 @@ function LiveRosterPage() {
     person: string;
     items: Assignment[];
   } | null>(null);
+
+  // Local state map to track assignment status updates per assignment ID
+  const [statuses, setStatuses] = useState<Record<string, AssignmentStatus>>({});
+
+  const handleStatusChange = (assignmentId: string, status: AssignmentStatus) => {
+    setStatuses((prev) => ({ ...prev, [assignmentId]: status }));
+    const labels: Record<AssignmentStatus, string> = {
+      pending: "Pending",
+      reminder_sent: "Reminder Sent",
+      declined: "Declined",
+      confirmed: "Confirmed",
+    };
+    toast.info(`Updated status to ${labels[status]}`);
+  };
 
   const cellMap = useMemo(() => assignmentsByCell(assignments), [assignments]);
   const clashes = useMemo(() => detectClashes(assignments), [assignments]);
@@ -83,7 +117,6 @@ function LiveRosterPage() {
     return Array.from(s).sort();
   }, [dates]);
 
-  // Safe ISO date comparison to avoid timezone boundary issues
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
   const shownDates = useMemo(() => {
@@ -166,7 +199,7 @@ function LiveRosterPage() {
                 {columns.map((c) => (
                   <th
                     key={c.label}
-                    className="border-b p-2 text-left font-medium text-xs text-muted-foreground min-w-[140px] whitespace-nowrap"
+                    className="border-b p-2 text-left font-medium text-xs text-muted-foreground min-w-[150px] whitespace-nowrap"
                   >
                     {c.label}
                   </th>
@@ -198,7 +231,7 @@ function LiveRosterPage() {
                         const list = cellMap.get(`${d}||${c.label}`) || [];
                         return (
                           <td key={c.label} className="border-b p-2 align-top">
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1.5">
                               {list.map((a) => {
                                 const paused = pausedNames.has(a.person_name.toLowerCase());
                                 const isClash = clashKey.has(
@@ -207,63 +240,34 @@ function LiveRosterPage() {
                                 const overridden = clashKey.get(
                                   `${a.date}||${a.person_name.toLowerCase()}`,
                                 );
+                                const status = statuses[a.id] || "pending";
+
                                 return (
-                                  <button
+                                  <RosterCellBadge
                                     key={a.id}
-                                    onClick={() => {
-                                      // If it's an unapproved clash, open clash review. Otherwise, allow smart swap.
-                                      if (isClash && !overridden) {
-                                        const items = assignments.filter(
-                                          (x) =>
-                                            x.date === a.date &&
-                                            x.person_name.toLowerCase() ===
-                                              a.person_name.toLowerCase(),
-                                        );
-                                        setClashDetail({
-                                          date: a.date,
-                                          person: a.person_name,
-                                          items,
-                                        });
-                                      } else {
-                                        setSwapTarget(a);
-                                      }
-                                    }}
-                                    className={cn(
-                                      "text-left rounded-md px-2 py-1 text-xs transition border border-transparent",
-                                      paused
-                                        ? "bg-status-amber text-status-amber-foreground"
-                                        : isClash && !overridden
-                                          ? "bg-status-red text-status-red-foreground"
-                                          : isClash && overridden
-                                            ? "bg-status-blue text-status-blue-foreground"
-                                            : "bg-muted hover:bg-accent",
-                                    )}
-                                    title={
-                                      paused
-                                        ? "Paused — needs replacement"
-                                        : isClash && !overridden
-                                          ? "Clash detected"
-                                          : overridden
-                                            ? "Approved exception (click to swap)"
-                                            : "Click to swap"
+                                    assignment={a}
+                                    status={status}
+                                    paused={paused}
+                                    isClash={isClash}
+                                    overridden={overridden}
+                                    onStatusChange={(newStatus) =>
+                                      handleStatusChange(a.id, newStatus)
                                     }
-                                  >
-                                    <div className="flex items-center gap-1 font-medium">
-                                      {paused && <Pause className="h-3 w-3" />}
-                                      {isClash && <AlertTriangle className="h-3 w-3" />}
-                                      <span className="truncate">{a.person_name}</span>
-                                    </div>
-                                    {paused && (
-                                      <div className="text-[10px] opacity-80 mt-0.5">
-                                        Needs replacement
-                                      </div>
-                                    )}
-                                    {isClash && (
-                                      <div className="text-[10px] opacity-80 mt-0.5">
-                                        {overridden ? "Exception allowed" : "Clash alert"}
-                                      </div>
-                                    )}
-                                  </button>
+                                    onSelectSwap={() => setSwapTarget(a)}
+                                    onSelectClash={() => {
+                                      const items = assignments.filter(
+                                        (x) =>
+                                          x.date === a.date &&
+                                          x.person_name.toLowerCase() ===
+                                            a.person_name.toLowerCase(),
+                                      );
+                                      setClashDetail({
+                                        date: a.date,
+                                        person: a.person_name,
+                                        items,
+                                      });
+                                    }}
+                                  />
                                 );
                               })}
                             </div>
@@ -281,6 +285,130 @@ function LiveRosterPage() {
 
       <SwapDialog target={swapTarget} onClose={() => setSwapTarget(null)} />
       <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
+    </div>
+  );
+}
+
+/**
+ * Custom Roster Cell Badge Component
+ * Handles status color switching (Gray, Yellow, Red, Green)
+ * and direct replacement triggers.
+ */
+function RosterCellBadge({
+  assignment,
+  status,
+  paused,
+  isClash,
+  overridden,
+  onStatusChange,
+  onSelectSwap,
+  onSelectClash,
+}: {
+  assignment: Assignment;
+  status: AssignmentStatus;
+  paused: boolean;
+  isClash: boolean;
+  overridden?: boolean;
+  onStatusChange: (status: AssignmentStatus) => void;
+  onSelectSwap: () => void;
+  onSelectClash: () => void;
+}) {
+  // Determine badge styling based on priority: Paused / Clash > Status
+  const getBadgeStyle = () => {
+    if (paused) return "bg-status-amber text-status-amber-foreground border-amber-300";
+    if (isClash && !overridden)
+      return "bg-status-red text-status-red-foreground border-red-300";
+    if (isClash && overridden)
+      return "bg-status-blue text-status-blue-foreground border-blue-300";
+
+    switch (status) {
+      case "reminder_sent":
+        return "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200";
+      case "declined":
+        return "bg-red-100 text-red-900 border-red-300 dark:bg-red-950 dark:text-red-200";
+      case "confirmed":
+        return "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200";
+      case "pending":
+      default:
+        return "bg-muted text-muted-foreground border-border hover:bg-accent/80";
+    }
+  };
+
+  const getStatusIcon = () => {
+    if (paused) return <Pause className="h-3 w-3" />;
+    if (isClash) return <AlertTriangle className="h-3 w-3" />;
+
+    switch (status) {
+      case "reminder_sent":
+        return <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />;
+      case "declined":
+        return <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />;
+      case "confirmed":
+        return <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />;
+      case "pending":
+      default:
+        return <HelpCircle className="h-3 w-3 opacity-60" />;
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "group relative flex items-center justify-between rounded-md border px-2 py-1 text-xs transition shadow-xs",
+        getBadgeStyle(),
+      )}
+    >
+      {/* Click main body to swap or inspect clash */}
+      <button
+        type="button"
+        onClick={() => {
+          if (isClash && !overridden) {
+            onSelectClash();
+          } else {
+            onSelectSwap();
+          }
+        }}
+        className="flex-1 text-left font-medium truncate flex items-center gap-1.5 focus:outline-hidden"
+      >
+        {getStatusIcon()}
+        <span className="truncate">{assignment.person_name}</span>
+      </button>
+
+      {/* Quick Status Switcher Dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-1 p-0.5 rounded-xs hover:bg-black/10 dark:hover:bg-white/10"
+            title="Change status"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          <DropdownMenuItem onClick={() => onStatusChange("pending")}>
+            <HelpCircle className="h-3.5 w-3.5 mr-2 opacity-60" />
+            Pending (Gray)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onStatusChange("reminder_sent")}>
+            <Clock className="h-3.5 w-3.5 mr-2 text-amber-500" />
+            Reminder (Yellow)
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              onStatusChange("declined");
+              onSelectSwap(); // Prompt smart swap automatically if declined
+            }}
+          >
+            <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
+            Declined (Red)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onStatusChange("confirmed")}>
+            <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-500" />
+            Confirmed (Green)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -394,7 +522,6 @@ function ClashDialog({
     : [];
   const allOverride = live.length > 0 && live.every((a) => a.is_override);
 
-  // Auto-close modal if all assignments in the clash are removed
   useEffect(() => {
     if (detail && live.length === 0) {
       onClose();
