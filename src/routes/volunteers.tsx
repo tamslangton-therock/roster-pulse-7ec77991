@@ -12,12 +12,22 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  X,
 } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/volunteers")({
@@ -26,7 +36,8 @@ export const Route = createFileRoute("/volunteers")({
       { title: "Volunteers — Roster Pulse" },
       {
         name: "description",
-        content: "Manage volunteer directory, teams, availability, and blackout dates.",
+        content:
+          "Manage volunteer directory, skills, availability, and block out unavailable dates.",
       },
     ],
   }),
@@ -97,6 +108,7 @@ export function VolunteersPage() {
     });
   }, [volunteers, searchQuery]);
 
+  // Current volunteer blackouts & conflicts
   const activeBlackouts = selectedVolunteer
     ? getBlackoutDates(selectedVolunteer.full_name)
     : [];
@@ -174,9 +186,10 @@ export function VolunteersPage() {
           return (
             <div
               key={v.id || vName}
-              className={`rounded-xl border bg-card p-4 shadow-sm flex flex-col justify-between transition-all hover:border-primary/50 ${
-                v.is_paused ? "opacity-60 bg-muted/30" : ""
-              }`}
+              className={cn(
+                "group relative rounded-xl border bg-card p-4 shadow-xs flex flex-col justify-between transition-all hover:border-primary/50",
+                v.is_paused && "opacity-60 bg-muted/30"
+              )}
             >
               <div>
                 <div className="flex items-start justify-between gap-2">
@@ -193,17 +206,26 @@ export function VolunteersPage() {
                     <p className="text-xs text-muted-foreground">{v.email || v.phone || ""}</p>
                   </div>
 
-                  <button
-                    type="button"
-                    className="px-2 py-1 text-[11px] font-medium border rounded hover:bg-accent transition-colors"
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
                     onClick={() => {
                       const updated = { ...v, is_paused: !v.is_paused };
                       updateVolunteer(updated);
                       toast.success(`Updated status for ${vName}`);
                     }}
                   >
-                    {v.is_paused ? "Paused" : "Active"}
-                  </button>
+                    {v.is_paused ? (
+                      <Badge variant="outline" className="border-amber-500/40 text-amber-700 bg-amber-500/10 text-[10px]">
+                        <PauseCircle className="h-3 w-3 mr-1" /> Paused
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">
+                        <PlayCircle className="h-3 w-3 mr-1 text-green-600" /> Active
+                      </Badge>
+                    )}
+                  </Button>
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1">
@@ -215,146 +237,137 @@ export function VolunteersPage() {
                 </div>
               </div>
 
-              {/* BOTTOM FOOTER WITH BLACKOUT BUTTON */}
               <div className="mt-4 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
                   {vAssignments.length} shift{vAssignments.length === 1 ? "" : "s"}
                 </span>
 
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSelectedVolunteer(v)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-md border flex items-center gap-1.5 transition-colors ${
+                  className={`h-7 text-xs gap-1.5 ${
                     hasClash
-                      ? "border-red-600 bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-900/30"
+                      ? "border-red-600/50 bg-red-950/10 text-red-800 dark:text-red-300"
                       : vBlackouts.length > 0
-                      ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100"
-                      : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                      ? "border-purple-500/30 text-purple-700 bg-purple-50 dark:bg-purple-950/30"
+                      : ""
                   }`}
                 >
-                  <CalendarX className="h-3.5 w-3.5 text-purple-600" />
+                  <CalendarX className="h-3.5 w-3.5" />
                   {vBlackouts.length > 0 ? `${vBlackouts.length} Blocked` : "Set Blackout"}
-                </button>
+                </Button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Lightweight Overlay Modal */}
-      {selectedVolunteer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-card border p-5 shadow-lg space-y-4 relative">
-            <button
-              type="button"
-              onClick={() => setSelectedVolunteer(null)}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
-            </button>
+      {/* Popup Dialog for Managing Blackout Dates */}
+      <Dialog open={!!selectedVolunteer} onOpenChange={(open) => !open && setSelectedVolunteer(null)}>
+        <DialogContent className="sm:max-w-md">
+          {selectedVolunteer && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <CalendarX className="h-5 w-5 text-purple-600" />
+                  Manage Blackout Dates
+                </DialogTitle>
+                <DialogDescription>
+                  Block out dates when <strong>{selectedVolunteer.full_name}</strong> is unavailable.
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="flex items-center gap-2 text-lg font-semibold">
-              <CalendarX className="h-5 w-5 text-purple-600" />
-              Manage Blackout Dates
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Block out dates when <strong>{selectedVolunteer.full_name}</strong> is unavailable.
-            </p>
+              <div className="space-y-4 my-2">
+                {/* Clash Warning */}
+                {activeConflicts.length > 0 && (
+                  <div className="p-3 rounded-lg bg-red-900/15 border border-red-700/40 text-red-900 dark:text-red-200 flex items-start gap-2 text-xs">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-semibold block">Active Blackout Clash Detected!</strong>
+                      {selectedVolunteer.full_name} is currently rostered on {activeConflicts.length} blacked-out date(s).
+                    </div>
+                  </div>
+                )}
 
-            {/* Conflict Banner */}
-            {activeConflicts.length > 0 && (
-              <div className="p-3 rounded-lg bg-red-900/15 border border-red-700/40 text-red-900 dark:text-red-200 flex items-start gap-2 text-xs">
-                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="font-semibold block">Active Blackout Clash Detected!</strong>
-                  {selectedVolunteer.full_name} is rostered on {activeConflicts.length} blacked-out date(s).
+                {/* Add Date Box */}
+                <div className="p-3.5 rounded-lg border bg-muted/30 space-y-3">
+                  <Label className="text-xs font-semibold">Add Unavailable Date</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="h-9 text-xs bg-background"
+                    />
+                    <Button size="sm" onClick={handleAddDate} className="h-9 shrink-0 gap-1">
+                      <Plus className="h-4 w-4" /> Block Date
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Date List */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-muted-foreground">
+                    Currently Blocked Out ({activeBlackouts.length})
+                  </Label>
+
+                  {activeBlackouts.length === 0 ? (
+                    <div className="text-xs text-center py-6 text-muted-foreground border border-dashed rounded-lg">
+                      No blackout dates set for this volunteer.
+                    </div>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                      {[...activeBlackouts].sort().map((dateStr) => {
+                        const isConflicting = assignments.some(
+                          (a) =>
+                            a?.person_name?.toLowerCase() === selectedVolunteer.full_name.toLowerCase() &&
+                            a.date === dateStr
+                        );
+
+                        return (
+                          <div
+                            key={dateStr}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${
+                              isConflicting
+                                ? "bg-red-950/20 border-red-700/50 text-red-900 dark:text-red-200"
+                                : "bg-card"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{formatDateLabel(dateStr)}</span>
+                              {isConflicting && (
+                                <Badge variant="destructive" className="text-[10px] bg-red-700">
+                                  Clash
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleRemoveDate(dateStr)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Date Picker Input */}
-            <div className="p-3 rounded-lg border bg-muted/20 space-y-2">
-              <label className="text-xs font-semibold block">Add Unavailable Date</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="h-9 px-3 rounded-md border text-xs bg-background flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddDate}
-                  className="h-9 px-3 text-xs font-medium bg-primary text-primary-foreground rounded-md flex items-center gap-1 hover:opacity-90"
-                >
-                  <Plus className="h-4 w-4" /> Block Date
-                </button>
-              </div>
-            </div>
-
-            {/* Blackout List */}
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-muted-foreground">
-                Currently Blocked Out ({activeBlackouts.length})
-              </div>
-
-              {activeBlackouts.length === 0 ? (
-                <div className="text-xs text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-                  No blackout dates set for this volunteer.
-                </div>
-              ) : (
-                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                  {[...activeBlackouts].sort().map((dateStr) => {
-                    const isConflicting = assignments.some(
-                      (a) =>
-                        a?.person_name?.toLowerCase() === selectedVolunteer.full_name.toLowerCase() &&
-                        a.date === dateStr
-                    );
-
-                    return (
-                      <div
-                        key={dateStr}
-                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${
-                          isConflicting
-                            ? "bg-red-950/20 border-red-700/50 text-red-900 dark:text-red-200"
-                            : "bg-card"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{formatDateLabel(dateStr)}</span>
-                          {isConflicting && (
-                            <Badge variant="destructive" className="text-[10px] bg-red-700">
-                              Clash
-                            </Badge>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          className="text-red-500 hover:text-red-700 p-1"
-                          onClick={() => handleRemoveDate(dateStr)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedVolunteer(null)}
-                className="px-4 py-1.5 text-xs font-medium border rounded-md hover:bg-accent"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <DialogFooter>
+                <Button variant="outline" size="sm" onClick={() => setSelectedVolunteer(null)}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
