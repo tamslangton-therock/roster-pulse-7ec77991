@@ -43,15 +43,14 @@ export const Route = createFileRoute("/volunteers")({
 
 function VolunteersPage() {
   const { volunteers, updateVolunteer, addVolunteer, removeVolunteer } =
-    useRoster() as any;
+    useRoster();
 
   const [search, setSearch] = useState("");
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [showAdd, setShowAdd] = useState(false);
 
-  // New volunteer form state
   const [newName, setNewName] = useState("");
-  const [newAreas, setNewAreas] = useState<string[]>(["Welcome"]);
+  const [newAreas] = useState<string[]>(["Welcome"]);
   const [newMax, setNewMax] = useState(2);
 
   const allAreas = useMemo(() => {
@@ -74,16 +73,8 @@ function VolunteersPage() {
   }, [volunteers, search, selectedArea]);
 
   const handleUpdate = (id: string, updates: Partial<Volunteer>) => {
-    if (updateVolunteer) {
-      updateVolunteer(id, updates);
-      toast.success("Volunteer updated");
-    } else {
-      const vol = volunteers.find((v: Volunteer) => v.id === id);
-      if (vol) {
-        Object.assign(vol, updates);
-        toast.success("Volunteer updated");
-      }
-    }
+    updateVolunteer(id, updates);
+    toast.success("Volunteer updated");
   };
 
   return (
@@ -139,7 +130,6 @@ function VolunteersPage() {
         ))}
       </div>
 
-      {/* Add Modal */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent>
           <DialogHeader>
@@ -260,7 +250,6 @@ function VolunteerCard({
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex items-center gap-1">
             {isEditing ? (
               <>
@@ -312,7 +301,6 @@ function VolunteerCard({
           </div>
         </div>
 
-        {/* Serving Areas Tags */}
         <div className="mt-3 flex flex-wrap gap-1.5">
           {volunteer.serving_areas.map((area) => (
             <span
@@ -337,7 +325,6 @@ function VolunteerCard({
           ))}
         </div>
 
-        {/* Add Serving Area Dropdown */}
         {unselectedAreas.length > 0 && (
           <div className="mt-3 flex items-center gap-2">
             <Select value={newAreaPick} onValueChange={setNewAreaPick}>
