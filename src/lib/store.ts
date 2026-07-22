@@ -97,7 +97,7 @@ export const useRoster = create<RosterState>()(
         })),
     }),
     {
-      name: "roster-pulse-storage",
+      name: "roster-pulse-v3",
     }
   )
 );
