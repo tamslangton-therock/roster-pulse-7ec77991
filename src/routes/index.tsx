@@ -13,8 +13,8 @@ import {
   XCircle,
   HelpCircle,
   ChevronDown,
+  Layers,
 } from "lucide-react";
-
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
   assignmentsByCell,
@@ -61,7 +61,16 @@ export const Route = createFileRoute("/")({
   component: LiveRosterPage,
 });
 
-export type AssignmentStatus = "pending" | "reminder_sent" | "declined" | "confirmed";
+export type AssignmentStatus =
+  | "pending"
+  | "reminder_sent"
+  | "declined"
+  | "confirmed";
+
+interface VolunteerWorkloadStats {
+  total: number;
+  clashDates: Set<string>;
+}
 
 function LiveRosterPage() {
   const { volunteers, assignments, dates } = useRoster();
@@ -76,7 +85,9 @@ function LiveRosterPage() {
   } | null>(null);
 
   // Status mapping stored by assignment ID
-  const [statusMap, setStatusMap] = useState<Record<string, AssignmentStatus>>({});
+  const [statusMap, setStatusMap] = useState<Record<string, AssignmentStatus>>(
+    {}
+  );
 
   const setAssignmentStatus = (id: string, status: AssignmentStatus) => {
     setStatusMap((prev) => ({ ...prev, [id]: status }));
@@ -91,9 +102,11 @@ function LiveRosterPage() {
 
   const cellMap = useMemo(() => assignmentsByCell(assignments), [assignments]);
   const clashes = useMemo(() => detectClashes(assignments), [assignments]);
+
   const clashKey = useMemo(() => {
     const m = new Map<string, boolean>();
-    for (const c of clashes) m.set(`${c.date}||${c.person.toLowerCase()}`, c.is_override);
+    for (const c of clashes)
+      m.set(`${c.date}||${c.person.toLowerCase()}`, c.is_override);
     return m;
   }, [clashes]);
 
@@ -102,7 +115,9 @@ function LiveRosterPage() {
     for (const a of assignments) {
       if (!seen.has(a.label)) seen.set(a.label, { area: a.area, label: a.label });
     }
-    return Array.from(seen.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(seen.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
   }, [assignments]);
 
   const months = useMemo(() => {
@@ -117,20 +132,64 @@ function LiveRosterPage() {
     return dates.filter((d) => {
       const matchesMonth = filterMonth === "all" || d.startsWith(filterMonth);
       if (!matchesMonth) return false;
-
       if (hidePastWeeks && d < todayStr) return false;
-
       return true;
     });
   }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
+  // 1. Calculate volunteer workload stats and multi-row double-booking clashes across visible range
+  const volunteerStatsMap = useMemo(() => {
+    const map = new Map<string, VolunteerWorkloadStats>();
+    const visibleDatesSet = new Set(shownDates);
+    const volDateCounts = new Map<string, Map<string, number>>();
+
+    for (const a of assignments) {
+      if (!visibleDatesSet.has(a.date)) continue;
+      const key = a.person_name.toLowerCase();
+
+      if (!map.has(key)) {
+        map.set(key, { total: 0, clashDates: new Set() });
+      }
+      const stat = map.get(key)!;
+      stat.total += 1;
+
+      if (!volDateCounts.has(key)) {
+        volDateCounts.set(key, new Map());
+      }
+      const dateMap = volDateCounts.get(key)!;
+      const currentCount = (dateMap.get(a.date) || 0) + 1;
+      dateMap.set(a.date, currentCount);
+
+      if (currentCount > 1) {
+        stat.clashDates.add(a.date);
+      }
+    }
+
+    return map;
+  }, [assignments, shownDates]);
+
+  // Count distinct double-booked volunteers
+  const doubleBookedVolunteersCount = useMemo(() => {
+    let count = 0;
+    for (const stat of volunteerStatsMap.values()) {
+      if (stat.clashDates.size > 0) count++;
+    }
+    return count;
+  }, [volunteerStatsMap]);
+
   const pausedNames = useMemo(
-    () => new Set(volunteers.filter((v) => v.is_paused).map((v) => v.full_name.toLowerCase())),
-    [volunteers],
+    () =>
+      new Set(
+        volunteers
+          .filter((v) => v.is_paused)
+          .map((v) => v.full_name.toLowerCase())
+      ),
+    [volunteers]
   );
 
   return (
     <div className="p-6 space-y-6">
+      {/* Top Header Section */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Live Roster</h1>
@@ -156,7 +215,6 @@ function LiveRosterPage() {
               </SelectContent>
             </Select>
           </div>
-
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <Checkbox
               checked={hidePastWeeks}
@@ -171,7 +229,6 @@ function LiveRosterPage() {
               Hide past weeks
             </span>
           </label>
-
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <Checkbox
               checked={showClashesOnly}
@@ -182,8 +239,50 @@ function LiveRosterPage() {
         </div>
       </div>
 
+      {/* 2. Roster Capacity & Health Summary Banner */}
+      <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "p-2 rounded-lg flex items-center justify-center",
+              doubleBookedVolunteersCount > 0
+                ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            )}
+          >
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold">Roster Capacity & Health</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {doubleBookedVolunteersCount === 0
+                ? "All active volunteers have clear single assignments across scheduled dates."
+                : `${doubleBookedVolunteersCount} volunteer${
+                    doubleBookedVolunteersCount > 1 ? "s have" : " has"
+                  } multi-role double-bookings.`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full border bg-muted/50 font-medium">
+            Double-Booked Volunteers:{" "}
+            <strong
+              className={
+                doubleBookedVolunteersCount > 0
+                  ? "text-red-600 dark:text-red-400 font-bold"
+                  : "text-emerald-600 dark:text-emerald-400 font-bold"
+              }
+            >
+              {doubleBookedVolunteersCount}
+            </strong>
+          </span>
+        </div>
+      </div>
+
+      {/* Table Section */}
       <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-        <div className="overflow-auto max-h-[calc(100vh-220px)]">
+        <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 bg-muted/80 backdrop-blur z-10">
               <tr>
@@ -203,7 +302,10 @@ function LiveRosterPage() {
             <tbody>
               {shownDates.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="text-center py-8 text-muted-foreground">
+                  <td
+                    colSpan={columns.length + 1}
+                    className="text-center py-8 text-muted-foreground"
+                  >
                     No Sundays match the current filters.
                   </td>
                 </tr>
@@ -215,7 +317,9 @@ function LiveRosterPage() {
                     <tr key={d} className="hover:bg-muted/20">
                       <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span>{format(parseISO(`${d}T12:00:00`), "d MMM")}</span>
+                          <span>
+                            {format(parseISO(`${d}T12:00:00`), "d MMM")}
+                          </span>
                           <span className="text-[11px] text-muted-foreground">
                             {format(parseISO(`${d}T12:00:00`), "EEEE")}
                           </span>
@@ -227,16 +331,19 @@ function LiveRosterPage() {
                           <td key={c.label} className="border-b p-2 align-top">
                             <div className="flex flex-col gap-1.5">
                               {list.map((a) => {
-                                const paused = pausedNames.has(a.person_name.toLowerCase());
-                                const isClash = clashKey.has(
-                                  `${a.date}||${a.person_name.toLowerCase()}`,
-                                );
-                                const overridden = clashKey.get(
-                                  `${a.date}||${a.person_name.toLowerCase()}`,
-                                );
-                                // Read status from local state or fallback to assignment.status if present
+                                const key = a.person_name.toLowerCase();
+                                const stats = volunteerStatsMap.get(key) || {
+                                  total: 0,
+                                  clashDates: new Set(),
+                                };
+                                const paused = pausedNames.has(key);
+                                const isClash = clashKey.has(`${a.date}||${key}`);
+                                const overridden = clashKey.get(`${a.date}||${key}`);
+                                const isDoubleBookedOnDate = stats.clashDates.has(a.date);
                                 const currentStatus: AssignmentStatus =
-                                  statusMap[a.id] || (a as any).status || "pending";
+                                  statusMap[a.id] ||
+                                  (a as any).status ||
+                                  "pending";
 
                                 return (
                                   <StatusCellBadge
@@ -246,14 +353,18 @@ function LiveRosterPage() {
                                     paused={paused}
                                     isClash={isClash}
                                     overridden={overridden}
-                                    onStatusChange={(s) => setAssignmentStatus(a.id, s)}
+                                    totalWorkload={stats.total}
+                                    clashDatesCount={stats.clashDates.size}
+                                    isDoubleBookedOnDate={isDoubleBookedOnDate}
+                                    onStatusChange={(s) =>
+                                      setAssignmentStatus(a.id, s)
+                                    }
                                     onSelectSwap={() => setSwapTarget(a)}
                                     onSelectClash={() => {
                                       const items = assignments.filter(
                                         (x) =>
                                           x.date === a.date &&
-                                          x.person_name.toLowerCase() ===
-                                            a.person_name.toLowerCase(),
+                                          x.person_name.toLowerCase() === key
                                       );
                                       setClashDetail({
                                         date: a.date,
@@ -284,8 +395,7 @@ function LiveRosterPage() {
 }
 
 /**
- * High-Visibility Status Badge
- * Explicit colors ensure the state visually changes immediately on switch.
+ * High-Visibility Status Badge with Workload & Double-Booking Highlights
  */
 function StatusCellBadge({
   assignment,
@@ -293,6 +403,9 @@ function StatusCellBadge({
   paused,
   isClash,
   overridden,
+  totalWorkload,
+  clashDatesCount,
+  isDoubleBookedOnDate,
   onStatusChange,
   onSelectSwap,
   onSelectClash,
@@ -302,11 +415,13 @@ function StatusCellBadge({
   paused: boolean;
   isClash: boolean;
   overridden?: boolean;
+  totalWorkload: number;
+  clashDatesCount: number;
+  isDoubleBookedOnDate: boolean;
   onStatusChange: (status: AssignmentStatus) => void;
   onSelectSwap: () => void;
   onSelectClash: () => void;
 }) {
-  // Explicit background & text colors for clear contrast
   const getBadgeStyle = () => {
     if (paused) {
       return "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40";
@@ -317,7 +432,6 @@ function StatusCellBadge({
     if (isClash && overridden) {
       return "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/40";
     }
-
     switch (status) {
       case "reminder_sent":
         return "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200";
@@ -334,7 +448,6 @@ function StatusCellBadge({
   const getIcon = () => {
     if (paused) return <Pause className="h-3 w-3 text-amber-600" />;
     if (isClash) return <AlertTriangle className="h-3 w-3 text-red-600" />;
-
     switch (status) {
       case "reminder_sent":
         return <Clock className="h-3 w-3 text-amber-600" />;
@@ -353,6 +466,8 @@ function StatusCellBadge({
       className={cn(
         "group flex items-center justify-between rounded-md border px-2 py-1 text-xs transition-colors shadow-xs",
         getBadgeStyle(),
+        // 4. Highlight cells where the volunteer is double-booked on that date
+        isDoubleBookedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
       )}
     >
       <button
@@ -368,6 +483,28 @@ function StatusCellBadge({
       >
         {getIcon()}
         <span className="truncate">{assignment.person_name}</span>
+
+        {/* 3. Red double-booking alert badge if double-booked across dates */}
+        {clashDatesCount > 0 && (
+          <span
+            className="flex items-center gap-0.5 px-1 py-0.2 text-[10px] rounded-full bg-red-600 text-white font-bold shrink-0"
+            title={`Double-booked on ${clashDatesCount} date${
+              clashDatesCount > 1 ? "s" : ""
+            }`}
+          >
+            <AlertTriangle className="h-2.5 w-2.5" />
+            {clashDatesCount}
+          </span>
+        )}
+
+        {/* 3. Workload capacity badge showing total shift count */}
+        <span
+          className="flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] rounded-md bg-black/10 dark:bg-white/15 font-mono text-muted-foreground dark:text-gray-200 shrink-0"
+          title={`Assigned ${totalWorkload} shift(s) across visible range`}
+        >
+          <Layers className="h-2.5 w-2.5 opacity-70" />
+          {totalWorkload}
+        </span>
       </button>
 
       {/* Dropdown Menu for Status Switcher */}
@@ -393,7 +530,7 @@ function StatusCellBadge({
           <DropdownMenuItem
             onClick={() => {
               onStatusChange("declined");
-              onSelectSwap(); // Open swap dialog automatically when declined
+              onSelectSwap();
             }}
           >
             <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
@@ -416,13 +553,16 @@ function SwapDialog({
   target: Assignment | null;
   onClose: () => void;
 }) {
-  const { volunteers, assignments, swapAssignment, removeAssignment } = useRoster();
+  const { volunteers, assignments, swapAssignment, removeAssignment } =
+    useRoster();
   const candidates = useMemo(() => {
     if (!target) return [];
     return rankSwapCandidates(target, volunteers, assignments);
   }, [target, volunteers, assignments]);
 
-  const targetVol = target ? findVolunteer(volunteers, target.person_name) : undefined;
+  const targetVol = target
+    ? findVolunteer(volunteers, target.person_name)
+    : undefined;
   const partnerNames = targetVol?.partners ?? [];
 
   return (
@@ -433,17 +573,20 @@ function SwapDialog({
             <DialogHeader>
               <DialogTitle>Smart Swap</DialogTitle>
               <DialogDescription>
-                {target.label} · {format(parseISO(`${target.date}T12:00:00`), "EEE d MMM yyyy")} · Replacing{" "}
-                <span className="font-medium text-foreground">{target.person_name}</span>
+                {target.label} ·{" "}
+                {format(parseISO(`${target.date}T12:00:00`), "EEE d MMM yyyy")} ·
+                Replacing{" "}
+                <span className="font-medium text-foreground">
+                  {target.person_name}
+                </span>
               </DialogDescription>
             </DialogHeader>
-
             {partnerNames.length > 0 && (
               <div className="rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 p-3 text-xs">
-                Partner link: <b>{partnerNames.join(", ")}</b> — consider rostering together.
+                Partner link: <b>{partnerNames.join(", ")}</b> — consider
+                rostering together.
               </div>
             )}
-
             <div className="space-y-2 max-h-[360px] overflow-auto -mx-1 px-1">
               {candidates.length === 0 && (
                 <div className="text-sm text-muted-foreground py-6 text-center">
@@ -477,7 +620,6 @@ function SwapDialog({
                 </div>
               ))}
             </div>
-
             <div className="flex justify-between pt-2">
               <Button
                 variant="ghost"
@@ -513,10 +655,11 @@ function ClashDialog({
     ? assignments.filter(
         (a) =>
           a.date === detail.date &&
-          a.person_name.toLowerCase() === detail.person.toLowerCase(),
+          a.person_name.toLowerCase() === detail.person.toLowerCase()
       )
     : [];
-  const allOverride = live.length > 0 && live.every((a) => a.is_override);
+  const allOverride =
+    live.length > 0 && live.every((a) => a.is_override);
 
   useEffect(() => {
     if (detail && live.length === 0) {
@@ -531,15 +674,14 @@ function ClashDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                Clash — {detail.person}
+                <AlertTriangle className="h-4 w-4 text-red-500" /> Clash —{" "}
+                {detail.person}
               </DialogTitle>
               <DialogDescription>
-                {format(parseISO(`${detail.date}T12:00:00`), "EEEE d MMMM yyyy")} · assigned to{" "}
-                {live.length} roles
+                {format(parseISO(`${detail.date}T12:00:00`), "EEEE d MMMM yyyy")} ·
+                assigned to {live.length} roles
               </DialogDescription>
             </DialogHeader>
-
             <div className="space-y-2">
               {live.map((a) => (
                 <div
@@ -557,7 +699,6 @@ function ClashDialog({
                 </div>
               ))}
             </div>
-
             <label className="flex items-center gap-2 pt-2 text-sm">
               <Checkbox
                 checked={allOverride}
@@ -567,7 +708,6 @@ function ClashDialog({
               />
               Allow as exception (double-booking approved)
             </label>
-
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close
