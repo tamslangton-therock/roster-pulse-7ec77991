@@ -45,7 +45,7 @@ export const Route = createFileRoute("/teams")({
 
 function TeamsPage() {
   const { teams, volunteers, assignments, updateTeamMembers, updateTeam, addTeam, removeTeam } =
-    useRoster() as any; // updateTeam fallback
+    useRoster();
 
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -70,16 +70,7 @@ function TeamsPage() {
   );
 
   const handleTeamUpdate = (team: Team, updatedFields: Partial<Team>) => {
-    // If updateTeam exists on store, use it; otherwise update member list
-    if (updateTeam) {
-      updateTeam(team.id, updatedFields);
-    } else {
-      if (updatedFields.team_name) team.team_name = updatedFields.team_name;
-      if (updatedFields.serving_area) team.serving_area = updatedFields.serving_area;
-      if (updatedFields.member_names) {
-        updateTeamMembers(team.id, updatedFields.member_names);
-      }
-    }
+    updateTeam(team.id, updatedFields);
 
     const impactedDates = assignments
       .filter((a) => a.team_name === team.team_name && new Date(a.date) >= new Date())
@@ -295,7 +286,6 @@ function TeamCard({
           </div>
         )}
 
-        {/* --- EDIT / DELETE ACTION BUTTONS --- */}
         <div className="flex items-center gap-1">
           {isEditing ? (
             <>
@@ -403,5 +393,4 @@ function TeamCard({
   );
 }
 
-// Silence unused warnings
 void UserMinus;
