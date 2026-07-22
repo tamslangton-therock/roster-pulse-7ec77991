@@ -53,6 +53,11 @@ function VolunteersPage() {
   const [newAreas] = useState<string[]>(["Welcome"]);
   const [newMax, setNewMax] = useState(2);
 
+  // Track row being edited in Table view
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [rowEditName, setRowEditName] = useState("");
+  const [rowEditMax, setRowEditMax] = useState(2);
+
   const allAreas = useMemo(() => {
     const set = new Set<string>();
     volunteers.forEach((v: Volunteer) =>
@@ -75,6 +80,21 @@ function VolunteersPage() {
   const handleUpdate = (id: string, updates: Partial<Volunteer>) => {
     updateVolunteer(id, updates);
     toast.success("Volunteer updated");
+  };
+
+  const handleStartRowEdit = (v: Volunteer) => {
+    setEditingRowId(v.id);
+    setRowEditName(v.full_name);
+    setRowEditMax(v.max_serves_per_month);
+  };
+
+  const handleSaveRowEdit = (id: string) => {
+    if (!rowEditName.trim()) return;
+    handleUpdate(id, {
+      full_name: rowEditName.trim(),
+      max_serves_per_month: Number(rowEditMax),
+    });
+    setEditingRowId(null);
   };
 
   return (
@@ -115,7 +135,127 @@ function VolunteersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {/* Table / List View */}
+      <div className="border rounded-lg bg-card overflow-hidden">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-muted/50 text-xs uppercase text-muted-foreground font-medium border-b">
+            <tr>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Serving Areas</th>
+              <th className="px-4 py-3">Max / Month</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filtered.map((v) => {
+              const isEditing = editingRowId === v.id;
+
+              return (
+                <tr key={v.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3 font-medium">
+                    {isEditing ? (
+                      <Input
+                        value={rowEditName}
+                        onChange={(e) => setRowEditName(e.target.value)}
+                        className="h-8 max-w-[200px]"
+                      />
+                    ) : (
+                      v.full_name
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {v.serving_areas.map((area) => (
+                        <span
+                          key={area}
+                          className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
+                        >
+                          {area}
+                          <button
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() =>
+                              handleUpdate(v.id, {
+                                serving_areas: v.serving_areas.filter(
+                                  (a) => a !== area,
+                                ),
+                              })
+                            }
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        value={rowEditMax}
+                        onChange={(e) => setRowEditMax(Number(e.target.value))}
+                        className="h-8 w-20"
+                        min={1}
+                      />
+                    ) : (
+                      `${v.max_serves_per_month} serves`
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {isEditing ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSaveRowEdit(v.id)}
+                            className="h-8 w-8 text-green-600"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRowId(null)}
+                            className="h-8 w-8"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleStartRowEdit(v)}
+                            title="Edit volunteer"
+                            className="h-8 w-8 bg-background border-input"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              removeVolunteer(v.id);
+                              toast.info(`Removed ${v.full_name}`);
+                            }}
+                            className="h-8 w-8 text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Grid Card View */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
         {filtered.map((v: Volunteer) => (
           <VolunteerCard
             key={v.id}
@@ -130,6 +270,7 @@ function VolunteersPage() {
         ))}
       </div>
 
+      {/* Add Modal */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent>
           <DialogHeader>
@@ -203,7 +344,6 @@ function VolunteerCard({
   const [editMax, setEditMax] = useState(volunteer.max_serves_per_month);
   const [newAreaPick, setNewAreaPick] = useState("");
 
-  // Sync internal edit state if volunteer prop changes
   useEffect(() => {
     setEditName(volunteer.full_name);
     setEditMax(volunteer.max_serves_per_month);
