@@ -79,23 +79,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 function PasscodeGate({ children }: { children: ReactNode }) {
+  // Always defaults to unauthenticated on every fresh page load/reload
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const savedAuth = sessionStorage.getItem("roster_auth");
-    if (savedAuth === "true") {
-      setIsAuthenticated(true);
-    }
-    setLoading(false);
-  }, []);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
     if (passcode === MASTER_PASSCODE) {
-      sessionStorage.setItem("roster_auth", "true");
       setIsAuthenticated(true);
       setError(false);
     } else {
@@ -104,12 +95,9 @@ function PasscodeGate({ children }: { children: ReactNode }) {
   };
 
   const handleLock = () => {
-    sessionStorage.removeItem("roster_auth");
     setIsAuthenticated(false);
     setPasscode("");
   };
-
-  if (loading) return null;
 
   if (!isAuthenticated) {
     return (
