@@ -18,6 +18,9 @@ import {
   Printer,
   Share2,
   Users,
+  CalendarX,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
@@ -35,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -66,7 +70,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Interactive Sunday roster grid with team filtering, shareable view, clash detection, and smart swaps.",
+          "Interactive Sunday roster grid with team filtering, blackout date management, shareable view, and smart swaps.",
       },
     ],
   }),
@@ -82,6 +86,7 @@ export type AssignmentStatus =
 interface VolunteerWorkloadStats {
   total: number;
   clashDates: Set<string>;
+  blackoutClashDates: Set<string>;
 }
 
 function LiveRosterPage() {
@@ -103,15 +108,45 @@ function LiveRosterPage() {
     date: string;
     person: string;
     items: Assignment[];
+    isBlackout?: boolean;
   } | null>(null);
+
+  // Blackout Dates Management Dialog state
+  const [selectedVolunteerForBlackouts, setSelectedVolunteerForBlackouts] =
+    useState<{ id: string; name: string } | null>(null);
+
+  // Volunteer Blackouts Map state: volunteer_name (lowercase) -> Set<"YYYY-MM-DD">
+  const [blackoutsMap, setBlackoutsMap] = useState<Record<string, Set<string>>>(
+    {
+      // Sample mock blackout data for demonstration
+      "john doe": new Set(["2026-08-02", "2026-08-16"]),
+      "jane smith": new Set(["2026-08-09"]),
+    }
+  );
+
+  const toggleBlackoutDate = (volunteerName: string, dateStr: string) => {
+    const key = volunteerName.toLowerCase();
+    setBlackoutsMap((prev) => {
+      const currentSet = new Set(prev[key] || []);
+      if (currentSet.has(dateStr)) {
+        currentSet.delete(dateStr);
+        toast.info(`Removed blackout date ${dateStr} for ${volunteerName}`);
+      } else {
+        currentSet.add(dateStr);
+        toast.success(`Marked ${dateStr} as unavailable for ${volunteerName}`);
+      }
+      return { ...prev, [key]: currentSet };
+    });
+  };
 
   // Status mapping stored by assignment ID
   const [statusMap, setStatusMap] = useState<Record<string, AssignmentStatus>>(
     {}
   );
 
-  // Helper to update search params
-  const updateSearchParams = (updates: Partial<z.infer<typeof rosterSearchSchema>>) => {
+  const updateSearchParams = (
+    updates: Partial<z.infer<typeof rosterSearchSchema>>
+  ) => {
     navigate({
       search: (prev) => ({
         ...prev,
@@ -192,7 +227,7 @@ function LiveRosterPage() {
     });
   }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
-  // Workload stats calculation
+  // Workload stats calculation + Blackout Clash Detection
   const volunteerStatsMap = useMemo(() => {
     const map = new Map<string, VolunteerWorkloadStats>();
     const visibleDatesSet = new Set(shownDates);
@@ -203,10 +238,20 @@ function LiveRosterPage() {
       const key = a.person_name.toLowerCase();
 
       if (!map.has(key)) {
-        map.set(key, { total: 0, clashDates: new Set() });
+        map.set(key, {
+          total: 0,
+          clashDates: new Set(),
+          blackoutClashDates: new Set(),
+        });
       }
       const stat = map.get(key)!;
       stat.total += 1;
+
+      // Check for Blackout clash
+      const personBlackouts = blackoutsMap[key];
+      if (personBlackouts && personBlackouts.has(a.date)) {
+        stat.blackoutClashDates.add(a.date);
+      }
 
       if (!volDateCounts.has(key)) {
         volDateCounts.set(key, new Map());
@@ -221,13 +266,13 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, shownDates]);
+  }, [filteredAssignments, shownDates, blackoutsMap]);
 
-  // Double booked count
+  // Double booked count & Blackout clashes count
   const doubleBookedVolunteersCount = useMemo(() => {
     let count = 0;
     for (const stat of volunteerStatsMap.values()) {
-      if (stat.clashDates.size > 0) count++;
+      if (stat.clashDates.size > 0 || stat.blackoutClashDates.size > 0) count++;
     }
     return count;
   }, [volunteerStatsMap]);
@@ -242,11 +287,16 @@ function LiveRosterPage() {
     [volunteers]
   );
 
-  // Group clashes by date for Clashes column
+  // Group clashes by date for Clashes column (including blackout clashes)
   const dateClashesMap = useMemo(() => {
     const map = new Map<
       string,
-      Array<{ person: string; roles: string[]; areas: string[] }>
+      Array<{
+        person: string;
+        roles: string[];
+        areas: string[];
+        isBlackoutClash?: boolean;
+      }>
     >();
 
     for (const d of dates) {
@@ -263,14 +313,20 @@ function LiveRosterPage() {
         person: string;
         roles: string[];
         areas: string[];
+        isBlackoutClash?: boolean;
       }> = [];
 
       for (const [person, items] of personMap.entries()) {
-        if (items.length > 1) {
+        const key = person.toLowerCase();
+        const hasDoubleBook = items.length > 1;
+        const isBlackout = blackoutsMap[key]?.has(d);
+
+        if (hasDoubleBook || isBlackout) {
           dayClashes.push({
             person,
             roles: items.map((i) => i.label),
             areas: Array.from(new Set(items.map((i) => i.area))),
+            isBlackoutClash: isBlackout,
           });
         }
       }
@@ -281,7 +337,7 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, dates]);
+  }, [filteredAssignments, dates, blackoutsMap]);
 
   const copyShareableLink = () => {
     const url = window.location.href;
@@ -349,7 +405,14 @@ function LiveRosterPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {shownDates.length} Sundays · {filteredAssignments.length} assignments
             {selectedTeam !== "all" && ` (${selectedTeam})`} ·{" "}
-            <span className="text-red-500 font-medium">{clashes.length} clashes</span>
+            <span className="text-red-500 font-medium">
+              {clashes.length +
+                Array.from(volunteerStatsMap.values()).reduce(
+                  (acc, curr) => acc + curr.blackoutClashDates.size,
+                  0
+                )}{" "}
+              clashes/blackouts
+            </span>
           </p>
         </div>
 
@@ -445,7 +508,7 @@ function LiveRosterPage() {
               checked={showClashesOnly}
               onCheckedChange={(v) => setShowClashesOnly(!!v)}
             />
-            Clashes only
+            Clashes & Blackouts only
           </label>
         </div>
       )}
@@ -479,14 +542,14 @@ function LiveRosterPage() {
                 ? "All active volunteers have clear single assignments across scheduled dates."
                 : `${doubleBookedVolunteersCount} volunteer${
                     doubleBookedVolunteersCount > 1 ? "s have" : " has"
-                  } multi-role double-bookings.`}
+                  } clashes or blackout date conflicts.`}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
           <span className="px-3 py-1 rounded-full border bg-muted/50 font-medium">
-            Double-Booked Volunteers:{" "}
+            Clashed/Blackout Volunteers:{" "}
             <strong
               className={
                 doubleBookedVolunteersCount > 0
@@ -519,7 +582,7 @@ function LiveRosterPage() {
                 ))}
                 {/* Clashes Header */}
                 <th className="border-b border-l bg-muted/90 p-2 text-left font-semibold text-xs text-foreground min-w-[220px] whitespace-nowrap print:bg-transparent">
-                  Clashes
+                  Clashes & Blackouts
                 </th>
               </tr>
             </thead>
@@ -561,11 +624,14 @@ function LiveRosterPage() {
                                 const stats = volunteerStatsMap.get(key) || {
                                   total: 0,
                                   clashDates: new Set(),
+                                  blackoutClashDates: new Set(),
                                 };
                                 const paused = pausedNames.has(key);
                                 const isClash = clashKey.has(`${a.date}||${key}`);
                                 const overridden = clashKey.get(`${a.date}||${key}`);
                                 const isDoubleBookedOnDate = stats.clashDates.has(a.date);
+                                const isBlackoutOnDate =
+                                  blackoutsMap[key]?.has(a.date) ?? false;
                                 const currentStatus: AssignmentStatus =
                                   statusMap[a.id] ||
                                   (a as any).status ||
@@ -582,6 +648,7 @@ function LiveRosterPage() {
                                     totalWorkload={stats.total}
                                     clashDatesCount={stats.clashDates.size}
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
+                                    isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
                                     onStatusChange={(s) =>
                                       setAssignmentStatus(a.id, s)
@@ -597,6 +664,17 @@ function LiveRosterPage() {
                                         date: a.date,
                                         person: a.person_name,
                                         items,
+                                        isBlackout: isBlackoutOnDate,
+                                      });
+                                    }}
+                                    onManageBlackouts={() => {
+                                      const vol = volunteers.find(
+                                        (v) =>
+                                          v.full_name.toLowerCase() === key
+                                      );
+                                      setSelectedVolunteerForBlackouts({
+                                        id: vol?.id || a.id,
+                                        name: a.person_name,
                                       });
                                     }}
                                   />
@@ -633,18 +711,39 @@ function LiveRosterPage() {
                                     date: d,
                                     person: c.person,
                                     items,
+                                    isBlackout: c.isBlackoutClash,
                                   });
                                 }}
                                 className={cn(
-                                  "text-left rounded-md border border-red-500/40 bg-red-500/15 p-2 text-xs transition-colors",
-                                  !isShareView && "hover:bg-red-500/25 cursor-pointer"
+                                  "text-left rounded-md border p-2 text-xs transition-colors",
+                                  c.isBlackoutClash
+                                    ? "border-purple-500/40 bg-purple-500/15"
+                                    : "border-red-500/40 bg-red-500/15",
+                                  !isShareView && "hover:opacity-80 cursor-pointer"
                                 )}
                               >
-                                <div className="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-300">
-                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
-                                  <span>{c.person}</span>
+                                <div className="flex items-center gap-1.5 font-semibold">
+                                  {c.isBlackoutClash ? (
+                                    <CalendarX className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                                  ) : (
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
+                                  )}
+                                  <span
+                                    className={
+                                      c.isBlackoutClash
+                                        ? "text-purple-700 dark:text-purple-300"
+                                        : "text-red-700 dark:text-red-300"
+                                    }
+                                  >
+                                    {c.person}
+                                  </span>
                                 </div>
-                                <div className="mt-1 text-[11px] text-red-800/90 dark:text-red-200/90 space-y-0.5">
+                                <div className="mt-1 text-[11px] opacity-90 space-y-0.5">
+                                  {c.isBlackoutClash && (
+                                    <div className="font-semibold text-purple-700 dark:text-purple-300">
+                                      ⚠ Blackout Date Conflict
+                                    </div>
+                                  )}
                                   <div>
                                     <span className="font-medium">Roles:</span>{" "}
                                     {c.roles.join(", ")}
@@ -672,6 +771,27 @@ function LiveRosterPage() {
         <>
           <SwapDialog target={swapTarget} onClose={() => setSwapTarget(null)} />
           <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
+          <BlackoutManagementDialog
+            volunteer={selectedVolunteerForBlackouts}
+            blackouts={
+              selectedVolunteerForBlackouts
+                ? Array.from(
+                    blackoutsMap[
+                      selectedVolunteerForBlackouts.name.toLowerCase()
+                    ] || []
+                  )
+                : []
+            }
+            onToggleDate={(dateStr) => {
+              if (selectedVolunteerForBlackouts) {
+                toggleBlackoutDate(
+                  selectedVolunteerForBlackouts.name,
+                  dateStr
+                );
+              }
+            }}
+            onClose={() => setSelectedVolunteerForBlackouts(null)}
+          />
         </>
       )}
     </div>
@@ -679,7 +799,7 @@ function LiveRosterPage() {
 }
 
 /**
- * High-Visibility Status Badge with Workload & Double-Booking Highlights
+ * High-Visibility Status Badge with Workload, Double-Booking, & Blackout Highlights
  */
 function StatusCellBadge({
   assignment,
@@ -690,10 +810,12 @@ function StatusCellBadge({
   totalWorkload,
   clashDatesCount,
   isDoubleBookedOnDate,
+  isBlackoutOnDate,
   isShareView,
   onStatusChange,
   onSelectSwap,
   onSelectClash,
+  onManageBlackouts,
 }: {
   assignment: Assignment;
   status: AssignmentStatus;
@@ -703,12 +825,17 @@ function StatusCellBadge({
   totalWorkload: number;
   clashDatesCount: number;
   isDoubleBookedOnDate: boolean;
+  isBlackoutOnDate: boolean;
   isShareView?: boolean;
   onStatusChange: (status: AssignmentStatus) => void;
   onSelectSwap: () => void;
   onSelectClash: () => void;
+  onManageBlackouts: () => void;
 }) {
   const getBadgeStyle = () => {
+    if (isBlackoutOnDate) {
+      return "bg-purple-500/20 text-purple-800 dark:text-purple-300 border-purple-500/40 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(168,85,247,0.08)_5px,rgba(168,85,247,0.08)_10px)]";
+    }
     if (paused) {
       return "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40";
     }
@@ -732,18 +859,20 @@ function StatusCellBadge({
   };
 
   const getIcon = () => {
-    if (paused) return <Pause className="h-3 w-3 text-amber-600" />;
-    if (isClash) return <AlertTriangle className="h-3 w-3 text-red-600" />;
+    if (isBlackoutOnDate)
+      return <CalendarX className="h-3 w-3 text-purple-600 shrink-0" />;
+    if (paused) return <Pause className="h-3 w-3 text-amber-600 shrink-0" />;
+    if (isClash) return <AlertTriangle className="h-3 w-3 text-red-600 shrink-0" />;
     switch (status) {
       case "reminder_sent":
-        return <Clock className="h-3 w-3 text-amber-600" />;
+        return <Clock className="h-3 w-3 text-amber-600 shrink-0" />;
       case "declined":
-        return <XCircle className="h-3 w-3 text-red-600" />;
+        return <XCircle className="h-3 w-3 text-red-600 shrink-0" />;
       case "confirmed":
-        return <CheckCircle2 className="h-3 w-3 text-emerald-600" />;
+        return <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />;
       case "pending":
       default:
-        return <HelpCircle className="h-3 w-3 text-gray-400" />;
+        return <HelpCircle className="h-3 w-3 text-gray-400 shrink-0" />;
     }
   };
 
@@ -760,7 +889,7 @@ function StatusCellBadge({
         disabled={isShareView}
         onClick={() => {
           if (isShareView) return;
-          if (isClash && !overridden) {
+          if ((isClash && !overridden) || isBlackoutOnDate) {
             onSelectClash();
           } else {
             onSelectSwap();
@@ -795,44 +924,161 @@ function StatusCellBadge({
         </span>
       </button>
 
-      {/* Hide status menu dropdown in shareable view or print mode */}
+      {/* Action buttons on badge */}
       {!isShareView && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="ml-1 p-0.5 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-opacity cursor-pointer print:hidden"
-              title="Change status"
-            >
-              <ChevronDown className="h-3 w-3 opacity-60 group-hover:opacity-100" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 z-50">
-            <DropdownMenuItem onClick={() => onStatusChange("pending")}>
-              <HelpCircle className="h-3.5 w-3.5 mr-2 text-gray-400" />
-              <span>Gray: Pending</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onStatusChange("reminder_sent")}>
-              <Clock className="h-3.5 w-3.5 mr-2 text-amber-500" />
-              <span>Yellow: Reminder</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                onStatusChange("declined");
-                onSelectSwap();
-              }}
-            >
-              <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
-              <span>Red: Declined</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onStatusChange("confirmed")}>
-              <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-500" />
-              <span>Green: Confirmed</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-0.5 print:hidden">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onManageBlackouts();
+            }}
+            className="p-0.5 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-opacity cursor-pointer opacity-50 group-hover:opacity-100"
+            title="Manage Blackout / Unavailable Dates"
+          >
+            <CalendarX className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-0.5 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-opacity cursor-pointer"
+                title="Change status"
+              >
+                <ChevronDown className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 z-50">
+              <DropdownMenuItem onClick={() => onStatusChange("pending")}>
+                <HelpCircle className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                <span>Gray: Pending</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onStatusChange("reminder_sent")}
+              >
+                <Clock className="h-3.5 w-3.5 mr-2 text-amber-500" />
+                <span>Yellow: Reminder</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  onStatusChange("declined");
+                  onSelectSwap();
+                }}
+              >
+                <XCircle className="h-3.5 w-3.5 mr-2 text-red-500" />
+                <span>Red: Declined</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onStatusChange("confirmed")}>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-500" />
+                <span>Green: Confirmed</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Dialog to view, add, or clear unavailable / blackout dates for a specific volunteer
+ */
+function BlackoutManagementDialog({
+  volunteer,
+  blackouts,
+  onToggleDate,
+  onClose,
+}: {
+  volunteer: { id: string; name: string } | null;
+  blackouts: string[];
+  onToggleDate: (dateStr: string) => void;
+  onClose: () => void;
+}) {
+  const [newDate, setNewDate] = useState("");
+
+  return (
+    <Dialog open={!!volunteer} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        {volunteer && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarX className="h-5 w-5 text-purple-600" />
+                Manage Blackouts — {volunteer.name}
+              </DialogTitle>
+              <DialogDescription>
+                Add or remove dates when this volunteer is unavailable.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2">
+              {/* Add Blackout Input */}
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="flex-1 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (newDate) {
+                      onToggleDate(newDate);
+                      setNewDate("");
+                    }
+                  }}
+                  disabled={!newDate}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add Date
+                </Button>
+              </div>
+
+              {/* Current Blackout Dates List */}
+              <div className="space-y-2 max-h-[220px] overflow-auto border rounded-lg p-2 bg-muted/20">
+                <div className="text-xs font-semibold text-muted-foreground mb-1">
+                  Current Unavailable Dates ({blackouts.length}):
+                </div>
+
+                {blackouts.length === 0 ? (
+                  <div className="text-xs text-muted-foreground py-4 text-center">
+                    No blackout dates set for {volunteer.name}.
+                  </div>
+                ) : (
+                  blackouts
+                    .sort()
+                    .map((dateStr) => (
+                      <div
+                        key={dateStr}
+                        className="flex items-center justify-between rounded-md border bg-card px-3 py-1.5 text-xs"
+                      >
+                        <span className="font-medium">
+                          {format(parseISO(`${dateStr}T12:00:00`), "EEEE, d MMMM yyyy")}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => onToggleDate(dateStr)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Done
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -937,7 +1183,12 @@ function ClashDialog({
   detail,
   onClose,
 }: {
-  detail: { date: string; person: string; items: Assignment[] } | null;
+  detail: {
+    date: string;
+    person: string;
+    items: Assignment[];
+    isBlackout?: boolean;
+  } | null;
   onClose: () => void;
 }) {
   const { assignments, setOverride, removeAssignment } = useRoster();
@@ -964,14 +1215,26 @@ function ClashDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" /> Clash —{" "}
+                {detail.isBlackout ? (
+                  <CalendarX className="h-5 w-5 text-purple-600" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                )}
+                {detail.isBlackout ? "Blackout Clash — " : "Double-Booking Clash — "}
                 {detail.person}
               </DialogTitle>
               <DialogDescription>
                 {format(parseISO(`${detail.date}T12:00:00`), "EEEE d MMMM yyyy")} ·
-                assigned to {live.length} roles
+                assigned to {live.length} role(s)
               </DialogDescription>
             </DialogHeader>
+
+            {detail.isBlackout && (
+              <div className="rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-800 dark:text-purple-300 p-3 text-xs font-medium">
+                ⚠ {detail.person} has marked this date as unavailable / blacked out.
+              </div>
+            )}
+
             <div className="space-y-2">
               {live.map((a) => (
                 <div
@@ -996,7 +1259,7 @@ function ClashDialog({
                   live.forEach((a) => setOverride(a.id, !!v));
                 }}
               />
-              Allow as exception (double-booking approved)
+              Allow as exception (approved assignment)
             </label>
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>
