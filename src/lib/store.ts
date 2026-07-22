@@ -1,65 +1,132 @@
 import { create } from "zustand";
-import { initialVolunteers, initialAssignments, initialDates } from "@/data/roster-data";
-import type { Volunteer, Assignment } from "@/lib/types";
+import { persist, createJSONStorage } from "zustand/middleware";
+import type { Volunteer, Assignment } from "./types";
 
-interface RosterState {
+interface RosterStore {
   volunteers: Volunteer[];
   assignments: Assignment[];
-  dates: string[];
-  blackoutsMap: Record<string, string[]>; // volunteerId or lowercase name -> dates[]
+  blackoutsMap: Record<string, string[]>;
   
   // Actions
-  addVolunteer: (volunteer: Volunteer) => void;
+  setVolunteers: (volunteers: Volunteer[]) => void;
   updateVolunteer: (volunteer: Volunteer) => void;
-  setVolunteerBlackouts: (volunteerName: string, dates: string[]) => void;
+  setAssignments: (assignments: Assignment[]) => void;
   toggleBlackoutDate: (volunteerName: string, dateStr: string) => void;
+  getBlackoutDates: (volunteerName: string) => string[];
+  resetStore: () => void;
 }
 
-export const useRoster = create<RosterState>((set) => ({
-  volunteers: initialVolunteers,
-  assignments: initialAssignments,
-  dates: initialDates,
-  blackoutsMap: {
-    "tamara langton": ["2026-08-02", "2026-08-16"],
+const initialVolunteers: Volunteer[] = [
+  {
+    id: "1",
+    full_name: "Alex Morgan",
+    email: "alex.m@example.com",
+    phone: "555-0101",
+    serving_areas: ["Worship", "AV"],
+    is_paused: false,
+    blackout_dates: [],
   },
+  {
+    id: "2",
+    full_name: "Sam Taylor",
+    email: "sam.t@example.com",
+    phone: "555-0102",
+    serving_areas: ["Welcome", "Hospitality"],
+    is_paused: false,
+    blackout_dates: [],
+  },
+];
 
-  addVolunteer: (volunteer) =>
-    set((state) => ({ volunteers: [...state.volunteers, volunteer] })),
+const initialAssignments: Assignment[] = [];
 
-  updateVolunteer: (volunteer) =>
-    set((state) => ({
-      volunteers: state.volunteers.map((v) =>
-        v.id === volunteer.id ? volunteer : v
-      ),
-    })),
+export const useRoster = create<RosterStore>()(
+  persist(
+    (set, get) => ({
+      volunteers: initialVolunteers,
+      assignments: initialAssignments,
+      blackoutsMap: {},
 
-  setVolunteerBlackouts: (volunteerName, dates) =>
-    set((state) => ({
-      blackoutsMap: {
-        ...state.blackoutsMap,
-        [volunteerName.toLowerCase()]: dates,
+      setVolunteers: (volunteers) =>
+        set({ volunteers: Array.isArray(volunteers) ? volunteers : [] }),
+
+      updateVolunteer: (updated) =>
+        set((state) => {
+          const current = Array.isArray(state.volunteers) ? state.volunteers : [];
+          return {
+            volunteers: current.map((v) => (v.id === updated.id ? updated : v)),
+          };
+        }),
+
+      setAssignments: (assignments) =>
+        set({ assignments: Array.isArray(assignments) ? assignments : [] }),
+
+      toggleBlackoutDate: (volunteerName, dateStr) => {
+        if (!volunteerName || !dateStr) return;
+        const key = volunteerName.toLowerCase();
+
+        set((state) => {
+          const currentMap = state.blackoutsMap || {};
+          const currentDates = Array.isArray(currentMap[key]) ? currentMap[key] : [];
+          const updatedDates = currentDates.includes(dateStr)
+            ? currentDates.filter((d) => d !== dateStr)
+            : [...currentDates, dateStr].sort();
+
+          // Also keep individual volunteer object in sync if present
+          const currentVolunteers = Array.isArray(state.volunteers) ? state.volunteers : [];
+          const updatedVolunteers = currentVolunteers.map((v) => {
+            if (v?.full_name?.toLowerCase() === key) {
+              return {
+                ...v,
+                blackout_dates: updatedDates,
+              };
+            }
+            return v;
+          });
+
+          return {
+            blackoutsMap: {
+              ...currentMap,
+              [key]: updatedDates,
+            },
+            volunteers: updatedVolunteers,
+          };
+        });
       },
-    })),
 
-  toggleBlackoutDate: (volunteerName, dateStr) =>
-    set((state) => {
-      const key = volunteerName.toLowerCase();
-      const current = state.blackoutsMap[key] || [];
-      const updated = current.includes(dateStr)
-        ? current.filter((d) => d !== dateStr)
-        : [...current, dateStr].sort();
+      getBlackoutDates: (volunteerName) => {
+        if (!volunteerName) return [];
+        const key = volunteerName.toLowerCase();
+        const state = get();
+        
+        const mapDates = state?.blackoutsMap?.[key];
+        if (Array.isArray(mapDates)) return mapDates;
 
-      return {
-        blackoutsMap: {
-          ...state.blackoutsMap,
-          [key]: updated,
-        },
-      };
+        const vol = (state?.volunteers || []).find(
+          (v) => v?.full_name?.toLowerCase() === key
+        );
+        return Array.isArray(vol?.blackout_dates) ? vol.blackout_dates : [];
+      },
+
+      resetStore: () =>
+        set({
+          volunteers: initialVolunteers,
+          assignments: initialAssignments,
+          blackoutsMap: {},
+        }),
     }),
-}));
-
-export function findVolunteer(volunteers: Volunteer[], name: string) {
-  return volunteers.find(
-    (v) => v.full_name.toLowerCase() === name.toLowerCase()
-  );
-}
+    {
+      name: "roster-pulse-storage",
+      storage: createJSONStorage(() => localStorage),
+      // Merge strategy guarantees empty arrays if localStorage contained bad/corrupted data
+      merge: (persistedState: any, currentState) => {
+        const merged = { ...currentState, ...(persistedState as object) };
+        return {
+          ...merged,
+          volunteers: Array.isArray(merged.volunteers) ? merged.volunteers : currentState.volunteers,
+          assignments: Array.isArray(merged.assignments) ? merged.assignments : currentState.assignments,
+          blackoutsMap: merged.blackoutsMap && typeof merged.blackoutsMap === "object" ? merged.blackoutsMap : {},
+        };
+      },
+    }
+  )
+);
