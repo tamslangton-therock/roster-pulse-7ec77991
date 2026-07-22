@@ -430,7 +430,7 @@ function VolunteerSheet({
   volunteer: Volunteer | null;
   onClose: () => void;
 }) {
-  const { assignments, updateVolunteer, togglePause, volunteers, dates } = useRoster();
+  const { assignments, updateVolunteer, togglePause, volunteers } = useRoster();
   const [newUnavailableDate, setNewUnavailableDate] = useState("");
   
   if (!volunteer) return null;
