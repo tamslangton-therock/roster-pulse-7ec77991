@@ -18,6 +18,7 @@ export interface Volunteer {
   priority_area: string;
   is_paused: boolean;
   notes: string;
+  unavailable_dates?: string[]; // ISO dates when volunteer cannot serve
 }
 
 export interface Team {
