@@ -47,18 +47,20 @@ export const useRoster = create<RosterState>()(
 
       removeTeam: (id) =>
         set((state) => ({
-          teams: state.teams.filter((t) => t.id !== id),
+          teams: state.teams.filter((t) => String(t.id) !== String(id)),
         })),
 
       updateTeam: (id, updates) =>
         set((state) => ({
-          teams: state.teams.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+          teams: state.teams.map((t) =>
+            String(t.id) === String(id) ? { ...t, ...updates } : t
+          ),
         })),
 
       updateTeamMembers: (teamId, memberNames) =>
         set((state) => ({
           teams: state.teams.map((t) =>
-            t.id === teamId ? { ...t, member_names: memberNames } : t
+            String(t.id) === String(teamId) ? { ...t, member_names: memberNames } : t
           ),
         })),
 
@@ -76,15 +78,49 @@ export const useRoster = create<RosterState>()(
 
       removeVolunteer: (id) =>
         set((state) => ({
-          volunteers: state.volunteers.filter((v) => v.id !== id),
+          volunteers: state.volunteers.filter((v) => String(v.id) !== String(id)),
         })),
 
       updateVolunteer: (id, updates) =>
-        set((state) => ({
-          volunteers: state.volunteers.map((v) =>
-            v.id === id ? { ...v, ...updates } : v
-          ),
-        })),
+        set((state) => {
+          const targetVolunteer = state.volunteers.find(
+            (v) => String(v.id) === String(id)
+          );
+          const oldName = targetVolunteer?.full_name;
+          const newName = updates.full_name;
+
+          // 1. Update the volunteer list
+          const updatedVolunteers = state.volunteers.map((v) =>
+            String(v.id) === String(id) ? { ...v, ...updates } : v
+          );
+
+          // If full_name wasn't changed, return early
+          if (!oldName || !newName || oldName === newName) {
+            return { volunteers: updatedVolunteers };
+          }
+
+          // 2. Cascade updated volunteer name into Teams member_names array
+          const updatedTeams = state.teams.map((team) => ({
+            ...team,
+            member_names: team.member_names.map((name) =>
+              name === oldName ? newName : name
+            ),
+          }));
+
+          // 3. Cascade updated volunteer name into Assignments
+          const updatedAssignments = state.assignments.map((assignment) => {
+            if ((assignment as any).volunteer_name === oldName) {
+              return { ...assignment, volunteer_name: newName };
+            }
+            return assignment;
+          });
+
+          return {
+            volunteers: updatedVolunteers,
+            teams: updatedTeams,
+            assignments: updatedAssignments,
+          };
+        }),
 
       // --- ASSIGNMENTS ---
       setAssignments: (assignments) => set({ assignments }),
@@ -92,12 +128,12 @@ export const useRoster = create<RosterState>()(
       updateAssignment: (id, updates) =>
         set((state) => ({
           assignments: state.assignments.map((a) =>
-            a.id === id ? { ...a, ...updates } : a
+            String(a.id) === String(id) ? { ...a, ...updates } : a
           ),
         })),
     }),
     {
-      name: "roster-pulse-v3",
+      name: "roster-pulse-v4", // Incremented storage version to automatically refresh cache
     }
   )
 );
