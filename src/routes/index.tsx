@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { format, parseISO, isBefore, startOfDay } from "date-fns";
-import { AlertTriangle, Filter, Pause, RefreshCcw, UserPlus, Users, Eye, EyeOff } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { format, parseISO } from "date-fns";
+import { AlertTriangle, Filter, Pause, RefreshCcw, Eye, EyeOff } from "lucide-react";
 
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
@@ -10,7 +10,6 @@ import {
   rankSwapCandidates,
 } from "@/lib/roster-engine";
 import type { Assignment } from "@/lib/types";
-import { ToneBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -85,24 +83,23 @@ function LiveRosterPage() {
     return Array.from(s).sort();
   }, [dates]);
 
-  const today = useMemo(() => startOfDay(new Date()), []);
+  // Safe ISO date comparison to avoid timezone boundary issues
+  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
   const shownDates = useMemo(() => {
     return dates.filter((d) => {
       const matchesMonth = filterMonth === "all" || d.startsWith(filterMonth);
       if (!matchesMonth) return false;
 
-      if (hidePastWeeks) {
-        const dateObj = parseISO(d);
-        if (isBefore(dateObj, today)) return false;
-      }
+      if (hidePastWeeks && d < todayStr) return false;
 
       return true;
     });
-  }, [dates, filterMonth, hidePastWeeks, today]);
+  }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
-  const pausedNames = new Set(
-    volunteers.filter((v) => v.is_paused).map((v) => v.full_name.toLowerCase()),
+  const pausedNames = useMemo(
+    () => new Set(volunteers.filter((v) => v.is_paused).map((v) => v.full_name.toLowerCase())),
+    [volunteers],
   );
 
   return (
@@ -126,7 +123,7 @@ function LiveRosterPage() {
                 <SelectItem value="all">All months</SelectItem>
                 {months.map((m) => (
                   <SelectItem key={m} value={m}>
-                    {format(parseISO(m + "-01"), "MMMM yyyy")}
+                    {format(parseISO(`${m}-01T12:00:00`), "MMMM yyyy")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -139,7 +136,11 @@ function LiveRosterPage() {
               onCheckedChange={(v) => setHidePastWeeks(!!v)}
             />
             <span className="flex items-center gap-1">
-              {hidePastWeeks ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
+              {hidePastWeeks ? (
+                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
               Hide past weeks
             </span>
           </label>
@@ -187,9 +188,9 @@ function LiveRosterPage() {
                     <tr key={d} className="hover:bg-muted/30">
                       <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span>{format(parseISO(d), "d MMM")}</span>
+                          <span>{format(parseISO(`${d}T12:00:00`), "d MMM")}</span>
                           <span className="text-[11px] text-muted-foreground">
-                            {format(parseISO(d), "EEEE")}
+                            {format(parseISO(`${d}T12:00:00`), "EEEE")}
                           </span>
                         </div>
                       </td>
@@ -210,7 +211,8 @@ function LiveRosterPage() {
                                   <button
                                     key={a.id}
                                     onClick={() => {
-                                      if (isClash) {
+                                      // If it's an unapproved clash, open clash review. Otherwise, allow smart swap.
+                                      if (isClash && !overridden) {
                                         const items = assignments.filter(
                                           (x) =>
                                             x.date === a.date &&
@@ -239,9 +241,11 @@ function LiveRosterPage() {
                                     title={
                                       paused
                                         ? "Paused — needs replacement"
-                                        : isClash
+                                        : isClash && !overridden
                                           ? "Clash detected"
-                                          : "Click to swap"
+                                          : overridden
+                                            ? "Approved exception (click to swap)"
+                                            : "Click to swap"
                                     }
                                   >
                                     <div className="flex items-center gap-1 font-medium">
@@ -305,7 +309,7 @@ function SwapDialog({
             <DialogHeader>
               <DialogTitle>Smart Swap</DialogTitle>
               <DialogDescription>
-                {target.label} · {format(parseISO(target.date), "EEE d MMM yyyy")} · Replacing{" "}
+                {target.label} · {format(parseISO(`${target.date}T12:00:00`), "EEE d MMM yyyy")} · Replacing{" "}
                 <span className="font-medium text-foreground">{target.person_name}</span>
               </DialogDescription>
             </DialogHeader>
@@ -390,10 +394,17 @@ function ClashDialog({
     : [];
   const allOverride = live.length > 0 && live.every((a) => a.is_override);
 
+  // Auto-close modal if all assignments in the clash are removed
+  useEffect(() => {
+    if (detail && live.length === 0) {
+      onClose();
+    }
+  }, [detail, live.length, onClose]);
+
   return (
     <Dialog open={!!detail} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
-        {detail && (
+        {detail && live.length > 0 && (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -401,7 +412,7 @@ function ClashDialog({
                 Clash — {detail.person}
               </DialogTitle>
               <DialogDescription>
-                {format(parseISO(detail.date), "EEEE d MMMM yyyy")} · assigned to{" "}
+                {format(parseISO(`${detail.date}T12:00:00`), "EEEE d MMMM yyyy")} · assigned to{" "}
                 {live.length} roles
               </DialogDescription>
             </DialogHeader>
@@ -445,8 +456,3 @@ function ClashDialog({
     </Dialog>
   );
 }
-
-// Suppress unused import warnings for icons planned for later
-void UserPlus;
-void ToneBadge;
-void Users;
