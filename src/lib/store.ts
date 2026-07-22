@@ -83,23 +83,20 @@ export const useRoster = create<RosterState>()(
 
       updateVolunteer: (id, updates) =>
         set((state) => {
-          const targetVolunteer = state.volunteers.find(
-            (v) => String(v.id) === String(id)
-          );
-          const oldName = targetVolunteer?.full_name;
+          const target = state.volunteers.find((v) => String(v.id) === String(id));
+          const oldName = target?.full_name;
           const newName = updates.full_name;
 
-          // 1. Update the volunteer list
+          // 1. Update volunteer
           const updatedVolunteers = state.volunteers.map((v) =>
             String(v.id) === String(id) ? { ...v, ...updates } : v
           );
 
-          // If full_name wasn't changed, return early
           if (!oldName || !newName || oldName === newName) {
             return { volunteers: updatedVolunteers };
           }
 
-          // 2. Cascade updated volunteer name into Teams member_names array
+          // 2. Cascade name changes to Teams
           const updatedTeams = state.teams.map((team) => ({
             ...team,
             member_names: team.member_names.map((name) =>
@@ -107,13 +104,12 @@ export const useRoster = create<RosterState>()(
             ),
           }));
 
-          // 3. Cascade updated volunteer name into Assignments
-          const updatedAssignments = state.assignments.map((assignment) => {
-            if ((assignment as any).volunteer_name === oldName) {
-              return { ...assignment, volunteer_name: newName };
-            }
-            return assignment;
-          });
+          // 3. Cascade name changes to Assignments (person_name)
+          const updatedAssignments = state.assignments.map((assignment) =>
+            assignment.person_name === oldName
+              ? { ...assignment, person_name: newName }
+              : assignment
+          );
 
           return {
             volunteers: updatedVolunteers,
@@ -133,7 +129,7 @@ export const useRoster = create<RosterState>()(
         })),
     }),
     {
-      name: "roster-pulse-v4", // Incremented storage version to automatically refresh cache
+      name: "roster-pulse-v6", // Incremented key to automatically clear stale local storage
     }
   )
 );
