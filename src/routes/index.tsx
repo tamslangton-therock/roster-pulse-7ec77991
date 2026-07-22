@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ChevronDown,
   Layers,
+  ShieldCheck,
 } from "lucide-react";
 import { useRoster, findVolunteer } from "@/lib/store";
 import {
@@ -137,7 +138,7 @@ function LiveRosterPage() {
     });
   }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
-  // 1. Calculate volunteer workload stats and multi-row double-booking clashes across visible range
+  // Calculate volunteer workload stats and multi-row double-booking clashes across visible range
   const volunteerStatsMap = useMemo(() => {
     const map = new Map<string, VolunteerWorkloadStats>();
     const visibleDatesSet = new Set(shownDates);
@@ -186,6 +187,47 @@ function LiveRosterPage() {
       ),
     [volunteers]
   );
+
+  // Group clashes by date for quick lookup in the Clashes column
+  const dateClashesMap = useMemo(() => {
+    const map = new Map<
+      string,
+      Array<{ person: string; roles: string[]; areas: string[] }>
+    >();
+
+    for (const d of dates) {
+      const dayAssignments = assignments.filter((a) => a.date === d);
+      const personMap = new Map<string, Assignment[]>();
+
+      for (const a of dayAssignments) {
+        const key = a.person_name;
+        if (!personMap.has(key)) personMap.set(key, []);
+        personMap.get(key)!.push(a);
+      }
+
+      const dayClashes: Array<{
+        person: string;
+        roles: string[];
+        areas: string[];
+      }> = [];
+
+      for (const [person, items] of personMap.entries()) {
+        if (items.length > 1) {
+          dayClashes.push({
+            person,
+            roles: items.map((i) => i.label),
+            areas: Array.from(new Set(items.map((i) => i.area))),
+          });
+        }
+      }
+
+      if (dayClashes.length > 0) {
+        map.set(d, dayClashes);
+      }
+    }
+
+    return map;
+  }, [assignments, dates]);
 
   return (
     <div className="p-6 space-y-6">
@@ -239,7 +281,7 @@ function LiveRosterPage() {
         </div>
       </div>
 
-      {/* 2. Roster Capacity & Health Summary Banner */}
+      {/* Roster Capacity & Health Summary Banner */}
       <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div
@@ -297,13 +339,17 @@ function LiveRosterPage() {
                     {c.label}
                   </th>
                 ))}
+                {/* Rightmost Clashes Column Header */}
+                <th className="border-b border-l bg-muted/90 p-2 text-left font-semibold text-xs text-foreground min-w-[220px] whitespace-nowrap">
+                  Clashes
+                </th>
               </tr>
             </thead>
             <tbody>
               {shownDates.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={columns.length + 1}
+                    colSpan={columns.length + 2}
                     className="text-center py-8 text-muted-foreground"
                   >
                     No Sundays match the current filters.
@@ -311,8 +357,10 @@ function LiveRosterPage() {
                 </tr>
               ) : (
                 shownDates.map((d) => {
-                  const rowHasClash = clashes.some((c) => c.date === d);
+                  const dayClashesList = dateClashesMap.get(d) || [];
+                  const rowHasClash = dayClashesList.length > 0;
                   if (showClashesOnly && !rowHasClash) return null;
+
                   return (
                     <tr key={d} className="hover:bg-muted/20">
                       <td className="sticky left-0 z-10 bg-card border-b border-r p-3 font-medium whitespace-nowrap">
@@ -379,6 +427,54 @@ function LiveRosterPage() {
                           </td>
                         );
                       })}
+
+                      {/* Rightmost Clashes Column Cell */}
+                      <td className="border-b border-l bg-muted/10 p-2 align-top">
+                        {dayClashesList.length === 0 ? (
+                          <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            No Clash
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {dayClashesList.map((c, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                  const items = assignments.filter(
+                                    (x) =>
+                                      x.date === d &&
+                                      x.person_name.toLowerCase() ===
+                                        c.person.toLowerCase()
+                                  );
+                                  setClashDetail({
+                                    date: d,
+                                    person: c.person,
+                                    items,
+                                  });
+                                }}
+                                className="text-left rounded-md border border-red-500/40 bg-red-500/15 p-2 text-xs transition-colors hover:bg-red-500/25 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-1.5 font-semibold text-red-700 dark:text-red-300">
+                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
+                                  <span>{c.person}</span>
+                                </div>
+                                <div className="mt-1 text-[11px] text-red-800/90 dark:text-red-200/90 space-y-0.5">
+                                  <div>
+                                    <span className="font-medium">Roles:</span>{" "}
+                                    {c.roles.join(", ")}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Areas:</span>{" "}
+                                    {c.areas.join(", ")}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })
@@ -466,7 +562,6 @@ function StatusCellBadge({
       className={cn(
         "group flex items-center justify-between rounded-md border px-2 py-1 text-xs transition-colors shadow-xs",
         getBadgeStyle(),
-        // 4. Highlight cells where the volunteer is double-booked on that date
         isDoubleBookedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
       )}
     >
@@ -484,7 +579,6 @@ function StatusCellBadge({
         {getIcon()}
         <span className="truncate">{assignment.person_name}</span>
 
-        {/* 3. Red double-booking alert badge if double-booked across dates */}
         {clashDatesCount > 0 && (
           <span
             className="flex items-center gap-0.5 px-1 py-0.2 text-[10px] rounded-full bg-red-600 text-white font-bold shrink-0"
@@ -497,7 +591,6 @@ function StatusCellBadge({
           </span>
         )}
 
-        {/* 3. Workload capacity badge showing total shift count */}
         <span
           className="flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] rounded-md bg-black/10 dark:bg-white/15 font-mono text-muted-foreground dark:text-gray-200 shrink-0"
           title={`Assigned ${totalWorkload} shift(s) across visible range`}
@@ -507,7 +600,6 @@ function StatusCellBadge({
         </span>
       </button>
 
-      {/* Dropdown Menu for Status Switcher */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
