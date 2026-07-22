@@ -1,24 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { format, parseISO, isAfter, startOfDay } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   Users,
   Search,
   Plus,
   Calendar,
   CalendarX,
-  Clock,
-  Shield,
   PauseCircle,
   PlayCircle,
   Trash2,
-  AlertTriangle,
-  CheckCircle2,
-  X,
-  Edit2,
 } from "lucide-react";
 import { useRoster } from "@/lib/store";
-import type { Volunteer, Assignment } from "@/lib/types";
+import type { Volunteer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,16 +29,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -63,10 +48,15 @@ export const Route = createFileRoute("/volunteers")({
 });
 
 export function VolunteersPage() {
-  const { volunteers, assignments, dates, addVolunteer, updateVolunteer } =
-    useRoster();
+  const {
+    volunteers,
+    assignments,
+    blackoutsMap,
+    updateVolunteer,
+    toggleBlackoutDate,
+  } = useRoster();
 
-  // Local State
+  // Local UI State
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(
     null
@@ -86,7 +76,7 @@ export function VolunteersPage() {
     });
   }, [volunteers, searchQuery]);
 
-  // Assignments for active selected volunteer
+  // Assignments for current active volunteer
   const activeAssignments = useMemo(() => {
     if (!selectedVolunteer) return [];
     return assignments.filter(
@@ -95,29 +85,21 @@ export function VolunteersPage() {
     );
   }, [assignments, selectedVolunteer]);
 
-  // Handle toggling blackout dates
-  const handleToggleBlackoutDate = (dateStr: string) => {
+  // Blackout dates for active volunteer from store
+  const activeBlackoutDates = useMemo(() => {
+    if (!selectedVolunteer) return [];
+    return blackoutsMap[selectedVolunteer.full_name.toLowerCase()] || [];
+  }, [blackoutsMap, selectedVolunteer]);
+
+  const handleToggleBlackout = (dateStr: string) => {
     if (!selectedVolunteer) return;
-
-    const currentBlackouts = selectedVolunteer.blackout_dates || [];
-    const exists = currentBlackouts.includes(dateStr);
-
-    let updatedBlackouts: string[];
-    if (exists) {
-      updatedBlackouts = currentBlackouts.filter((d) => d !== dateStr);
+    toggleBlackoutDate(selectedVolunteer.full_name, dateStr);
+    
+    if (activeBlackoutDates.includes(dateStr)) {
       toast.info(`Removed ${dateStr} from blocked out dates.`);
     } else {
-      updatedBlackouts = [...currentBlackouts, dateStr].sort();
       toast.success(`Blocked out ${dateStr} for ${selectedVolunteer.full_name}.`);
     }
-
-    const updated = {
-      ...selectedVolunteer,
-      blackout_dates: updatedBlackouts,
-    };
-
-    updateVolunteer(updated);
-    setSelectedVolunteer(updated);
   };
 
   return (
@@ -147,13 +129,13 @@ export function VolunteersPage() {
         </div>
       </div>
 
-      {/* Volunteer Grid */}
+      {/* Volunteer Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredVolunteers.map((v) => {
           const vAssignments = assignments.filter(
             (a) => a.person_name.toLowerCase() === v.full_name.toLowerCase()
           );
-          const blackoutCount = v.blackout_dates?.length || 0;
+          const vBlackouts = blackoutsMap[v.full_name.toLowerCase()] || [];
 
           return (
             <div
@@ -195,10 +177,10 @@ export function VolunteersPage() {
                   <Calendar className="h-3.5 w-3.5" />
                   {vAssignments.length} shifts
                 </span>
-                {blackoutCount > 0 && (
+                {vBlackouts.length > 0 && (
                   <span className="flex items-center gap-1 text-purple-700 font-medium">
                     <CalendarX className="h-3.5 w-3.5" />
-                    {blackoutCount} blocked date{blackoutCount > 1 ? "s" : ""}
+                    {vBlackouts.length} blocked date{vBlackouts.length > 1 ? "s" : ""}
                   </span>
                 )}
               </div>
@@ -267,7 +249,7 @@ export function VolunteersPage() {
                       Upcoming Shifts ({activeAssignments.length})
                     </TabsTrigger>
                     <TabsTrigger value="blackouts" className="text-xs">
-                      Block Out Dates ({(selectedVolunteer.blackout_dates || []).length})
+                      Block Out Dates ({activeBlackoutDates.length})
                     </TabsTrigger>
                   </TabsList>
 
@@ -279,9 +261,7 @@ export function VolunteersPage() {
                       </div>
                     ) : (
                       activeAssignments.map((a) => {
-                        const isBlackedOut = (
-                          selectedVolunteer.blackout_dates || []
-                        ).includes(a.date);
+                        const isBlackedOut = activeBlackoutDates.includes(a.date);
 
                         return (
                           <div
@@ -338,7 +318,7 @@ export function VolunteersPage() {
                           disabled={!newBlackoutDate}
                           onClick={() => {
                             if (newBlackoutDate) {
-                              handleToggleBlackoutDate(newBlackoutDate);
+                              handleToggleBlackout(newBlackoutDate);
                               setNewBlackoutDate("");
                             }
                           }}
@@ -354,13 +334,12 @@ export function VolunteersPage() {
                         Currently Blocked Out Dates:
                       </div>
 
-                      {(!selectedVolunteer.blackout_dates ||
-                        selectedVolunteer.blackout_dates.length === 0) ? (
+                      {activeBlackoutDates.length === 0 ? (
                         <div className="text-xs text-center py-6 text-muted-foreground border border-dashed rounded-lg">
                           No blackout dates set for {selectedVolunteer.full_name}.
                         </div>
                       ) : (
-                        selectedVolunteer.blackout_dates.sort().map((dateStr) => (
+                        activeBlackoutDates.sort().map((dateStr) => (
                           <div
                             key={dateStr}
                             className="flex items-center justify-between p-2.5 rounded-lg border bg-card text-xs"
@@ -375,7 +354,7 @@ export function VolunteersPage() {
                               variant="ghost"
                               size="sm"
                               className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
-                              onClick={() => handleToggleBlackoutDate(dateStr)}
+                              onClick={() => handleToggleBlackout(dateStr)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
