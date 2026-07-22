@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Plus, Trash2, UserMinus, X } from "lucide-react";
-
+import { Check, Edit2, Plus, Trash2, UserMinus, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Team } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,9 @@ export const Route = createFileRoute("/teams")({
 });
 
 function TeamsPage() {
-  const { teams, volunteers, assignments, updateTeamMembers, addTeam, removeTeam } = useRoster();
+  const { teams, volunteers, assignments, updateTeamMembers, addTeam, removeTeam } =
+    useRoster();
+
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -68,12 +69,25 @@ function TeamsPage() {
     [teams, selectedArea],
   );
 
-  const handleMembersChange = (team: Team, members: string[]) => {
-    updateTeamMembers(team.id, members);
+  const handleTeamUpdate = (team: Team, updatedFields: Partial<Team>) => {
+    // Perform update on team
+    const updatedMembers = updatedFields.member_names ?? team.member_names;
+    
+    // Mutate team properties locally in store context
+    if (updatedFields.team_name !== undefined) {
+      team.team_name = updatedFields.team_name;
+    }
+    if (updatedFields.serving_area !== undefined) {
+      team.serving_area = updatedFields.serving_area;
+    }
+
+    updateTeamMembers(team.id, updatedMembers);
+
     const impactedDates = assignments
       .filter((a) => a.team_name === team.team_name && new Date(a.date) >= new Date())
       .map((a) => a.date);
     const unique = Array.from(new Set(impactedDates));
+
     if (unique.length > 0) {
       setReallocPrompt({ team, dates: unique });
     } else {
@@ -90,6 +104,7 @@ function TeamsPage() {
             {teams.length} teams across {areas.length} serving areas
           </p>
         </div>
+
         <div className="flex items-center gap-2">
           <Select value={selectedArea} onValueChange={setSelectedArea}>
             <SelectTrigger className="w-[180px]">
@@ -98,10 +113,13 @@ function TeamsPage() {
             <SelectContent>
               <SelectItem value="all">All areas</SelectItem>
               {areas.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
           <Button onClick={() => setShowAdd(true)}>
             <Plus className="h-4 w-4 mr-1" /> New team
           </Button>
@@ -113,8 +131,9 @@ function TeamsPage() {
           <TeamCard
             key={t.id}
             team={t}
+            areas={areas}
             volunteers={volunteers}
-            onMembersChange={(members) => handleMembersChange(t, members)}
+            onUpdateTeam={(updatedFields) => handleTeamUpdate(t, updatedFields)}
             onRemove={() => {
               removeTeam(t.id);
               toast.info(`Removed ${t.team_name}`);
@@ -129,25 +148,32 @@ function TeamsPage() {
             <DialogTitle>Create team</DialogTitle>
             <DialogDescription>Group volunteers under a serving area.</DialogDescription>
           </DialogHeader>
+
           <div className="space-y-3">
             <Input
               placeholder="Team name (e.g. Welcome Team 7)"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
+
             <Select value={newArea} onValueChange={setNewArea}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {areas.map((a) => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowAdd(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 if (!newName.trim()) return;
@@ -170,10 +196,10 @@ function TeamsPage() {
               <DialogHeader>
                 <DialogTitle>Re-allocate live roster?</DialogTitle>
                 <DialogDescription>
-                  {reallocPrompt.team.team_name} composition changed. The following
-                  upcoming Sundays reference this team and may need review.
+                  {reallocPrompt.team.team_name} composition changed. The following upcoming Sundays reference this team and may need review.
                 </DialogDescription>
               </DialogHeader>
+
               <div className="space-y-1 max-h-64 overflow-auto">
                 {reallocPrompt.dates.map((d) => (
                   <div key={d} className="rounded-md bg-muted px-3 py-2 text-sm">
@@ -181,6 +207,7 @@ function TeamsPage() {
                   </div>
                 ))}
               </div>
+
               <DialogFooter>
                 <Button variant="outline" onClick={() => setReallocPrompt(null)}>
                   Later
@@ -204,15 +231,20 @@ function TeamsPage() {
 
 function TeamCard({
   team,
+  areas,
   volunteers,
-  onMembersChange,
+  onUpdateTeam,
   onRemove,
 }: {
   team: Team;
+  areas: string[];
   volunteers: import("@/lib/types").Volunteer[];
-  onMembersChange: (members: string[]) => void;
+  onUpdateTeam: (updatedFields: Partial<Team>) => void;
   onRemove: () => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(team.team_name);
+  const [editArea, setEditArea] = useState(team.serving_area);
   const [addPick, setAddPick] = useState("");
 
   const areaVolunteers = volunteers
@@ -220,25 +252,89 @@ function TeamCard({
       (v) =>
         !team.member_names.some((m) => m.toLowerCase() === v.full_name.toLowerCase()) &&
         v.serving_areas.some(
-          (a) => a.toLowerCase() === team.serving_area.toLowerCase(),
+          (a) => a.toLowerCase() === (isEditing ? editArea : team.serving_area).toLowerCase(),
         ),
     )
     .slice(0, 200);
 
+  const handleSaveHeader = () => {
+    if (!editName.trim()) return;
+    onUpdateTeam({ team_name: editName.trim(), serving_area: editArea });
+    setIsEditing(false);
+  };
+
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            {team.serving_area}
+        {isEditing ? (
+          <div className="flex-1 space-y-2">
+            <Select value={editArea} onValueChange={setEditArea}>
+              <SelectTrigger className="h-7 text-xs uppercase tracking-wide">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {areas.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="h-8 font-semibold text-sm"
+              placeholder="Team name"
+            />
           </div>
-          <div className="font-semibold">{team.team_name}</div>
+        ) : (
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              {team.serving_area}
+            </div>
+            <div className="font-semibold">{team.team_name}</div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1">
+          {isEditing ? (
+            <>
+              <Button variant="ghost" size="icon" onClick={handleSaveHeader} title="Save changes">
+                <Check className="h-4 w-4 text-green-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setEditName(team.team_name);
+                  setEditArea(team.serving_area);
+                  setIsEditing(false);
+                }}
+                title="Cancel"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsEditing(true)}
+                title="Edit team details"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onRemove} title="Delete team">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
-        <Button variant="ghost" size="icon" onClick={onRemove} title="Delete team">
-          <Trash2 className="h-4 w-4" />
-        </Button>
       </div>
 
+      {/* Member Tags */}
       <div className="mt-3 flex flex-wrap gap-1.5 min-h-[40px]">
         {team.member_names.length === 0 && (
           <span className="text-xs text-muted-foreground italic">No members yet</span>
@@ -252,7 +348,9 @@ function TeamCard({
             <button
               className="text-muted-foreground hover:text-foreground"
               onClick={() =>
-                onMembersChange(team.member_names.filter((x) => x !== m))
+                onUpdateTeam({
+                  member_names: team.member_names.filter((x) => x !== m),
+                })
               }
               title="Remove"
             >
@@ -262,6 +360,7 @@ function TeamCard({
         ))}
       </div>
 
+      {/* Add Volunteer Selector */}
       <div className="mt-3 flex items-center gap-2">
         <Select value={addPick} onValueChange={setAddPick}>
           <SelectTrigger className="flex-1">
@@ -269,7 +368,9 @@ function TeamCard({
           </SelectTrigger>
           <SelectContent>
             {areaVolunteers.map((v) => (
-              <SelectItem key={v.id} value={v.full_name}>{v.full_name}</SelectItem>
+              <SelectItem key={v.id} value={v.full_name}>
+                {v.full_name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -278,7 +379,7 @@ function TeamCard({
           disabled={!addPick}
           onClick={() => {
             if (!addPick) return;
-            onMembersChange([...team.member_names, addPick]);
+            onUpdateTeam({ member_names: [...team.member_names, addPick] });
             setAddPick("");
           }}
         >
