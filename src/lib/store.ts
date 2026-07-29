@@ -1,12 +1,26 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { Team, Volunteer, Assignment } from "./types";
-import { initialTeams, initialVolunteers, initialAssignments } from "../data/mockData";
+import { fetchAllTabs, writeTab } from "./sheets.functions";
+import type { SheetTab } from "./sheets-config";
+import { toast } from "sonner";
+
+type SyncStatus = "idle" | "syncing" | "error";
 
 interface RosterState {
   teams: Team[];
   volunteers: Volunteer[];
   assignments: Assignment[];
+
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+  syncStatus: SyncStatus;
+
+  // Derived
+  dates: string[];
+
+  // Lifecycle
+  hydrate: () => Promise<void>;
 
   // Team Actions
   addTeam: (team_name: string, serving_area: string) => void;
@@ -15,121 +29,266 @@ interface RosterState {
   updateTeamMembers: (teamId: string, memberNames: string[]) => void;
 
   // Volunteer Actions
-  addVolunteer: (volunteer: Omit<Volunteer, "id">) => void;
+  addVolunteer: (volunteer: Partial<Volunteer> & { full_name: string } & Record<string, unknown>) => void;
   removeVolunteer: (id: string) => void;
-  updateVolunteer: (id: string, updates: Partial<Volunteer>) => void;
+  updateVolunteer: (id: string, updates: Partial<Volunteer> & Record<string, unknown>) => void;
 
   // Assignment Actions
   setAssignments: (assignments: Assignment[]) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
+  swapAssignment: (id: string, newPersonName: string) => void;
+  removeAssignment: (id: string) => void;
+  setOverride: (id: string, is_override: boolean) => void;
 }
 
-export const useRoster = create<RosterState>()(
-  persist(
-    (set) => ({
-      teams: initialTeams,
-      volunteers: initialVolunteers,
-      assignments: initialAssignments,
+// --------- Background sync ---------
+const dirtyTimers: Partial<Record<SheetTab, ReturnType<typeof setTimeout>>> = {};
+const inFlight: Partial<Record<SheetTab, boolean>> = {};
 
-      // --- TEAMS ---
-      addTeam: (team_name, serving_area) =>
-        set((state) => ({
-          teams: [
-            ...state.teams,
-            {
-              id: `team-${Date.now()}`,
-              team_name,
-              serving_area,
-              member_names: [],
-            },
-          ],
-        })),
-
-      removeTeam: (id) =>
-        set((state) => ({
-          teams: state.teams.filter((t) => String(t.id) !== String(id)),
-        })),
-
-      updateTeam: (id, updates) =>
-        set((state) => ({
-          teams: state.teams.map((t) =>
-            String(t.id) === String(id) ? { ...t, ...updates } : t
-          ),
-        })),
-
-      updateTeamMembers: (teamId, memberNames) =>
-        set((state) => ({
-          teams: state.teams.map((t) =>
-            String(t.id) === String(teamId) ? { ...t, member_names: memberNames } : t
-          ),
-        })),
-
-      // --- VOLUNTEERS ---
-      addVolunteer: (volunteer) =>
-        set((state) => ({
-          volunteers: [
-            ...state.volunteers,
-            {
-              ...volunteer,
-              id: `vol-${Date.now()}`,
-            },
-          ],
-        })),
-
-      removeVolunteer: (id) =>
-        set((state) => ({
-          volunteers: state.volunteers.filter((v) => String(v.id) !== String(id)),
-        })),
-
-      updateVolunteer: (id, updates) =>
-        set((state) => {
-          const target = state.volunteers.find((v) => String(v.id) === String(id));
-          const oldName = target?.full_name;
-          const newName = updates.full_name;
-
-          // 1. Update volunteer
-          const updatedVolunteers = state.volunteers.map((v) =>
-            String(v.id) === String(id) ? { ...v, ...updates } : v
-          );
-
-          if (!oldName || !newName || oldName === newName) {
-            return { volunteers: updatedVolunteers };
-          }
-
-          // 2. Cascade name changes to Teams
-          const updatedTeams = state.teams.map((team) => ({
-            ...team,
-            member_names: team.member_names.map((name) =>
-              name === oldName ? newName : name
-            ),
-          }));
-
-          // 3. Cascade name changes to Assignments (person_name)
-          const updatedAssignments = state.assignments.map((assignment) =>
-            assignment.person_name === oldName
-              ? { ...assignment, person_name: newName }
-              : assignment
-          );
-
-          return {
-            volunteers: updatedVolunteers,
-            teams: updatedTeams,
-            assignments: updatedAssignments,
-          };
-        }),
-
-      // --- ASSIGNMENTS ---
-      setAssignments: (assignments) => set({ assignments }),
-
-      updateAssignment: (id, updates) =>
-        set((state) => ({
-          assignments: state.assignments.map((a) =>
-            String(a.id) === String(id) ? { ...a, ...updates } : a
-          ),
-        })),
-    }),
-    {
-      name: "roster-pulse-v6", // Incremented key to automatically clear stale local storage
+function scheduleSync(tab: SheetTab, getRows: () => Array<Record<string, unknown>>) {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (dirtyTimers[tab]) clearTimeout(dirtyTimers[tab]!);
+  dirtyTimers[tab] = setTimeout(async () => {
+    if (inFlight[tab]) {
+      // retry shortly after current write finishes
+      scheduleSync(tab, getRows);
+      return;
     }
-  )
-);
+    inFlight[tab] = true;
+    try {
+      await writeTab({ data: { tab, rows: getRows() } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[sheets sync] ${tab} failed`, err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error(`Google Sheets sync failed for ${tab}`, { description: msg.slice(0, 200) });
+    } finally {
+      inFlight[tab] = false;
+    }
+  }, 800);
+}
+
+function computeDates(assignments: Assignment[]): string[] {
+  return Array.from(new Set(assignments.map((a) => a.date))).sort();
+}
+
+function stripVolunteer(v: Volunteer): Record<string, unknown> {
+  return {
+    id: v.id,
+    full_name: v.full_name,
+    email: v.email ?? "",
+    phone: v.phone ?? "",
+    serving_areas: v.serving_areas ?? [],
+    partners: v.partners ?? [],
+    max_serving_per_month: v.max_serving_per_month ?? 0,
+    frequency_preference: v.frequency_preference ?? "",
+    priority_area: v.priority_area ?? "",
+    is_paused: !!v.is_paused,
+    notes: v.notes ?? "",
+    unavailable_dates: v.unavailable_dates ?? [],
+  };
+}
+
+function stripTeam(t: Team): Record<string, unknown> {
+  return {
+    id: t.id,
+    team_name: t.team_name,
+    serving_area: t.serving_area,
+    member_names: t.member_names ?? [],
+  };
+}
+
+function stripAssignment(a: Assignment): Record<string, unknown> {
+  return {
+    id: a.id,
+    date: a.date,
+    area: a.area,
+    role: a.role,
+    label: a.label,
+    person_name: a.person_name,
+    team_name: a.team_name ?? "",
+    is_override: !!a.is_override,
+    notes: a.notes ?? "",
+    status: a.status ?? "",
+  };
+}
+
+export const useRoster = create<RosterState>()((set, get) => ({
+  teams: [],
+  volunteers: [],
+  assignments: [],
+
+  ready: false,
+  loading: false,
+  error: null,
+  syncStatus: "idle",
+
+  dates: [],
+
+  hydrate: async () => {
+    if (get().ready || get().loading) return;
+    set({ loading: true, error: null });
+    try {
+      const data = await fetchAllTabs();
+      const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
+        ...v,
+        id: v.id || `vol-${Math.random().toString(36).slice(2, 10)}`,
+      }));
+      const teams = (data.teams as unknown as Team[]).map((t) => ({
+        ...t,
+        id: t.id || `team-${Math.random().toString(36).slice(2, 10)}`,
+      }));
+      const assignments = (data.assignments as unknown as Assignment[]).map((a) => ({
+        ...a,
+        id: a.id || `asg-${Math.random().toString(36).slice(2, 10)}`,
+      }));
+      set({
+        volunteers,
+        teams,
+        assignments,
+        dates: computeDates(assignments),
+        ready: true,
+        loading: false,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[sheets hydrate] failed", err);
+      set({ loading: false, error: msg, ready: true });
+      toast.error("Failed to load from Google Sheets", { description: msg.slice(0, 200) });
+    }
+  },
+
+  // --- TEAMS ---
+  addTeam: (team_name, serving_area) => {
+    set((state) => ({
+      teams: [
+        ...state.teams,
+        { id: `team-${Date.now()}`, team_name, serving_area, member_names: [] },
+      ],
+    }));
+    scheduleSync("teams", () => get().teams.map(stripTeam));
+  },
+  removeTeam: (id) => {
+    set((state) => ({ teams: state.teams.filter((t) => String(t.id) !== String(id)) }));
+    scheduleSync("teams", () => get().teams.map(stripTeam));
+  },
+  updateTeam: (id, updates) => {
+    set((state) => ({
+      teams: state.teams.map((t) => (String(t.id) === String(id) ? { ...t, ...updates } : t)),
+    }));
+    scheduleSync("teams", () => get().teams.map(stripTeam));
+  },
+  updateTeamMembers: (teamId, memberNames) => {
+    set((state) => ({
+      teams: state.teams.map((t) =>
+        String(t.id) === String(teamId) ? { ...t, member_names: memberNames } : t,
+      ),
+    }));
+    scheduleSync("teams", () => get().teams.map(stripTeam));
+  },
+
+  // --- VOLUNTEERS ---
+  addVolunteer: (volunteer) => {
+    const v: Volunteer = {
+      id: `vol-${Date.now()}`,
+      full_name: String(volunteer.full_name ?? ""),
+      email: (volunteer.email as string) ?? "",
+      phone: (volunteer.phone as string) ?? "",
+      serving_areas: (volunteer.serving_areas as string[]) ?? [],
+      partners: (volunteer.partners as string[]) ?? [],
+      max_serving_per_month: Number(
+        volunteer.max_serving_per_month ?? volunteer.max_serves_per_month ?? 0,
+      ),
+      frequency_preference: (volunteer.frequency_preference as string) ?? "",
+      priority_area: (volunteer.priority_area as string) ?? "",
+      is_paused: !!volunteer.is_paused,
+      notes: (volunteer.notes as string) ?? "",
+      unavailable_dates: (volunteer.unavailable_dates as string[]) ?? [],
+    };
+    set((state) => ({ volunteers: [...state.volunteers, v] }));
+    scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));
+  },
+  removeVolunteer: (id) => {
+    set((state) => ({ volunteers: state.volunteers.filter((v) => String(v.id) !== String(id)) }));
+    scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));
+  },
+  updateVolunteer: (id, updates) => {
+    const normalized: Partial<Volunteer> = { ...updates };
+    if ("max_serves_per_month" in updates && updates.max_serves_per_month !== undefined) {
+      normalized.max_serving_per_month = Number(updates.max_serves_per_month);
+    }
+    set((state) => {
+      const target = state.volunteers.find((v) => String(v.id) === String(id));
+      const oldName = target?.full_name;
+      const newName = normalized.full_name;
+
+      const updatedVolunteers = state.volunteers.map((v) =>
+        String(v.id) === String(id) ? { ...v, ...normalized } : v,
+      );
+      if (!oldName || !newName || oldName === newName) {
+        return { volunteers: updatedVolunteers };
+      }
+      const updatedTeams = state.teams.map((team) => ({
+        ...team,
+        member_names: team.member_names.map((n) => (n === oldName ? newName : n)),
+      }));
+      const updatedAssignments = state.assignments.map((a) =>
+        a.person_name === oldName ? { ...a, person_name: newName } : a,
+      );
+      return {
+        volunteers: updatedVolunteers,
+        teams: updatedTeams,
+        assignments: updatedAssignments,
+      };
+    });
+    scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));
+    // Cascade: also sync teams + assignments if a rename happened
+    scheduleSync("teams", () => get().teams.map(stripTeam));
+    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+  },
+
+  // --- ASSIGNMENTS ---
+  setAssignments: (assignments) => {
+    set({ assignments, dates: computeDates(assignments) });
+    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+  },
+  updateAssignment: (id, updates) => {
+    set((state) => ({
+      assignments: state.assignments.map((a) =>
+        String(a.id) === String(id) ? { ...a, ...updates } : a,
+      ),
+    }));
+    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+  },
+  swapAssignment: (id, newPersonName) => {
+    set((state) => ({
+      assignments: state.assignments.map((a) =>
+        String(a.id) === String(id) ? { ...a, person_name: newPersonName } : a,
+      ),
+    }));
+    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+  },
+  removeAssignment: (id) => {
+    set((state) => {
+      const next = state.assignments.filter((a) => String(a.id) !== String(id));
+      return { assignments: next, dates: computeDates(next) };
+    });
+    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+  },
+  setOverride: (id, is_override) => {
+    set((state) => ({
+      assignments: state.assignments.map((a) =>
+        String(a.id) === String(id) ? { ...a, is_override } : a,
+      ),
+    }));
+    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+  },
+}));
+
+// Helper used elsewhere in the app
+export function findVolunteer(volunteers: Volunteer[], name: string): Volunteer | undefined {
+  const lc = name.toLowerCase();
+  return volunteers.find((v) => v.full_name.toLowerCase() === lc);
+}

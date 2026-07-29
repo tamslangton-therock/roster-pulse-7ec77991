@@ -80,14 +80,14 @@ function VolunteersPage() {
   const startEditing = (volunteer: Volunteer) => {
     setEditingVolunteer(volunteer);
     setEditName(volunteer.full_name);
-    setEditMax(volunteer.max_serves_per_month);
+    setEditMax(volunteer.max_serving_per_month);
   };
 
   const handleSaveEdit = () => {
     if (!editingVolunteer || !editName.trim()) return;
     updateVolunteer(editingVolunteer.id, {
       full_name: editName.trim(),
-      max_serves_per_month: Number(editMax),
+      max_serving_per_month: Number(editMax),
     });
     setEditingVolunteer(null);
     toast.success("Volunteer updated");
@@ -173,7 +173,7 @@ function VolunteersPage() {
                     ))}
                   </div>
                 </td>
-                <td className="px-4 py-3">{v.max_serves_per_month} serves</td>
+                <td className="px-4 py-3">{v.max_serving_per_month} serves</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Button
@@ -303,7 +303,7 @@ function VolunteersPage() {
                 addVolunteer({
                   full_name: newName.trim(),
                   serving_areas: ["Welcome"],
-                  max_serves_per_month: newMax,
+                  max_serving_per_month: newMax,
                   active: true,
                 });
                 setNewName("");
