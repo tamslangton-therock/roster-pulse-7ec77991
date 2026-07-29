@@ -49,10 +49,12 @@ function encodeCell(value: unknown, field: string, tab: SheetTab): string {
   return String(value);
 }
 
-function decodeCell(raw: unknown, field: string, tab: SheetTab): unknown {
+type CellValue = string | number | boolean | string[];
+
+function decodeCell(raw: unknown, field: string, tab: SheetTab): CellValue {
   const s = raw == null ? "" : String(raw).trim();
   if ((ARRAY_FIELDS[tab] as readonly string[]).includes(field)) {
-    if (!s) return [];
+    if (!s) return [] as string[];
     return s.split(/\s*[|,;]\s*/).filter(Boolean);
   }
   if ((BOOL_FIELDS[tab] as readonly string[]).includes(field)) {
@@ -64,6 +66,8 @@ function decodeCell(raw: unknown, field: string, tab: SheetTab): unknown {
   }
   return s;
 }
+
+export type SheetRow = Record<string, CellValue>;
 
 async function ensureTabWithHeaders(tab: SheetTab) {
   const title = SHEET_TABS[tab];
