@@ -110,7 +110,7 @@ async function ensureTabWithHeaders(tab: SheetTab) {
 // ---------- Server functions ----------
 
 export const fetchAllTabs = createServerFn({ method: "GET" }).handler(async () => {
-  const result: Record<SheetTab, Array<Record<string, unknown>>> = {
+  const result: Record<SheetTab, SheetRow[]> = {
     volunteers: [],
     teams: [],
     assignments: [],
@@ -126,8 +126,8 @@ export const fetchAllTabs = createServerFn({ method: "GET" }).handler(async () =
     const schema = SHEET_SCHEMAS[tab];
     result[tab] = dataRows
       .filter((r) => r.some((c) => (c ?? "").toString().trim() !== ""))
-      .map((r) => {
-        const obj: Record<string, unknown> = {};
+      .map((r): SheetRow => {
+        const obj: SheetRow = {};
         for (const field of schema) {
           const idx = header.indexOf(field);
           obj[field] = decodeCell(idx >= 0 ? r[idx] : "", field, tab);
