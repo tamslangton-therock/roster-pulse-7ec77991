@@ -29,7 +29,7 @@ interface RosterState {
   updateTeamMembers: (teamId: string, memberNames: string[]) => void;
 
   // Volunteer Actions
-  addVolunteer: (volunteer: Omit<Volunteer, "id"> & Record<string, unknown>) => void;
+  addVolunteer: (volunteer: Partial<Volunteer> & { full_name: string } & Record<string, unknown>) => void;
   removeVolunteer: (id: string) => void;
   updateVolunteer: (id: string, updates: Partial<Volunteer> & Record<string, unknown>) => void;
 
