@@ -94,4 +94,5 @@ export const SUB_TEAMS_SCHEMA = [
   "sub_team_name",
   "slot_label",
   "person_name",
+  "color",
 ] as const;

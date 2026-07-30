@@ -90,6 +90,7 @@ interface RosterState {
   addSubTeam: (area: string, name: string) => void;
   removeSubTeam: (area: string, name: string) => void;
   renameSubTeam: (area: string, oldName: string, newName: string) => void;
+  setSubTeamColor: (area: string, name: string, color: string) => void;
   setSubTeamSlot: (area: string, name: string, slotLabel: string, person: string) => void;
   applySubTeamToDate: (area: string, name: string, date: string) => number;
 }
@@ -725,6 +726,14 @@ export const useRoster = create<RosterState>()((set, get) => ({
         r.serving_area === area && r.sub_team_name === oldName
           ? { ...r, sub_team_name: newName }
           : r,
+      ),
+    }));
+    scheduleSubTeamSync();
+  },
+  setSubTeamColor: (area, name, color) => {
+    set((state) => ({
+      subTeams: state.subTeams.map((r) =>
+        r.serving_area === area && r.sub_team_name === name ? { ...r, color } : r,
       ),
     }));
     scheduleSubTeamSync();

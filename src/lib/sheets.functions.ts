@@ -585,6 +585,7 @@ export interface SubTeamRow {
   sub_team_name: string;
   slot_label: string;
   person_name: string;
+  color?: string;
 }
 
 async function ensureSubTeamsTab() {
@@ -624,7 +625,7 @@ export const fetchSubTeams = createServerFn({ method: "GET" }).handler(
     let data: { values?: string[][] };
     try {
       data = await gwFetch(
-        `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1:D5000`,
+        `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1:E5000`,
       );
     } catch {
       return [];
@@ -639,6 +640,7 @@ export const fetchSubTeams = createServerFn({ method: "GET" }).handler(
         sub_team_name,
         slot_label: String(r[2] ?? "").trim(),
         person_name: String(r[3] ?? "").trim(),
+        color: String(r[4] ?? "").trim(),
       });
     }
     return out;
@@ -650,7 +652,7 @@ export const writeSubTeams = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await ensureSubTeamsTab();
     await gwFetch(
-      `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1:D5000:clear`,
+      `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1:E5000:clear`,
       { method: "POST", body: "{}" },
     );
     const values: string[][] = [
@@ -660,6 +662,7 @@ export const writeSubTeams = createServerFn({ method: "POST" })
         r.sub_team_name,
         r.slot_label ?? "",
         r.person_name ?? "",
+        r.color ?? "",
       ]),
     ];
     await gwFetch(
