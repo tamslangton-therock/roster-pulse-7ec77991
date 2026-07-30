@@ -544,6 +544,30 @@ function PrintRosterPage() {
                 </div>
               </div>
             )}
+
+            {areaSubTeams.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Sub-teams
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {areaSubTeams.map((st) => (
+                    <span
+                      key={st.name}
+                      className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium"
+                      style={{
+                        backgroundColor: st.color.bg,
+                        borderColor: st.color.border,
+                        color: st.color.text,
+                      }}
+                    >
+                      {st.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </>
         )}
       </div>
