@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Download, Printer, Users } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
-import { teamColor } from "@/lib/person-colors";
+import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -111,6 +111,38 @@ function PrintRosterPage() {
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [shownDates, slots, cellMap]);
+
+  // Sub-team colours (chosen swatch or auto pastel) keyed by slot label + person.
+  const subTeams = useRoster((s) => s.subTeams);
+  const subTeamColors = useMemo(() => {
+    const bySlot = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
+    const byPerson = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
+    for (const r of subTeams) {
+      const person = r.person_name?.trim();
+      if (!person) continue;
+      const entry = {
+        name: r.sub_team_name,
+        color: resolveSubTeamColor(r.serving_area, r.sub_team_name, r.color),
+      };
+      if (r.slot_label?.trim()) bySlot.set(`${r.slot_label}||${person.toLowerCase()}`, entry);
+      if (
+        r.serving_area?.trim().toLowerCase() === area.trim().toLowerCase() &&
+        !byPerson.has(person.toLowerCase())
+      ) {
+        byPerson.set(person.toLowerCase(), entry);
+      }
+    }
+    return { bySlot, byPerson };
+  }, [subTeams, area]);
+
+  const colorFor = (person: string, slotLabel?: string) => {
+    const key = person.trim().toLowerCase();
+    const hit =
+      (slotLabel ? subTeamColors.bySlot.get(`${slotLabel}||${key}`) : undefined) ??
+      subTeamColors.byPerson.get(key);
+    return hit?.color ?? teamColor(area);
+  };
+
 
   const rangeLabel =
     selectedMonths.length > 0
