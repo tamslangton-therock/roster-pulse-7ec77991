@@ -279,7 +279,7 @@ function LiveRosterPage() {
   const [visibleRows, setVisibleRows] = useState(ROW_CHUNK);
   useEffect(() => {
     setVisibleRows(ROW_CHUNK);
-  }, [filterMonth, hidePastWeeks, selectedTeam, showClashesOnly]);
+  }, [filterMonth, hidePastWeeks, selectedTeam, showClashesOnly, showPartnerSplitsOnly]);
   const renderedDates = useMemo(
     () => shownDates.slice(0, visibleRows),
     [shownDates, visibleRows],
