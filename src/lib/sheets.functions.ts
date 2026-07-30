@@ -11,6 +11,8 @@ import {
   BLOCKOUTS_SCHEMA,
   STATUSES_TAB,
   STATUSES_SCHEMA,
+  ALLOWED_CLASHES_TAB,
+  ALLOWED_CLASHES_SCHEMA,
   type SheetTab,
 } from "./sheets-config";
 
@@ -456,6 +458,89 @@ export const writeStatuses = createServerFn({ method: "POST" })
     ];
     await gwFetch(
       `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
+
+// ---------- Allowed clash exceptions ----------
+
+export interface AllowedClashRow {
+  area_a: string;
+  area_b: string;
+  notes: string;
+}
+
+async function ensureAllowedClashesTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [ALLOWED_CLASHES_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: ALLOWED_CLASHES_TAB,
+                gridProperties: { frozenRowCount: 1 },
+              },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [ALLOWED_CLASHES_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchAllowedClashes = createServerFn({ method: "GET" }).handler(
+  async (): Promise<AllowedClashRow[]> => {
+    await ensureAllowedClashesTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!A1:C500`,
+      );
+    } catch {
+      return [];
+    }
+    const out: AllowedClashRow[] = [];
+    for (const r of (data.values ?? []).slice(1)) {
+      const area_a = String(r[0] ?? "").trim();
+      const area_b = String(r[1] ?? "").trim();
+      if (!area_a || !area_b) continue;
+      out.push({ area_a, area_b, notes: String(r[2] ?? "").trim() });
+    }
+    return out;
+  },
+);
+
+export const writeAllowedClashes = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: AllowedClashRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureAllowedClashesTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!A1:C500:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [
+      ALLOWED_CLASHES_SCHEMA.slice(),
+      ...data.rows.map((r) => [r.area_a, r.area_b, r.notes ?? ""]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!A1?valueInputOption=RAW`,
       { method: "PUT", body: JSON.stringify({ values }) },
     );
     return { ok: true, count: data.rows.length };

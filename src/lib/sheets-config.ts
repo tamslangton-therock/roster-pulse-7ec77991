@@ -79,3 +79,8 @@ export const STATUSES_SCHEMA = [
   "status",
   "updated_at",
 ] as const;
+
+// Allowed clash exceptions — pairs of serving areas (or "Area — Role" labels)
+// that a person MAY serve in on the same date. Everything else counts as a clash.
+export const ALLOWED_CLASHES_TAB = "Allowed_Clashes";
+export const ALLOWED_CLASHES_SCHEMA = ["area_a", "area_b", "notes"] as const;
