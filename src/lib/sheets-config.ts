@@ -68,3 +68,14 @@ export const LIVE_ROSTER_TAB = "Live_Roster";
 export const BLOCKOUTS_TAB = "Blockouts";
 export const BLOCKOUTS_SCHEMA = ["person_name", "date", "reason"] as const;
 
+
+// Confirmation statuses per roster slot — editable directly in the sheet.
+// Only non-pending rows are stored, so the tab stays short.
+export const STATUSES_TAB = "Statuses";
+export const STATUSES_SCHEMA = [
+  "date",
+  "slot",
+  "person_name",
+  "status",
+  "updated_at",
+] as const;

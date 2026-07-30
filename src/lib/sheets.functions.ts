@@ -357,3 +357,104 @@ export const writeBlockouts = createServerFn({ method: "POST" })
     );
     return { ok: true, count: data.rows.length };
   });
+
+// ---------- Statuses (per-slot confirmation state) ----------
+
+export interface StatusRow {
+  date: string; // ISO YYYY-MM-DD
+  slot: string; // roster slot label
+  person_name: string;
+  status: string; // pending | reminder_sent | declined | confirmed
+  updated_at: string;
+}
+
+async function ensureStatusesTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [STATUSES_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: STATUSES_TAB,
+                gridProperties: { frozenRowCount: 1 },
+              },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [STATUSES_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+const VALID_STATUSES = ["pending", "reminder_sent", "declined", "confirmed"];
+
+export const fetchStatuses = createServerFn({ method: "GET" }).handler(
+  async (): Promise<StatusRow[]> => {
+    await ensureStatusesTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!A1:E5000`,
+      );
+    } catch {
+      return [];
+    }
+    const rows = (data.values ?? []).slice(1);
+    const out: StatusRow[] = [];
+    for (const r of rows) {
+      const date = normalizeDate(String(r[0] ?? ""));
+      const slot = String(r[1] ?? "").trim();
+      const status = String(r[3] ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      if (!date || !slot || !VALID_STATUSES.includes(status)) continue;
+      out.push({
+        date,
+        slot,
+        person_name: String(r[2] ?? "").trim(),
+        status,
+        updated_at: String(r[4] ?? "").trim(),
+      });
+    }
+    return out;
+  },
+);
+
+export const writeStatuses = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: StatusRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureStatusesTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!A1:E5000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [
+      STATUSES_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.date,
+        r.slot,
+        r.person_name ?? "",
+        r.status,
+        r.updated_at ?? "",
+      ]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${STATUSES_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
