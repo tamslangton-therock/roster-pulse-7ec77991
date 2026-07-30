@@ -121,8 +121,14 @@ function LiveRosterPage() {
 
   // Local UI State
   const [showClashesOnly, setShowClashesOnly] = useState(false);
+  const [showPartnerSplitsOnly, setShowPartnerSplitsOnly] = useState(false);
   const [hidePastWeeks, setHidePastWeeks] = useState(true);
   const [swapTarget, setSwapTarget] = useState<Assignment | null>(null);
+  const [partnerTarget, setPartnerTarget] = useState<{
+    date: string;
+    person: string;
+    missing: string[];
+  } | null>(null);
   const [clashDetail, setClashDetail] = useState<{
     date: string;
     person: string;
