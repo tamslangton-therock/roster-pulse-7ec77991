@@ -20,7 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  VolunteerForm,
+  emptyDraft,
+  toDraft,
+  type VolunteerDraft,
+} from "@/components/volunteer-form";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
@@ -50,13 +57,11 @@ function VolunteersPage() {
   const [showAdd, setShowAdd] = useState(false);
 
   // New volunteer state
-  const [newName, setNewName] = useState("");
-  const [newMax, setNewMax] = useState(2);
+  const [newDraft, setNewDraft] = useState<VolunteerDraft>(emptyDraft);
 
   // Edit volunteer state
   const [editingVolunteer, setEditingVolunteer] = useState<Volunteer | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editMax, setEditMax] = useState(2);
+  const [editDraft, setEditDraft] = useState<VolunteerDraft>(emptyDraft);
 
   const allAreas = useMemo(() => {
     const set = new Set<string>();
@@ -65,6 +70,11 @@ function VolunteersPage() {
     );
     return Array.from(set).sort();
   }, [volunteers]);
+
+  const allNames = useMemo(
+    () => volunteers.map((v: Volunteer) => v.full_name).filter(Boolean).sort(),
+    [volunteers]
+  );
 
   const filtered = useMemo(() => {
     return volunteers.filter((v: Volunteer) => {
@@ -79,19 +89,20 @@ function VolunteersPage() {
 
   const startEditing = (volunteer: Volunteer) => {
     setEditingVolunteer(volunteer);
-    setEditName(volunteer.full_name);
-    setEditMax(volunteer.max_serving_per_month);
+    setEditDraft(toDraft(volunteer));
   };
 
   const handleSaveEdit = () => {
-    if (!editingVolunteer || !editName.trim()) return;
+    if (!editingVolunteer || !editDraft.full_name.trim()) return;
     updateVolunteer(editingVolunteer.id, {
-      full_name: editName.trim(),
-      max_serving_per_month: Number(editMax),
+      ...editDraft,
+      full_name: editDraft.full_name.trim(),
+      max_serving_per_month: Number(editDraft.max_serving_per_month) || 0,
     });
     setEditingVolunteer(null);
     toast.success("Volunteer updated");
   };
+
 
   return (
     <div className="p-6 space-y-6">
@@ -211,87 +222,51 @@ function VolunteersPage() {
           if (!open) setEditingVolunteer(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Volunteer</DialogTitle>
+            <DialogTitle>Edit {editingVolunteer?.full_name}</DialogTitle>
             <DialogDescription>
-              Update the name and maximum monthly serving capacity for this volunteer.
+              Every field here maps to a column in the Volunteers tab of your
+              Google Sheet.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">
-                Full Name
-              </label>
-              <Input
-                placeholder="Volunteer Name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">
-                Max Monthly Serves
-              </label>
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={editMax}
-                onChange={(e) => setEditMax(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          <VolunteerForm
+            draft={editDraft}
+            onChange={setEditDraft}
+            allNames={allNames.filter((n) => n !== editingVolunteer?.full_name)}
+          />
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditingVolunteer(null)}
-            >
+            <Button variant="outline" onClick={() => setEditingVolunteer(null)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit}>Save Changes</Button>
+            <Button onClick={handleSaveEdit}>Save changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Volunteer Dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent>
+      <Dialog
+        open={showAdd}
+        onOpenChange={(open) => {
+          setShowAdd(open);
+          if (open) setNewDraft(emptyDraft());
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Volunteer</DialogTitle>
             <DialogDescription>
-              Create a new volunteer profile with serving areas and monthly cap.
+              Create a full volunteer profile — it syncs straight to the sheet.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">
-                Full Name
-              </label>
-              <Input
-                placeholder="Full Name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold uppercase text-muted-foreground block mb-1">
-                Max Monthly Serves
-              </label>
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={newMax}
-                onChange={(e) => setNewMax(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          <VolunteerForm
+            draft={newDraft}
+            onChange={setNewDraft}
+            allNames={allNames}
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>
@@ -299,14 +274,17 @@ function VolunteersPage() {
             </Button>
             <Button
               onClick={() => {
-                if (!newName.trim()) return;
+                if (!newDraft.full_name.trim()) {
+                  toast.error("Name is required");
+                  return;
+                }
                 addVolunteer({
-                  full_name: newName.trim(),
-                  serving_areas: ["Welcome"],
-                  max_serving_per_month: newMax,
-                  active: true,
+                  ...newDraft,
+                  full_name: newDraft.full_name.trim(),
+                  max_serving_per_month:
+                    Number(newDraft.max_serving_per_month) || 0,
                 });
-                setNewName("");
+                setNewDraft(emptyDraft());
                 setShowAdd(false);
                 toast.success("Volunteer added");
               }}
@@ -316,6 +294,7 @@ function VolunteersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
