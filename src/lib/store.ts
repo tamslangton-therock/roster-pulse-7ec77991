@@ -5,11 +5,15 @@ import {
   writeTab,
   fetchLiveRoster,
   writeLiveRoster,
+  fetchBlockouts,
+  writeBlockouts,
   type LiveRosterRow,
+  type BlockoutRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
+
 
 type SyncStatus = "idle" | "syncing" | "error";
 
