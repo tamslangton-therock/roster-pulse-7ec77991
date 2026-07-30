@@ -21,6 +21,7 @@ import {
   CalendarX,
   Plus,
   Trash2,
+  HeartHandshake,
 } from "lucide-react";
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
@@ -32,6 +33,12 @@ import {
   groupAllowed,
   rankSwapCandidates,
 } from "@/lib/roster-engine";
+import {
+  buildPartnerIndex,
+  partnerGapsByDate,
+  partnersStillRostered,
+  suggestSlotsForPartner,
+} from "@/lib/partners";
 import type { Assignment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
