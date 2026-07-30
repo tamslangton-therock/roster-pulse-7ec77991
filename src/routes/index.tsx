@@ -363,10 +363,6 @@ function LiveRosterPage() {
     toast.success("Shareable link copied to clipboard!");
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="p-6 space-y-6">
       {/* CSS Print Stylesheet */}
@@ -504,8 +500,20 @@ function LiveRosterPage() {
             </Button>
           )}
 
-          {/* Print/Download Button */}
-          <Button variant="outline" size="sm" onClick={handlePrint}>
+          {/* Team print / PDF */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              navigate({
+                to: "/print",
+                search: {
+                  area: selectedTeam !== "all" ? selectedTeam : "",
+                  months: filterMonth !== "all" ? filterMonth : "",
+                },
+              })
+            }
+          >
             <Printer className="h-4 w-4 mr-1.5" />
             Print / PDF
           </Button>
