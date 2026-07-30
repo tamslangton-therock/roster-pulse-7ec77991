@@ -170,6 +170,50 @@ function scheduleBlockoutSync() {
 }
 
 
+let statusTimer: ReturnType<typeof setTimeout> | null = null;
+let statusInFlight = false;
+
+function scheduleStatusSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(async () => {
+    if (statusInFlight) {
+      scheduleStatusSync();
+      return;
+    }
+    statusInFlight = true;
+    try {
+      const state = useRoster.getState();
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const byKey = new Map(state.assignments.map((a) => [`${a.date}::${a.label}`, a]));
+      const rows: StatusRow[] = Object.entries(state.statuses)
+        .map(([key, status]) => {
+          const [date, slot] = key.split("::");
+          return {
+            date,
+            slot,
+            person_name: byKey.get(key)?.person_name ?? "",
+            status,
+            updated_at: now,
+          };
+        })
+        .sort((a, b) => a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
+      await writeStatuses({ data: { rows } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[statuses sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Statuses", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      statusInFlight = false;
+    }
+  }, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
