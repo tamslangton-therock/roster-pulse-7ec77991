@@ -13,6 +13,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { HydrateStore } from "@/components/hydrate-store";
+import { SaveBar } from "@/components/save-bar";
 import { Toaster } from "@/components/ui/sonner";
 
 // CHANGE YOUR ACCESS CODE HERE
@@ -221,6 +222,7 @@ function RootComponent() {
       <HydrateStore>
         <PasscodeGate>
           <Outlet />
+          <SaveBar />
         </PasscodeGate>
         <Toaster position="top-right" />
       </HydrateStore>

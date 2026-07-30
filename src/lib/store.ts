@@ -39,6 +39,8 @@ interface RosterState {
   loading: boolean;
   error: string | null;
   syncStatus: SyncStatus;
+  /** Number of queued writes not yet sent to Google Sheets. */
+  pendingWrites: number;
 
   // Derived
   dates: string[];
@@ -80,6 +82,23 @@ interface RosterState {
 
 
 // --------- Background sync ---------
+// Every scheduler registers the write it is about to perform so a manual
+// "Save now" (or leaving the page) can flush it immediately.
+const pendingJobs = new Map<string, () => Promise<void>>();
+
+function setPending(key: string, job: (() => Promise<void>) | null) {
+  if (job) pendingJobs.set(key, job);
+  else pendingJobs.delete(key);
+  useRoster.setState({ pendingWrites: pendingJobs.size });
+}
+
+/** Flush every queued Google Sheets write right now. */
+export async function flushPendingSync(): Promise<void> {
+  const jobs = Array.from(pendingJobs.values());
+  if (jobs.length === 0) return;
+  await Promise.all(jobs.map((j) => j()));
+}
+
 const dirtyTimers: Partial<Record<SheetTab, ReturnType<typeof setTimeout>>> = {};
 const inFlight: Partial<Record<SheetTab, boolean>> = {};
 
@@ -87,13 +106,15 @@ function scheduleSync(tab: SheetTab, getRows: () => Array<Record<string, unknown
   if (typeof window === "undefined") return;
   useRoster.setState({ syncStatus: "syncing" });
   if (dirtyTimers[tab]) clearTimeout(dirtyTimers[tab]!);
-  dirtyTimers[tab] = setTimeout(async () => {
+  const run = async () => {
+    if (dirtyTimers[tab]) clearTimeout(dirtyTimers[tab]!);
     if (inFlight[tab]) {
       // retry shortly after current write finishes
       scheduleSync(tab, getRows);
       return;
     }
     inFlight[tab] = true;
+    setPending(tab, null);
     try {
       await writeTab({ data: { tab, rows: getRows() } });
       useRoster.setState({ syncStatus: "idle", error: null });
@@ -105,7 +126,9 @@ function scheduleSync(tab: SheetTab, getRows: () => Array<Record<string, unknown
     } finally {
       inFlight[tab] = false;
     }
-  }, 800);
+  };
+  setPending(tab, run);
+  dirtyTimers[tab] = setTimeout(run, 800);
 }
 
 let rosterTimer: ReturnType<typeof setTimeout> | null = null;
@@ -115,12 +138,14 @@ function scheduleRosterSync() {
   if (typeof window === "undefined") return;
   useRoster.setState({ syncStatus: "syncing" });
   if (rosterTimer) clearTimeout(rosterTimer);
-  rosterTimer = setTimeout(async () => {
+  const run = async () => {
+    if (rosterTimer) clearTimeout(rosterTimer);
     if (rosterInFlight) {
       scheduleRosterSync();
       return;
     }
     rosterInFlight = true;
+    setPending("live_roster", null);
     try {
       await writeLiveRoster({ data: { rows: buildRosterRows(useRoster.getState()) } });
       useRoster.setState({ syncStatus: "idle", error: null });
@@ -134,7 +159,9 @@ function scheduleRosterSync() {
     } finally {
       rosterInFlight = false;
     }
-  }, 900);
+  };
+  setPending("live_roster", run);
+  rosterTimer = setTimeout(run, 900);
 }
 
 let blockoutTimer: ReturnType<typeof setTimeout> | null = null;
@@ -144,12 +171,14 @@ function scheduleBlockoutSync() {
   if (typeof window === "undefined") return;
   useRoster.setState({ syncStatus: "syncing" });
   if (blockoutTimer) clearTimeout(blockoutTimer);
-  blockoutTimer = setTimeout(async () => {
+  const run = async () => {
+    if (blockoutTimer) clearTimeout(blockoutTimer);
     if (blockoutInFlight) {
       scheduleBlockoutSync();
       return;
     }
     blockoutInFlight = true;
+    setPending("blockouts", null);
     try {
       const rows = [...useRoster.getState().blockouts].sort(
         (a, b) => a.date.localeCompare(b.date) || a.person_name.localeCompare(b.person_name),
@@ -166,7 +195,9 @@ function scheduleBlockoutSync() {
     } finally {
       blockoutInFlight = false;
     }
-  }, 800);
+  };
+  setPending("blockouts", run);
+  blockoutTimer = setTimeout(run, 800);
 }
 
 
@@ -177,12 +208,14 @@ function scheduleStatusSync() {
   if (typeof window === "undefined") return;
   useRoster.setState({ syncStatus: "syncing" });
   if (statusTimer) clearTimeout(statusTimer);
-  statusTimer = setTimeout(async () => {
+  const run = async () => {
+    if (statusTimer) clearTimeout(statusTimer);
     if (statusInFlight) {
       scheduleStatusSync();
       return;
     }
     statusInFlight = true;
+    setPending("statuses", null);
     try {
       const state = useRoster.getState();
       const now = new Date().toISOString().slice(0, 16).replace("T", " ");
@@ -211,7 +244,9 @@ function scheduleStatusSync() {
     } finally {
       statusInFlight = false;
     }
-  }, 800);
+  };
+  setPending("statuses", run);
+  statusTimer = setTimeout(run, 800);
 }
 
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
@@ -283,6 +318,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   loading: false,
   error: null,
   syncStatus: "idle",
+  pendingWrites: 0,
 
   dates: [],
   rosterMeta: {},
