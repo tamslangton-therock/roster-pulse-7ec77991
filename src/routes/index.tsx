@@ -347,6 +347,45 @@ function LiveRosterPage() {
     [volunteers]
   );
 
+  // ---- Family / partner alignment -------------------------------------
+  // Linked partners should always serve on the same Sunday. Gaps are derived
+  // from the FULL assignment list (not the team filter) so a partner serving
+  // in another area still counts as aligned.
+  const partnerIndex = useMemo(
+    () => buildPartnerIndex(volunteers),
+    [volunteers]
+  );
+  const partnerGaps = useMemo(
+    () => partnerGapsByDate(assignments, partnerIndex),
+    [assignments, partnerIndex]
+  );
+
+  /** Dates (within the visible rows) that have at least one split couple. */
+  const partnerSplitDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of filteredAssignments) {
+      if (partnerGaps.has(`${a.date}||${a.person_name.toLowerCase()}`))
+        set.add(a.date);
+    }
+    return set;
+  }, [filteredAssignments, partnerGaps]);
+
+  const partnerSplitCount = useMemo(() => {
+    const visible = new Set(shownDates);
+    let n = 0;
+    const seen = new Set<string>();
+    for (const a of filteredAssignments) {
+      if (!visible.has(a.date)) continue;
+      const key = `${a.date}||${a.person_name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      if (partnerGaps.has(key)) {
+        seen.add(key);
+        n++;
+      }
+    }
+    return n;
+  }, [filteredAssignments, shownDates, partnerGaps]);
+
   // Group clashes by date for Clashes column (including blackout clashes)
   const dateClashesMap = useMemo(() => {
     const map = new Map<
