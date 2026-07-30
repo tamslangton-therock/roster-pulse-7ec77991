@@ -7,8 +7,11 @@ import {
   BOOL_FIELDS,
   NUMBER_FIELDS,
   LIVE_ROSTER_TAB,
+  BLOCKOUTS_TAB,
+  BLOCKOUTS_SCHEMA,
   type SheetTab,
 } from "./sheets-config";
+
 import {
   ROSTER_SLOTS,
   DETAIL_COL,
