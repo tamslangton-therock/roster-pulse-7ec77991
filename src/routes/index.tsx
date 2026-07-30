@@ -101,6 +101,12 @@ function LiveRosterPage() {
   const [addDateOpen, setAddDateOpen] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [slotTarget, setSlotTarget] = useState<{ date: string; label: string } | null>(null);
+  const knownNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of volunteers) if (v.full_name) set.add(v.full_name);
+    for (const a of assignments) if (a.person_name) set.add(a.person_name);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [volunteers, assignments]);
 
   // URL State
   const selectedTeam = search.team || "all";
@@ -834,7 +840,7 @@ function LiveRosterPage() {
             target={slotTarget}
             names={knownNames}
             onClose={() => setSlotTarget(null)}
-            onConfirm={(name) => {
+            onConfirm={(name: string) => {
               if (!slotTarget) return;
               if (name.trim()) {
                 assignSlot(slotTarget.date, slotTarget.label, name.trim());
@@ -1321,6 +1327,99 @@ function ClashDialog({
             </div>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddDateDialog({
+  open,
+  value,
+  onValueChange,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  value: string;
+  onValueChange: (v: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add a roster date</DialogTitle>
+          <DialogDescription>
+            Adds a new row to the Live_Roster tab in your Google Sheet.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          type="date"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={!value}>
+            Add date
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FillSlotDialog({
+  target,
+  names,
+  onClose,
+  onConfirm,
+}: {
+  target: { date: string; label: string } | null;
+  names: string[];
+  onClose: () => void;
+  onConfirm: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    setName("");
+  }, [target?.date, target?.label]);
+  if (!target) return null;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{target.label}</DialogTitle>
+          <DialogDescription>
+            {format(parseISO(`${target.date}T12:00:00`), "EEEE d MMMM yyyy")}
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          list="roster-known-names"
+          placeholder="Type or pick a name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) onConfirm(name);
+          }}
+          autoFocus
+        />
+        <datalist id="roster-known-names">
+          {names.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => onConfirm(name)} disabled={!name.trim()}>
+            Assign
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
