@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { Team, Volunteer, Assignment } from "./types";
-import { fetchAllTabs, writeTab } from "./sheets.functions";
+import {
+  fetchAllTabs,
+  writeTab,
+  fetchLiveRoster,
+  writeLiveRoster,
+  type LiveRosterRow,
+} from "./sheets.functions";
+import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
 
@@ -18,6 +25,7 @@ interface RosterState {
 
   // Derived
   dates: string[];
+  rosterMeta: Record<string, { label: string; notes: string; detail: string }>;
 
   // Lifecycle
   hydrate: () => Promise<void>;
@@ -39,6 +47,12 @@ interface RosterState {
   swapAssignment: (id: string, newPersonName: string) => void;
   removeAssignment: (id: string) => void;
   setOverride: (id: string, is_override: boolean) => void;
+
+  // Live Roster grid
+  addRosterDate: (date: string, label?: string) => void;
+  removeRosterDate: (date: string) => void;
+  assignSlot: (date: string, label: string, personName: string) => void;
+  clearSlot: (date: string, label: string) => void;
 }
 
 // --------- Background sync ---------
@@ -68,6 +82,47 @@ function scheduleSync(tab: SheetTab, getRows: () => Array<Record<string, unknown
       inFlight[tab] = false;
     }
   }, 800);
+}
+
+let rosterTimer: ReturnType<typeof setTimeout> | null = null;
+let rosterInFlight = false;
+
+function scheduleRosterSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (rosterTimer) clearTimeout(rosterTimer);
+  rosterTimer = setTimeout(async () => {
+    if (rosterInFlight) {
+      scheduleRosterSync();
+      return;
+    }
+    rosterInFlight = true;
+    try {
+      await writeLiveRoster({ data: { rows: buildRosterRows(useRoster.getState()) } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[live roster sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Live_Roster", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      rosterInFlight = false;
+    }
+  }, 900);
+}
+
+function buildRosterRows(state: RosterState): LiveRosterRow[] {
+  return state.dates.map((date) => {
+    const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
+    const cells: Record<string, string> = {};
+    for (const a of state.assignments) {
+      if (a.date !== date || !a.person_name) continue;
+      cells[a.label] = a.person_name;
+    }
+    return { date, label: meta.label || date, cells, notes: meta.notes, detail: meta.detail };
+  });
 }
 
 function computeDates(assignments: Assignment[]): string[] {
@@ -126,12 +181,13 @@ export const useRoster = create<RosterState>()((set, get) => ({
   syncStatus: "idle",
 
   dates: [],
+  rosterMeta: {},
 
   hydrate: async () => {
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const data = await fetchAllTabs();
+      const [data, gridRows] = await Promise.all([fetchAllTabs(), fetchLiveRoster()]);
       const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
         ...v,
         id: v.id || `vol-${Math.random().toString(36).slice(2, 10)}`,
@@ -140,15 +196,45 @@ export const useRoster = create<RosterState>()((set, get) => ({
         ...t,
         id: t.id || `team-${Math.random().toString(36).slice(2, 10)}`,
       }));
-      const assignments = (data.assignments as unknown as Assignment[]).map((a) => ({
-        ...a,
-        id: a.id || `asg-${Math.random().toString(36).slice(2, 10)}`,
-      }));
+
+      const slotByLabel = new Map(ROSTER_SLOTS.map((s) => [s.label, s]));
+      const assignments: Assignment[] = [];
+      const rosterMeta: RosterState["rosterMeta"] = {};
+      for (const row of gridRows) {
+        rosterMeta[row.date] = {
+          label: row.label || row.date,
+          notes: row.notes,
+          detail: row.detail,
+        };
+        for (const [label, person] of Object.entries(row.cells)) {
+          const slot = slotByLabel.get(label);
+          if (!slot || !person) continue;
+          assignments.push({
+            id: `${row.date}::${label}`,
+            date: row.date,
+            area: slot.area,
+            role: slot.role || slot.area,
+            label,
+            person_name: person,
+            is_override: false,
+            notes: "",
+            status: "pending",
+          });
+        }
+      }
+
+      let dates = Object.keys(rosterMeta).sort();
+      if (dates.length === 0) {
+        dates = defaultSundayWindow();
+        for (const d of dates) rosterMeta[d] = { label: d, notes: "", detail: "" };
+      }
+
       set({
         volunteers,
         teams,
         assignments,
-        dates: computeDates(assignments),
+        rosterMeta,
+        dates,
         ready: true,
         loading: false,
       });
@@ -246,13 +332,13 @@ export const useRoster = create<RosterState>()((set, get) => ({
     scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));
     // Cascade: also sync teams + assignments if a rename happened
     scheduleSync("teams", () => get().teams.map(stripTeam));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
 
   // --- ASSIGNMENTS ---
   setAssignments: (assignments) => {
     set({ assignments, dates: computeDates(assignments) });
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   updateAssignment: (id, updates) => {
     set((state) => ({
@@ -260,7 +346,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         String(a.id) === String(id) ? { ...a, ...updates } : a,
       ),
     }));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   swapAssignment: (id, newPersonName) => {
     set((state) => ({
@@ -268,14 +354,14 @@ export const useRoster = create<RosterState>()((set, get) => ({
         String(a.id) === String(id) ? { ...a, person_name: newPersonName } : a,
       ),
     }));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   removeAssignment: (id) => {
     set((state) => {
       const next = state.assignments.filter((a) => String(a.id) !== String(id));
       return { assignments: next, dates: computeDates(next) };
     });
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   setOverride: (id, is_override) => {
     set((state) => ({
@@ -283,7 +369,76 @@ export const useRoster = create<RosterState>()((set, get) => ({
         String(a.id) === String(id) ? { ...a, is_override } : a,
       ),
     }));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
+  },
+
+  // --- LIVE ROSTER GRID ---
+  addRosterDate: (date, label) => {
+    set((state) => {
+      if (state.dates.includes(date)) return {};
+      return {
+        dates: [...state.dates, date].sort(),
+        rosterMeta: {
+          ...state.rosterMeta,
+          [date]: { label: label || date, notes: "", detail: "" },
+        },
+      };
+    });
+    scheduleRosterSync();
+  },
+  removeRosterDate: (date) => {
+    set((state) => {
+      const rosterMeta = { ...state.rosterMeta };
+      delete rosterMeta[date];
+      return {
+        dates: state.dates.filter((d) => d !== date),
+        rosterMeta,
+        assignments: state.assignments.filter((a) => a.date !== date),
+      };
+    });
+    scheduleRosterSync();
+  },
+  assignSlot: (date, label, personName) => {
+    const slot = ROSTER_SLOTS.find((s) => s.label === label);
+    if (!slot) return;
+    set((state) => {
+      const id = `${date}::${label}`;
+      const exists = state.assignments.some((a) => a.id === id);
+      const assignments = exists
+        ? state.assignments.map((a) =>
+            a.id === id ? { ...a, person_name: personName } : a,
+          )
+        : [
+            ...state.assignments,
+            {
+              id,
+              date,
+              area: slot.area,
+              role: slot.role || slot.area,
+              label,
+              person_name: personName,
+              is_override: false,
+              notes: "",
+              status: "pending" as const,
+            },
+          ];
+      const dates = state.dates.includes(date)
+        ? state.dates
+        : [...state.dates, date].sort();
+      const rosterMeta = state.rosterMeta[date]
+        ? state.rosterMeta
+        : { ...state.rosterMeta, [date]: { label: date, notes: "", detail: "" } };
+      return { assignments, dates, rosterMeta };
+    });
+    scheduleRosterSync();
+  },
+  clearSlot: (date, label) => {
+    set((state) => ({
+      assignments: state.assignments.filter(
+        (a) => !(a.date === date && a.label === label),
+      ),
+    }));
+    scheduleRosterSync();
   },
 }));
 

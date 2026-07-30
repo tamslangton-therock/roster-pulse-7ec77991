@@ -23,6 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRoster, findVolunteer } from "@/lib/store";
+import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import {
   assignmentsByCell,
   detectClashes,
@@ -94,6 +95,18 @@ function LiveRosterPage() {
   const search = Route.useSearch();
 
   const { volunteers, assignments, dates } = useRoster();
+  const addRosterDate = useRoster((s) => s.addRosterDate);
+  const assignSlot = useRoster((s) => s.assignSlot);
+  const clearSlot = useRoster((s) => s.clearSlot);
+  const [addDateOpen, setAddDateOpen] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [slotTarget, setSlotTarget] = useState<{ date: string; label: string } | null>(null);
+  const knownNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of volunteers) if (v.full_name) set.add(v.full_name);
+    for (const a of assignments) if (a.person_name) set.add(a.person_name);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [volunteers, assignments]);
 
   // URL State
   const selectedTeam = search.team || "all";
@@ -200,15 +213,14 @@ function LiveRosterPage() {
     return m;
   }, [clashes]);
 
+  // Fixed column set from the Live_Roster grid schema, so empty slots stay visible
+  // and can be filled. When a team filter is active, narrow to that team's areas.
   const columns = useMemo(() => {
-    const seen = new Map<string, { area: string; label: string }>();
-    for (const a of filteredAssignments) {
-      if (!seen.has(a.label)) seen.set(a.label, { area: a.area, label: a.label });
-    }
-    return Array.from(seen.values()).sort((a, b) =>
-      a.label.localeCompare(b.label)
-    );
-  }, [filteredAssignments]);
+    const all = ROSTER_SLOTS.map((s) => ({ area: s.area, label: s.label }));
+    if (selectedTeam === "all") return all;
+    const areas = new Set(filteredAssignments.map((a) => a.area));
+    return all.filter((c) => areas.has(c.area));
+  }, [filteredAssignments, selectedTeam]);
 
   const months = useMemo(() => {
     const s = new Set<string>();
@@ -478,6 +490,14 @@ function LiveRosterPage() {
             Share Link
           </Button>
 
+          {/* Add Sunday */}
+          {!isShareView && (
+            <Button variant="outline" size="sm" onClick={() => setAddDateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Date
+            </Button>
+          )}
+
           {/* Print/Download Button */}
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-1.5" />
@@ -680,6 +700,17 @@ function LiveRosterPage() {
                                   />
                                 );
                               })}
+                              {list.length === 0 && !isShareView && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSlotTarget({ date: d, label: c.label })
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                >
+                                  <Plus className="h-3 w-3" /> Add
+                                </button>
+                              )}
                             </div>
                           </td>
                         );
@@ -791,6 +822,34 @@ function LiveRosterPage() {
               }
             }}
             onClose={() => setSelectedVolunteerForBlackouts(null)}
+          />
+          <AddDateDialog
+            open={addDateOpen}
+            value={newDate}
+            onValueChange={setNewDate}
+            onClose={() => setAddDateOpen(false)}
+            onConfirm={() => {
+              if (!newDate) return;
+              addRosterDate(newDate);
+              toast.success(`Added ${newDate} to the roster`);
+              setNewDate("");
+              setAddDateOpen(false);
+            }}
+          />
+          <FillSlotDialog
+            target={slotTarget}
+            names={knownNames}
+            onClose={() => setSlotTarget(null)}
+            onConfirm={(name: string) => {
+              if (!slotTarget) return;
+              if (name.trim()) {
+                assignSlot(slotTarget.date, slotTarget.label, name.trim());
+                toast.success(`${name.trim()} added to ${slotTarget.label}`);
+              } else {
+                clearSlot(slotTarget.date, slotTarget.label);
+              }
+              setSlotTarget(null);
+            }}
           />
         </>
       )}
@@ -1268,6 +1327,99 @@ function ClashDialog({
             </div>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddDateDialog({
+  open,
+  value,
+  onValueChange,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  value: string;
+  onValueChange: (v: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add a roster date</DialogTitle>
+          <DialogDescription>
+            Adds a new row to the Live_Roster tab in your Google Sheet.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          type="date"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={!value}>
+            Add date
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FillSlotDialog({
+  target,
+  names,
+  onClose,
+  onConfirm,
+}: {
+  target: { date: string; label: string } | null;
+  names: string[];
+  onClose: () => void;
+  onConfirm: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    setName("");
+  }, [target?.date, target?.label]);
+  if (!target) return null;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{target.label}</DialogTitle>
+          <DialogDescription>
+            {format(parseISO(`${target.date}T12:00:00`), "EEEE d MMMM yyyy")}
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          list="roster-known-names"
+          placeholder="Type or pick a name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) onConfirm(name);
+          }}
+          autoFocus
+        />
+        <datalist id="roster-known-names">
+          {names.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => onConfirm(name)} disabled={!name.trim()}>
+            Assign
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -60,3 +60,6 @@ export const NUMBER_FIELDS: Record<SheetTab, readonly string[]> = {
   teams: [],
   assignments: [],
 };
+
+// Wide grid tab (dates as rows, serving-area slots as columns).
+export const LIVE_ROSTER_TAB = "Live_Roster";
