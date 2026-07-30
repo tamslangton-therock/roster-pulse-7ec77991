@@ -81,10 +81,23 @@ function PrintRosterPage() {
     });
   };
 
-  const slots = useMemo(
-    () => ROSTER_SLOTS.filter((s) => s.area.toLowerCase() === area.toLowerCase()),
-    [area],
-  );
+  const slots = useMemo(() => {
+    const fixed = ROSTER_SLOTS.filter(
+      (s) => s.area.toLowerCase() === area.toLowerCase(),
+    );
+    if (fixed.length) return fixed;
+    // Fallback: derive columns from the assignments themselves so teams that
+    // aren't in the fixed slot list still render.
+    const seen = new Map<string, { area: string; role: string; label: string }>();
+    for (const a of assignments) {
+      if (a.area.toLowerCase() !== area.toLowerCase()) continue;
+      if (!seen.has(a.label)) {
+        seen.set(a.label, { area: a.area, role: a.role ?? a.label, label: a.label });
+      }
+    }
+    return Array.from(seen.values()).sort((x, y) => x.label.localeCompare(y.label));
+  }, [area, assignments]);
+
 
   const shownDates = useMemo(
     () => dates.filter((d) => selectedMonths.includes(d.slice(0, 7))).sort(),
@@ -134,6 +147,19 @@ function PrintRosterPage() {
     }
     return { bySlot, byPerson };
   }, [subTeams, area]);
+
+  const areaSubTeams = useMemo(() => {
+    const map = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
+    for (const r of subTeams) {
+      if (r.serving_area?.trim().toLowerCase() !== area.trim().toLowerCase()) continue;
+      const name = r.sub_team_name?.trim();
+      if (!name || map.has(name)) continue;
+      map.set(name, { name, color: resolveSubTeamColor(r.serving_area, name, r.color) });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [subTeams, area]);
+
+
 
   const colorFor = (person: string, slotLabel?: string) => {
     const key = person.trim().toLowerCase();
@@ -320,6 +346,33 @@ function PrintRosterPage() {
           x += pillW + 6;
         });
       }
+
+      if (areaSubTeams.length > 0) {
+        y += 26;
+        if (y > rowBottom()) y = newPage() + 8;
+        doc.setTextColor(93, 101, 113);
+        text("SUB-TEAMS", margin, y, 8, "bold");
+        y += 16;
+        let x = margin;
+        areaSubTeams.forEach((st) => {
+          const pillW = Math.min(180, doc.getTextWidth(st.name) + 16);
+          if (x + pillW > pageWidth - margin) {
+            x = margin;
+            y += 22;
+          }
+          if (y > rowBottom()) {
+            y = newPage() + 8;
+            x = margin;
+          }
+          setRgb(hslToRgb(st.color.bg), "fill");
+          setRgb(hslToRgb(st.color.border), "draw");
+          doc.roundedRect(x, y - 11, pillW, 17, 5, 5, "FD");
+          setRgb(hslToRgb(st.color.text), "text");
+          text(st.name, x + 8, y, 8, "bold");
+          x += pillW + 6;
+        });
+      }
+
 
       const safeArea = area.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const monthPart = selectedMonths.join("-") || "roster";
@@ -531,6 +584,30 @@ function PrintRosterPage() {
                 </div>
               </div>
             )}
+
+            {areaSubTeams.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Sub-teams
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {areaSubTeams.map((st) => (
+                    <span
+                      key={st.name}
+                      className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium"
+                      style={{
+                        backgroundColor: st.color.bg,
+                        borderColor: st.color.border,
+                        color: st.color.text,
+                      }}
+                    >
+                      {st.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </>
         )}
       </div>
