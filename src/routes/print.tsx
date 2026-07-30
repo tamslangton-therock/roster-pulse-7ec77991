@@ -121,17 +121,35 @@ function PrintRosterPage() {
   return (
     <div className="p-6 space-y-6 print:p-0 print:space-y-0">
       <style>{`
-        @page { size: A4 landscape; margin: 12mm; }
+        @page { size: A4 landscape; margin: 10mm; }
         @media print {
-          html, body { background: #fff !important; }
-          .no-print, header, nav, [data-sidebar] { display: none !important; }
-          .print-sheet { box-shadow: none !important; border: none !important; padding: 0 !important; }
+          html, body { background: #fff !important; width: 100% !important; }
+          /* Escape the app shell: hide everything, then reveal only the sheet */
+          body * { visibility: hidden !important; }
+          .print-sheet, .print-sheet * { visibility: visible !important; }
+          .print-sheet {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: #fff !important;
+            overflow: visible !important;
+          }
+          .print-sheet table { width: 100% !important; table-layout: auto; font-size: 10pt; }
+          .print-sheet .print-scroll { overflow: visible !important; max-height: none !important; }
+          .no-print { display: none !important; }
           table { page-break-inside: auto; }
           tr { page-break-inside: avoid; }
           thead { display: table-header-group; }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
+
 
       {/* Controls */}
       <div className="no-print rounded-xl border bg-card p-4 shadow-sm space-y-4">
