@@ -273,3 +273,87 @@ async function ensureLiveRosterTab() {
     });
   }
 }
+
+// ---------- Blockouts (date block-outs / unavailability) ----------
+
+export interface BlockoutRow {
+  person_name: string;
+  date: string; // ISO YYYY-MM-DD
+  reason: string;
+}
+
+async function ensureBlockoutsTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${BLOCKOUTS_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${BLOCKOUTS_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [BLOCKOUTS_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: BLOCKOUTS_TAB,
+                gridProperties: { frozenRowCount: 1 },
+              },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${BLOCKOUTS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [BLOCKOUTS_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchBlockouts = createServerFn({ method: "GET" }).handler(
+  async (): Promise<BlockoutRow[]> => {
+    await ensureBlockoutsTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${BLOCKOUTS_TAB}!A1:C2000`,
+      );
+    } catch {
+      return [];
+    }
+    const rows = (data.values ?? []).slice(1);
+    const out: BlockoutRow[] = [];
+    for (const r of rows) {
+      const person_name = String(r[0] ?? "").trim();
+      const iso = normalizeDate(String(r[1] ?? ""));
+      if (!person_name || !iso) continue;
+      out.push({ person_name, date: iso, reason: String(r[2] ?? "").trim() });
+    }
+    return out;
+  },
+);
+
+export const writeBlockouts = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: BlockoutRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureBlockoutsTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${BLOCKOUTS_TAB}!A1:C2000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [
+      BLOCKOUTS_SCHEMA.slice(),
+      ...data.rows.map((r) => [r.person_name, r.date, r.reason ?? ""]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${BLOCKOUTS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
