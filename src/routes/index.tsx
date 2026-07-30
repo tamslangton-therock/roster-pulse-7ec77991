@@ -1151,6 +1151,21 @@ function StatusCellBadge({
       {/* Action buttons on badge */}
       {!isShareView && (
         <div className="flex items-center gap-0.5 print:hidden">
+          {missingPartners.length > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectPartner?.();
+              }}
+              className="flex items-center gap-0.5 rounded-full border border-pink-500/40 bg-pink-500/15 px-1 py-0.5 text-[10px] font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-500/25 cursor-pointer shrink-0"
+              title={`Partner not rostered: ${missingPartners.join(", ")}`}
+            >
+              <HeartHandshake className="h-2.5 w-2.5" />
+              <span className="hidden sm:inline">Partner</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={(e) => {
