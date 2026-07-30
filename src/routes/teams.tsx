@@ -233,6 +233,9 @@ function SubTeamCard({
   onRename,
   onRemove,
   onApply,
+  colorId,
+  onSetColor,
+
 }: {
   area: string;
   name: string;
