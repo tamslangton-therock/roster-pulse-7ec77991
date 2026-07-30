@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Download, Printer, Users } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
-import { personColor } from "@/lib/person-colors";
+import { teamColor } from "@/lib/person-colors";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -243,7 +243,7 @@ function PrintRosterPage() {
             text("—", x + 8, y + 7, 9);
             return;
           }
-          const color = personColor(person);
+          const color = teamColor(area);
           const bg = hslToRgb(color.bg);
           const border = hslToRgb(color.border);
           const fg = hslToRgb(color.text);
@@ -270,7 +270,7 @@ function PrintRosterPage() {
         y += 16;
         let x = margin;
         people.forEach((person) => {
-          const color = personColor(person);
+          const color = teamColor(area);
           const pillW = Math.min(150, doc.getTextWidth(person) + 16);
           if (x + pillW > pageWidth - margin) {
             x = margin;
@@ -450,7 +450,7 @@ function PrintRosterPage() {
                     </td>
                     {slots.map((s) => {
                       const person = cellMap[d]?.[s.label] ?? "";
-                      const c = person ? personColor(person) : null;
+                      const c = person ? teamColor(area) : null;
                       return (
                         <td
                           key={s.label}
@@ -485,7 +485,7 @@ function PrintRosterPage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {people.map((p) => {
-                    const c = personColor(p);
+                    const c = teamColor(area);
                     return (
                       <span
                         key={p}

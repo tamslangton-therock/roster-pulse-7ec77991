@@ -1,4 +1,4 @@
-/** Deterministic pastel colour per person, so a name always looks the same. */
+/** Deterministic pastel colour per serving team, so a team always looks the same. */
 
 function hash(str: string): number {
   let h = 2166136261;
@@ -20,11 +20,11 @@ const HUES = [
   8, 24, 40, 56, 72, 92, 112, 132, 152, 172, 190, 208, 224, 244, 262, 280, 298, 318, 336, 352,
 ];
 
-export function personColor(name: string): PersonColor {
-  const key = name.trim().toLowerCase();
+/** One consistent pastel per team / serving area. */
+export function teamColor(team: string): PersonColor {
+  const key = team.trim().toLowerCase();
   const h = hash(key);
   const hue = HUES[h % HUES.length];
-  // Slight per-name variation so neighbours in the same hue bucket differ.
   const sat = 55 + ((h >> 5) % 3) * 8; // 55 / 63 / 71
   const light = 89 + ((h >> 9) % 2) * 3; // 89 / 92
   return {
