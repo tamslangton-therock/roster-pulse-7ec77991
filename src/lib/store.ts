@@ -10,10 +10,13 @@ import {
   fetchStatuses,
   writeStatuses,
   fetchAllowedClashes,
+  fetchSubTeams,
+  writeSubTeams,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
   type AllowedClashRow,
+  type SubTeamRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
@@ -34,6 +37,7 @@ interface RosterState {
   assignments: Assignment[];
   blockouts: BlockoutRow[];
   allowedClashes: AllowedClashRow[];
+  subTeams: SubTeamRow[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
 
@@ -81,6 +85,13 @@ interface RosterState {
 
   // Slot confirmation statuses — two-way with the Statuses tab
   setAssignmentStatus: (date: string, label: string, status: AssignmentStatus) => void;
+
+  // Sub-teams (ideal groupings per serving area) — two-way with Sub_Teams tab
+  addSubTeam: (area: string, name: string) => void;
+  removeSubTeam: (area: string, name: string) => void;
+  renameSubTeam: (area: string, oldName: string, newName: string) => void;
+  setSubTeamSlot: (area: string, name: string, slotLabel: string, person: string) => void;
+  applySubTeamToDate: (area: string, name: string, date: string) => number;
 }
 
 
@@ -252,6 +263,45 @@ function scheduleStatusSync() {
   statusTimer = setTimeout(run, 800);
 }
 
+let subTeamTimer: ReturnType<typeof setTimeout> | null = null;
+let subTeamInFlight = false;
+
+function scheduleSubTeamSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (subTeamTimer) clearTimeout(subTeamTimer);
+  const run = async () => {
+    if (subTeamTimer) clearTimeout(subTeamTimer);
+    if (subTeamInFlight) {
+      scheduleSubTeamSync();
+      return;
+    }
+    subTeamInFlight = true;
+    setPending("sub_teams", null);
+    try {
+      const rows = [...useRoster.getState().subTeams].sort(
+        (a, b) =>
+          a.serving_area.localeCompare(b.serving_area) ||
+          a.sub_team_name.localeCompare(b.sub_team_name) ||
+          a.slot_label.localeCompare(b.slot_label),
+      );
+      await writeSubTeams({ data: { rows } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[sub-teams sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Sub_Teams", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      subTeamInFlight = false;
+    }
+  };
+  setPending("sub_teams", run);
+  subTeamTimer = setTimeout(run, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
@@ -315,6 +365,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   assignments: [],
   blockouts: [],
   allowedClashes: [],
+  subTeams: [],
   statuses: {},
 
 
@@ -331,13 +382,15 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows, blockouts, statusRows, allowedClashes] = await Promise.all([
-        fetchAllTabs(),
-        fetchLiveRoster(),
-        fetchBlockouts().catch(() => [] as BlockoutRow[]),
-        fetchStatuses().catch(() => [] as StatusRow[]),
-        fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
-      ]);
+      const [data, gridRows, blockouts, statusRows, allowedClashes, subTeams] =
+        await Promise.all([
+          fetchAllTabs(),
+          fetchLiveRoster(),
+          fetchBlockouts().catch(() => [] as BlockoutRow[]),
+          fetchStatuses().catch(() => [] as StatusRow[]),
+          fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
+          fetchSubTeams().catch(() => [] as SubTeamRow[]),
+        ]);
 
       const statuses: Record<string, AssignmentStatus> = {};
       for (const r of statusRows) {
@@ -391,6 +444,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         assignments,
         blockouts,
         allowedClashes,
+        subTeams,
         statuses,
         rosterMeta,
         dates,
@@ -633,6 +687,83 @@ export const useRoster = create<RosterState>()((set, get) => ({
       };
     });
     scheduleStatusSync();
+  },
+
+  // --- SUB-TEAMS ---
+  addSubTeam: (area, name) => {
+    set((state) => {
+      const exists = state.subTeams.some(
+        (r) => r.serving_area === area && r.sub_team_name === name,
+      );
+      if (exists) return {};
+      const slots = ROSTER_SLOTS.filter((s) => s.area === area);
+      return {
+        subTeams: [
+          ...state.subTeams,
+          ...slots.map((s) => ({
+            serving_area: area,
+            sub_team_name: name,
+            slot_label: s.label,
+            person_name: "",
+          })),
+        ],
+      };
+    });
+    scheduleSubTeamSync();
+  },
+  removeSubTeam: (area, name) => {
+    set((state) => ({
+      subTeams: state.subTeams.filter(
+        (r) => !(r.serving_area === area && r.sub_team_name === name),
+      ),
+    }));
+    scheduleSubTeamSync();
+  },
+  renameSubTeam: (area, oldName, newName) => {
+    set((state) => ({
+      subTeams: state.subTeams.map((r) =>
+        r.serving_area === area && r.sub_team_name === oldName
+          ? { ...r, sub_team_name: newName }
+          : r,
+      ),
+    }));
+    scheduleSubTeamSync();
+  },
+  setSubTeamSlot: (area, name, slotLabel, person) => {
+    set((state) => {
+      const exists = state.subTeams.some(
+        (r) =>
+          r.serving_area === area &&
+          r.sub_team_name === name &&
+          r.slot_label === slotLabel,
+      );
+      const subTeams = exists
+        ? state.subTeams.map((r) =>
+            r.serving_area === area &&
+            r.sub_team_name === name &&
+            r.slot_label === slotLabel
+              ? { ...r, person_name: person }
+              : r,
+          )
+        : [
+            ...state.subTeams,
+            {
+              serving_area: area,
+              sub_team_name: name,
+              slot_label: slotLabel,
+              person_name: person,
+            },
+          ];
+      return { subTeams };
+    });
+    scheduleSubTeamSync();
+  },
+  applySubTeamToDate: (area, name, date) => {
+    const rows = get().subTeams.filter(
+      (r) => r.serving_area === area && r.sub_team_name === name && r.person_name,
+    );
+    for (const r of rows) get().assignSlot(date, r.slot_label, r.person_name);
+    return rows.length;
   },
 }));
 
