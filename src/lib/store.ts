@@ -59,7 +59,11 @@ interface RosterState {
   removeRosterDate: (date: string) => void;
   assignSlot: (date: string, label: string, personName: string) => void;
   clearSlot: (date: string, label: string) => void;
+
+  // Blockouts (date block-outs / unavailability) — two-way with the Blockouts tab
+  toggleBlockout: (personName: string, date: string, reason?: string) => void;
 }
+
 
 // --------- Background sync ---------
 const dirtyTimers: Partial<Record<SheetTab, ReturnType<typeof setTimeout>>> = {};
