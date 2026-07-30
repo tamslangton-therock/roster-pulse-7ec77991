@@ -43,17 +43,45 @@ function gatewayHeaders() {
   };
 }
 
-async function gwFetch(path: string, init: RequestInit = {}) {
-  const res = await fetch(`${GATEWAY}${path}`, {
-    ...init,
-    headers: { ...gatewayHeaders(), ...(init.headers ?? {}) },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Sheets ${init.method ?? "GET"} ${path} failed [${res.status}]: ${text}`);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function gwFetch(path: string, init: RequestInit = {}): Promise<any> {
+  const maxAttempts = 5;
+  let lastText = "";
+  let lastStatus = 0;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const res = await fetch(`${GATEWAY}${path}`, {
+      ...init,
+      headers: { ...gatewayHeaders(), ...(init.headers ?? {}) },
+    });
+    if (res.ok) return res.json();
+
+    lastStatus = res.status;
+    lastText = await res.text();
+
+    // Creating a tab that already exists is a no-op, not an error.
+    if (res.status === 400 && /already exists/i.test(lastText)) return {};
+
+    // Rate limited / transient server error — back off and retry.
+    if (res.status === 429 || res.status >= 500) {
+      const retryAfter = Number(res.headers.get("Retry-After"));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : Math.min(8000, 500 * 2 ** attempt) + Math.random() * 300;
+      if (attempt < maxAttempts - 1) {
+        await sleep(waitMs);
+        continue;
+      }
+    }
+    break;
   }
-  return res.json();
+
+  throw new Error(
+    `Sheets ${init.method ?? "GET"} ${path} failed [${lastStatus}]: ${lastText}`,
+  );
 }
+
 
 function encodeCell(value: unknown, field: string, tab: SheetTab): string {
   if (value === null || value === undefined) return "";
