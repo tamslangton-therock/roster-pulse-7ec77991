@@ -6,8 +6,16 @@ import {
   ARRAY_FIELDS,
   BOOL_FIELDS,
   NUMBER_FIELDS,
+  LIVE_ROSTER_TAB,
   type SheetTab,
 } from "./sheets-config";
+import {
+  ROSTER_SLOTS,
+  DETAIL_COL,
+  FIRST_DATA_ROW,
+  headerRows,
+  clashFormula,
+} from "./roster-grid";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
 
@@ -161,3 +169,104 @@ export const writeTab = createServerFn({ method: "POST" })
     );
     return { ok: true, count: rows.length };
   });
+
+// ---------- Live_Roster (wide grid) ----------
+
+function normalizeDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = s.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,})[-/\s](\d{4})/);
+  if (m) {
+    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const mi = months.indexOf(m[2].slice(0, 3).toLowerCase());
+    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
+export interface LiveRosterRow {
+  date: string;
+  label: string; // original cell text (may include "EASTER SUNDAY" etc.)
+  cells: Record<string, string>; // slot label -> person name
+  notes: string;
+  detail: string;
+}
+
+export const fetchLiveRoster = createServerFn({ method: "GET" }).handler(
+  async (): Promise<LiveRosterRow[]> => {
+    const range = `${LIVE_ROSTER_TAB}!A1:${DETAIL_COL}2000`;
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${range}`);
+    } catch {
+      return [];
+    }
+    const rows = data.values ?? [];
+    const out: LiveRosterRow[] = [];
+    for (let r = FIRST_DATA_ROW - 1; r < rows.length; r++) {
+      const row = rows[r] ?? [];
+      const rawDate = String(row[0] ?? "");
+      const iso = normalizeDate(rawDate);
+      if (!iso) continue;
+      const cells: Record<string, string> = {};
+      ROSTER_SLOTS.forEach((slot, i) => {
+        const v = String(row[i + 1] ?? "").trim();
+        if (v) cells[slot.label] = v;
+      });
+      out.push({
+        date: iso,
+        label: rawDate.trim(),
+        cells,
+        notes: String(row[ROSTER_SLOTS.length + 2] ?? "").trim(),
+        detail: String(row[ROSTER_SLOTS.length + 3] ?? "").trim(),
+      });
+    }
+    return out;
+  },
+);
+
+export const writeLiveRoster = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: LiveRosterRow[] }) => data)
+  .handler(async ({ data }) => {
+    const { rows } = data;
+    await ensureLiveRosterTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIVE_ROSTER_TAB}!A1:${DETAIL_COL}2000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [...headerRows()];
+    rows.forEach((row, i) => {
+      const sheetRow = FIRST_DATA_ROW + i;
+      values.push([
+        `'${row.label || row.date}`,
+        ...ROSTER_SLOTS.map((s) => row.cells[s.label] ?? ""),
+        clashFormula(sheetRow),
+        row.notes ?? "",
+        row.detail ?? "",
+      ]);
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIVE_ROSTER_TAB}!A1?valueInputOption=USER_ENTERED`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: rows.length };
+  });
+
+async function ensureLiveRosterTab() {
+  try {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${LIVE_ROSTER_TAB}!A1:A1`);
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          { addSheet: { properties: { title: LIVE_ROSTER_TAB, gridProperties: { frozenRowCount: 2, frozenColumnCount: 1 } } } },
+        ],
+      }),
+    });
+  }
+}
