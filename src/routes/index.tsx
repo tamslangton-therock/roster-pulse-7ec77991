@@ -842,7 +842,29 @@ function LiveRosterPage() {
             </tbody>
           </table>
         </div>
+        {visibleRows < shownDates.length && (
+          <div className="flex items-center justify-center gap-3 border-t bg-muted/30 p-3 text-xs print:hidden">
+            <span className="text-muted-foreground">
+              Showing {renderedDates.length} of {shownDates.length} Sundays
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setVisibleRows((n) => n + ROW_CHUNK)}
+            >
+              Show more
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setVisibleRows(shownDates.length)}
+            >
+              Show all
+            </Button>
+          </div>
+        )}
       </div>
+
 
       {!isShareView && (
         <>
