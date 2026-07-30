@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { Team, Volunteer, Assignment } from "./types";
-import { fetchAllTabs, writeTab } from "./sheets.functions";
+import {
+  fetchAllTabs,
+  writeTab,
+  fetchLiveRoster,
+  writeLiveRoster,
+  type LiveRosterRow,
+} from "./sheets.functions";
+import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
 
@@ -18,6 +25,7 @@ interface RosterState {
 
   // Derived
   dates: string[];
+  rosterMeta: Record<string, { label: string; notes: string; detail: string }>;
 
   // Lifecycle
   hydrate: () => Promise<void>;
@@ -39,6 +47,12 @@ interface RosterState {
   swapAssignment: (id: string, newPersonName: string) => void;
   removeAssignment: (id: string) => void;
   setOverride: (id: string, is_override: boolean) => void;
+
+  // Live Roster grid
+  addRosterDate: (date: string, label?: string) => void;
+  removeRosterDate: (date: string) => void;
+  assignSlot: (date: string, label: string, personName: string) => void;
+  clearSlot: (date: string, label: string) => void;
 }
 
 // --------- Background sync ---------
@@ -68,6 +82,47 @@ function scheduleSync(tab: SheetTab, getRows: () => Array<Record<string, unknown
       inFlight[tab] = false;
     }
   }, 800);
+}
+
+let rosterTimer: ReturnType<typeof setTimeout> | null = null;
+let rosterInFlight = false;
+
+function scheduleRosterSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (rosterTimer) clearTimeout(rosterTimer);
+  rosterTimer = setTimeout(async () => {
+    if (rosterInFlight) {
+      scheduleRosterSync();
+      return;
+    }
+    rosterInFlight = true;
+    try {
+      await writeLiveRoster({ data: { rows: buildRosterRows(useRoster.getState()) } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[live roster sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Live_Roster", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      rosterInFlight = false;
+    }
+  }, 900);
+}
+
+function buildRosterRows(state: RosterState): LiveRosterRow[] {
+  return state.dates.map((date) => {
+    const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
+    const cells: Record<string, string> = {};
+    for (const a of state.assignments) {
+      if (a.date !== date || !a.person_name) continue;
+      cells[a.label] = a.person_name;
+    }
+    return { date, label: meta.label || date, cells, notes: meta.notes, detail: meta.detail };
+  });
 }
 
 function computeDates(assignments: Assignment[]): string[] {
@@ -126,6 +181,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   syncStatus: "idle",
 
   dates: [],
+  rosterMeta: {},
 
   hydrate: async () => {
     if (get().ready || get().loading) return;
