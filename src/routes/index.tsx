@@ -260,6 +260,19 @@ function LiveRosterPage() {
     });
   }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
+  // Render the grid in chunks — the full year of Sundays × ~90 slots is far too
+  // much DOM to mount at once and makes the first paint feel frozen.
+  const ROW_CHUNK = 10;
+  const [visibleRows, setVisibleRows] = useState(ROW_CHUNK);
+  useEffect(() => {
+    setVisibleRows(ROW_CHUNK);
+  }, [filterMonth, hidePastWeeks, selectedTeam, showClashesOnly]);
+  const renderedDates = useMemo(
+    () => shownDates.slice(0, visibleRows),
+    [shownDates, visibleRows],
+  );
+
+
   // Workload stats calculation + Blackout Clash Detection
   const volunteerStatsMap = useMemo(() => {
     const map = new Map<string, VolunteerWorkloadStats>();
