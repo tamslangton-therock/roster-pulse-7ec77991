@@ -187,7 +187,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const data = await fetchAllTabs();
+      const [data, gridRows] = await Promise.all([fetchAllTabs(), fetchLiveRoster()]);
       const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
         ...v,
         id: v.id || `vol-${Math.random().toString(36).slice(2, 10)}`,
@@ -196,15 +196,45 @@ export const useRoster = create<RosterState>()((set, get) => ({
         ...t,
         id: t.id || `team-${Math.random().toString(36).slice(2, 10)}`,
       }));
-      const assignments = (data.assignments as unknown as Assignment[]).map((a) => ({
-        ...a,
-        id: a.id || `asg-${Math.random().toString(36).slice(2, 10)}`,
-      }));
+
+      const slotByLabel = new Map(ROSTER_SLOTS.map((s) => [s.label, s]));
+      const assignments: Assignment[] = [];
+      const rosterMeta: RosterState["rosterMeta"] = {};
+      for (const row of gridRows) {
+        rosterMeta[row.date] = {
+          label: row.label || row.date,
+          notes: row.notes,
+          detail: row.detail,
+        };
+        for (const [label, person] of Object.entries(row.cells)) {
+          const slot = slotByLabel.get(label);
+          if (!slot || !person) continue;
+          assignments.push({
+            id: `${row.date}::${label}`,
+            date: row.date,
+            area: slot.area,
+            role: slot.role || slot.area,
+            label,
+            person_name: person,
+            is_override: false,
+            notes: "",
+            status: "pending",
+          });
+        }
+      }
+
+      let dates = Object.keys(rosterMeta).sort();
+      if (dates.length === 0) {
+        dates = defaultSundayWindow();
+        for (const d of dates) rosterMeta[d] = { label: d, notes: "", detail: "" };
+      }
+
       set({
         volunteers,
         teams,
         assignments,
-        dates: computeDates(assignments),
+        rosterMeta,
+        dates,
         ready: true,
         loading: false,
       });
