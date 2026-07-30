@@ -135,7 +135,9 @@ async function ensureTabWithHeaders(tab: SheetTab) {
   } catch (err) {
     // Tab probably doesn't exist — create it
     const msg = err instanceof Error ? err.message : String(err);
+    if (/\[429\]|\[5\d\d\]|RESOURCE_EXHAUSTED/i.test(msg)) throw err;
     if (/Unable to parse range|not found|400/i.test(msg)) {
+
       await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
         method: "POST",
         body: JSON.stringify({
