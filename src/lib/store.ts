@@ -250,11 +250,13 @@ export const useRoster = create<RosterState>()((set, get) => ({
         volunteers,
         teams,
         assignments,
+        blockouts,
         rosterMeta,
         dates,
         ready: true,
         loading: false,
       });
+
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[sheets hydrate] failed", err);
