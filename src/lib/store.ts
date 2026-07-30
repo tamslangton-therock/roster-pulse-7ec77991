@@ -531,6 +531,23 @@ export const useRoster = create<RosterState>()((set, get) => ({
     });
     scheduleBlockoutSync();
   },
+
+  // --- STATUSES ---
+  setAssignmentStatus: (date, label, status) => {
+    set((state) => {
+      const key = `${date}::${label}`;
+      const statuses = { ...state.statuses };
+      if (status === "pending") delete statuses[key];
+      else statuses[key] = status;
+      return {
+        statuses,
+        assignments: state.assignments.map((a) =>
+          a.date === date && a.label === label ? { ...a, status } : a,
+        ),
+      };
+    });
+    scheduleStatusSync();
+  },
 }));
 
 
