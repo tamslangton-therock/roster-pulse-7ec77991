@@ -184,6 +184,8 @@ export const useRoster = create<RosterState>()((set, get) => ({
   teams: [],
   volunteers: [],
   assignments: [],
+  blockouts: [],
+
 
   ready: false,
   loading: false,
