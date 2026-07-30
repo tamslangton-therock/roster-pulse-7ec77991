@@ -64,7 +64,10 @@ function PrintRosterPage() {
 
   const selectedMonths = useMemo(() => {
     const raw = String(search.months || "").split(",").filter(Boolean) as string[];
-    return raw.length ? raw : monthOptions.slice(0, 3);
+    if (raw.length) return raw;
+    const now = new Date().toISOString().slice(0, 7);
+    const upcoming = monthOptions.filter((m) => m >= now);
+    return (upcoming.length ? upcoming : monthOptions).slice(0, 3);
   }, [search.months, monthOptions]);
 
   const toggleMonth = (m: string) => {
