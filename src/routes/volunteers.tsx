@@ -57,13 +57,11 @@ function VolunteersPage() {
   const [showAdd, setShowAdd] = useState(false);
 
   // New volunteer state
-  const [newName, setNewName] = useState("");
-  const [newMax, setNewMax] = useState(2);
+  const [newDraft, setNewDraft] = useState<VolunteerDraft>(emptyDraft);
 
   // Edit volunteer state
   const [editingVolunteer, setEditingVolunteer] = useState<Volunteer | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editMax, setEditMax] = useState(2);
+  const [editDraft, setEditDraft] = useState<VolunteerDraft>(emptyDraft);
 
   const allAreas = useMemo(() => {
     const set = new Set<string>();
@@ -72,6 +70,11 @@ function VolunteersPage() {
     );
     return Array.from(set).sort();
   }, [volunteers]);
+
+  const allNames = useMemo(
+    () => volunteers.map((v: Volunteer) => v.full_name).filter(Boolean).sort(),
+    [volunteers]
+  );
 
   const filtered = useMemo(() => {
     return volunteers.filter((v: Volunteer) => {
@@ -86,19 +89,20 @@ function VolunteersPage() {
 
   const startEditing = (volunteer: Volunteer) => {
     setEditingVolunteer(volunteer);
-    setEditName(volunteer.full_name);
-    setEditMax(volunteer.max_serving_per_month);
+    setEditDraft(toDraft(volunteer));
   };
 
   const handleSaveEdit = () => {
-    if (!editingVolunteer || !editName.trim()) return;
+    if (!editingVolunteer || !editDraft.full_name.trim()) return;
     updateVolunteer(editingVolunteer.id, {
-      full_name: editName.trim(),
-      max_serving_per_month: Number(editMax),
+      ...editDraft,
+      full_name: editDraft.full_name.trim(),
+      max_serving_per_month: Number(editDraft.max_serving_per_month) || 0,
     });
     setEditingVolunteer(null);
     toast.success("Volunteer updated");
   };
+
 
   return (
     <div className="p-6 space-y-6">
