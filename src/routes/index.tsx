@@ -768,6 +768,8 @@ function LiveRosterPage() {
                                   statusMap[`${a.date}::${a.label}`] ||
                                   (a.status as AssignmentStatus) ||
                                   "pending";
+                                const missingPartners =
+                                  partnerGaps.get(`${a.date}||${key}`) ?? [];
 
                                 return (
                                   <StatusCellBadge
@@ -785,6 +787,14 @@ function LiveRosterPage() {
                                     subTeam={subTeamMap.get(
                                       `${a.label}||${a.person_name.trim().toLowerCase()}`
                                     )}
+                                    missingPartners={missingPartners}
+                                    onSelectPartner={() =>
+                                      setPartnerTarget({
+                                        date: a.date,
+                                        person: a.person_name,
+                                        missing: missingPartners,
+                                      })
+                                    }
                                     onStatusChange={(s) =>
                                       setAssignmentStatus(a.date, a.label, s)
                                     }
