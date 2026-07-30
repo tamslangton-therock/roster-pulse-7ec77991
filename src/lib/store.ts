@@ -123,6 +123,39 @@ function scheduleRosterSync() {
   }, 900);
 }
 
+let blockoutTimer: ReturnType<typeof setTimeout> | null = null;
+let blockoutInFlight = false;
+
+function scheduleBlockoutSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (blockoutTimer) clearTimeout(blockoutTimer);
+  blockoutTimer = setTimeout(async () => {
+    if (blockoutInFlight) {
+      scheduleBlockoutSync();
+      return;
+    }
+    blockoutInFlight = true;
+    try {
+      const rows = [...useRoster.getState().blockouts].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.person_name.localeCompare(b.person_name),
+      );
+      await writeBlockouts({ data: { rows } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[blockouts sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Blockouts", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      blockoutInFlight = false;
+    }
+  }, 800);
+}
+
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
