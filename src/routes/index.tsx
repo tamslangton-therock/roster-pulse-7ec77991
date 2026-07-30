@@ -700,6 +700,9 @@ function LiveRosterPage() {
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
+                                    subTeam={subTeamMap.get(
+                                      `${a.label}||${a.person_name.trim().toLowerCase()}`
+                                    )}
                                     onStatusChange={(s) =>
                                       setAssignmentStatus(a.date, a.label, s)
                                     }
@@ -901,6 +904,7 @@ function StatusCellBadge({
   isDoubleBookedOnDate,
   isBlackoutOnDate,
   isShareView,
+  subTeam,
   onStatusChange,
   onSelectSwap,
   onSelectClash,
@@ -916,6 +920,7 @@ function StatusCellBadge({
   isDoubleBookedOnDate: boolean;
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
+  subTeam?: { name: string; color: { bg: string; border: string; text: string } };
   onStatusChange: (status: AssignmentStatus) => void;
   onSelectSwap: () => void;
   onSelectClash: () => void;
@@ -972,6 +977,11 @@ function StatusCellBadge({
         getBadgeStyle(),
         isDoubleBookedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
       )}
+      style={
+        subTeam && !paused && !isClash && !isBlackoutOnDate
+          ? { borderLeft: `4px solid ${subTeam.color.border}` }
+          : undefined
+      }
     >
       <button
         type="button"
@@ -990,6 +1000,13 @@ function StatusCellBadge({
         )}
       >
         {getIcon()}
+        {subTeam && (
+          <span
+            className="h-2 w-2 rounded-full shrink-0"
+            style={{ backgroundColor: subTeam.color.border }}
+            title={`Sub-team: ${subTeam.name}`}
+          />
+        )}
         <span className="truncate">{assignment.person_name}</span>
 
         {clashDatesCount > 0 && (
