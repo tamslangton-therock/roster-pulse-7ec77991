@@ -21,6 +21,8 @@ interface RosterState {
   teams: Team[];
   volunteers: Volunteer[];
   assignments: Assignment[];
+  blockouts: BlockoutRow[];
+
 
   ready: boolean;
   loading: boolean;
