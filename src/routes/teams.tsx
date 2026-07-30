@@ -22,7 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { subTeamColor } from "@/lib/person-colors";
+import { resolveSubTeamColor, PASTEL_SWATCHES } from "@/lib/person-colors";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export const Route = createFileRoute("/teams")({
   head: () => ({
@@ -152,6 +153,15 @@ function TeamsPage() {
                   )}
                   volunteers={volunteers}
                   dates={dates}
+                  colorId={
+                    subTeams.find(
+                      (r) =>
+                        r.serving_area === area &&
+                        r.sub_team_name === name &&
+                        r.color,
+                    )?.color
+                  }
+                  onSetColor={(id) => setSubTeamColor(area, name, id)}
                   onSetSlot={(label, person) => setSubTeamSlot(area, name, label, person)}
                   onRename={(next) => {
                     if (!next.trim() || next === name) return;
@@ -232,8 +242,10 @@ function SubTeamCard({
   onRename: (next: string) => void;
   onRemove: () => void;
   onApply: (date: string) => void;
+  colorId?: string;
+  onSetColor: (id: string) => void;
 }) {
-  const color = subTeamColor(area, name);
+  const color = resolveSubTeamColor(area, name, colorId);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [applyDate, setApplyDate] = useState("");
@@ -296,10 +308,42 @@ function SubTeamCard({
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <span
-              className="h-3 w-3 rounded-full shrink-0"
-              style={{ backgroundColor: color.border }}
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  title="Choose sub-team colour"
+                  className="h-4 w-4 rounded-full shrink-0 border border-black/10 hover:ring-2 hover:ring-offset-1 hover:ring-muted-foreground/30"
+                  style={{ backgroundColor: color.border }}
+                />
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="start">
+                <div className="text-xs font-medium mb-2">Sub-team colour</div>
+                <div className="grid grid-cols-6 gap-2">
+                  {PASTEL_SWATCHES.map((sw) => (
+                    <button
+                      key={sw.id}
+                      type="button"
+                      title={sw.label}
+                      onClick={() => onSetColor(sw.id)}
+                      className={`h-6 w-6 rounded-full border transition ${
+                        colorId === sw.id
+                          ? "ring-2 ring-offset-1 ring-foreground/50"
+                          : "hover:scale-110"
+                      }`}
+                      style={{ backgroundColor: sw.bg, borderColor: sw.border }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 text-xs text-muted-foreground underline"
+                  onClick={() => onSetColor("")}
+                >
+                  Reset to automatic
+                </button>
+              </PopoverContent>
+            </Popover>
             <span
               className="rounded-md px-2 py-0.5 text-sm font-medium"
               style={{ backgroundColor: color.bg, color: color.text }}
