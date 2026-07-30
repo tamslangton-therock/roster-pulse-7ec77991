@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
+import { subTeamColor } from "@/lib/person-colors";
 import {
   assignmentsByCell,
   detectClashes,
