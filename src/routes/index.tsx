@@ -817,6 +817,34 @@ function LiveRosterPage() {
             }}
             onClose={() => setSelectedVolunteerForBlackouts(null)}
           />
+          <AddDateDialog
+            open={addDateOpen}
+            value={newDate}
+            onValueChange={setNewDate}
+            onClose={() => setAddDateOpen(false)}
+            onConfirm={() => {
+              if (!newDate) return;
+              addRosterDate(newDate);
+              toast.success(`Added ${newDate} to the roster`);
+              setNewDate("");
+              setAddDateOpen(false);
+            }}
+          />
+          <FillSlotDialog
+            target={slotTarget}
+            names={knownNames}
+            onClose={() => setSlotTarget(null)}
+            onConfirm={(name) => {
+              if (!slotTarget) return;
+              if (name.trim()) {
+                assignSlot(slotTarget.date, slotTarget.label, name.trim());
+                toast.success(`${name.trim()} added to ${slotTarget.label}`);
+              } else {
+                clearSlot(slotTarget.date, slotTarget.label);
+              }
+              setSlotTarget(null);
+            }}
+          />
         </>
       )}
     </div>
