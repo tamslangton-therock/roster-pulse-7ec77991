@@ -8,7 +8,59 @@ export interface Clash {
   is_override: boolean;
 }
 
-export function detectClashes(assignments: Assignment[]): Clash[] {
+/**
+ * Allowed-clash exceptions: pairs of serving areas (or full "Area — Role"
+ * slot labels) a person MAY hold on the same date. Anything not listed clashes.
+ */
+export interface AllowedPair {
+  area_a: string;
+  area_b: string;
+}
+
+const norm = (s: string) => s.trim().toLowerCase();
+
+export function buildAllowedSet(pairs: AllowedPair[] = []): Set<string> {
+  const set = new Set<string>();
+  for (const p of pairs) {
+    const a = norm(p.area_a);
+    const b = norm(p.area_b);
+    if (!a || !b) continue;
+    set.add(`${a}||${b}`);
+    set.add(`${b}||${a}`);
+  }
+  return set;
+}
+
+/** True when these two assignments are an explicitly allowed same-day pairing. */
+export function isAllowedPair(
+  a: Assignment,
+  b: Assignment,
+  allowed: Set<string>,
+): boolean {
+  if (allowed.size === 0) return false;
+  const keys = (x: Assignment) => [norm(x.area), norm(x.label)];
+  for (const ka of keys(a)) {
+    for (const kb of keys(b)) {
+      if (allowed.has(`${ka}||${kb}`)) return true;
+    }
+  }
+  return false;
+}
+
+/** True when every pairing in the group is explicitly allowed. */
+export function groupAllowed(list: Assignment[], allowed: Set<string>): boolean {
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      if (!isAllowedPair(list[i], list[j], allowed)) return false;
+    }
+  }
+  return true;
+}
+
+export function detectClashes(
+  assignments: Assignment[],
+  allowed: Set<string> = new Set(),
+): Clash[] {
   const map = new Map<string, Assignment[]>();
   for (const a of assignments) {
     const key = `${a.date}||${a.person_name.toLowerCase()}`;
@@ -17,7 +69,7 @@ export function detectClashes(assignments: Assignment[]): Clash[] {
   }
   const clashes: Clash[] = [];
   for (const [key, list] of map) {
-    if (list.length > 1) {
+    if (list.length > 1 && !groupAllowed(list, allowed)) {
       const [date] = key.split("||");
       clashes.push({
         date,

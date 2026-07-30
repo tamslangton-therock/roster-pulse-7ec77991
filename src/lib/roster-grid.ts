@@ -1,3 +1,5 @@
+import { ALLOWED_CLASHES_TAB } from "./sheets-config";
+
 // Wide "Live_Roster" grid definition — mirrors the church's spreadsheet layout.
 // Row 1 = serving area, Row 2 = role / slot, Row 3+ = one row per date.
 // Columns B..BA are slots; BB = Clash Alert formula, BC = NOTES, BD = DETAIL.
@@ -102,15 +104,27 @@ export function headerRows(): string[][] {
  */
 export function clashFormula(row: number): string {
   const R = `$${FIRST_SLOT_COL}${row}:$${LAST_SLOT_COL}${row}`;
-  const H1 = `$${FIRST_SLOT_COL}$1:$${LAST_SLOT_COL}$1`;
+  const A = `$${FIRST_SLOT_COL}$1:$${LAST_SLOT_COL}$1`;
   const H2 = `$${FIRST_SLOT_COL}$2:$${LAST_SLOT_COL}$2`;
+  const EXA = `'${ALLOWED_CLASHES_TAB}'!$A$2:$A`;
+  const EXB = `'${ALLOWED_CLASHES_TAB}'!$B$2:$B`;
   return (
     `=IFERROR(LET(` +
     `r,ARRAYFORMULA(TRIM(${R})),` +
-    `h,ARRAYFORMULA(${H1}&IF(${H2}="",""," — "&${H2})),` +
-    `names,TOCOL(ARRAYFORMULA(IF((COUNTIF(r,r)>1)*(r<>""),r,NA())),3),` +
-    `IF(COUNTA(names)=0,"✓","⚠️ CLASH: "&TEXTJOIN(" | ",TRUE,` +
-    `MAP(UNIQUE(names),LAMBDA(n,n&" IN "&TEXTJOIN(" & ",TRUE,TOCOL(ARRAYFORMULA(IF(r=n,h,NA())),3))))))` +
+    `a,ARRAYFORMULA(TRIM(${A})),` +
+    `h,ARRAYFORMULA(TRIM(${A})&IF(${H2}="",""," — "&${H2})),` +
+    `ex,IFERROR(TOCOL(ARRAYFORMULA(IF(TRIM(${EXA})="",NA(),LOWER(TRIM(${EXA})&"||"&TRIM(${EXB})))),3),""),` +
+    `ex2,IFERROR(TOCOL(ARRAYFORMULA(IF(TRIM(${EXB})="",NA(),LOWER(TRIM(${EXB})&"||"&TRIM(${EXA})))),3),""),` +
+    `names,IFERROR(UNIQUE(TOCOL(ARRAYFORMULA(IF((COUNTIF(r,r)>1)*(r<>""),r,NA())),3)),""),` +
+    `bad,IF(COUNTA(names)=0,"",IFERROR(FILTER(names,MAP(names,LAMBDA(n,LET(` +
+    `ar,TOCOL(ARRAYFORMULA(IF(r=n,a,NA())),3),` +
+    `sl,TOCOL(ARRAYFORMULA(IF(r=n,h,NA())),3),` +
+    `k1,LOWER(INDEX(ar,1)&"||"&INDEX(ar,2)),` +
+    `k2,LOWER(INDEX(sl,1)&"||"&INDEX(sl,2)),` +
+    `IF(COUNTA(ar)<>2,TRUE,` +
+    `(COUNTIF(ex,k1)+COUNTIF(ex2,k1)+COUNTIF(ex,k2)+COUNTIF(ex2,k2))=0))))),"")),` +
+    `IF(COUNTA(bad)=0,"✓","⚠️ CLASH: "&TEXTJOIN(" | ",TRUE,` +
+    `MAP(bad,LAMBDA(n,n&" IN "&TEXTJOIN(" & ",TRUE,TOCOL(ARRAYFORMULA(IF(r=n,h,NA())),3))))))` +
     `),"✓")`
   );
 }
