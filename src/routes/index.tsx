@@ -625,6 +625,21 @@ function LiveRosterPage() {
             />
             Clashes & Blackouts only
           </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox
+              checked={showPartnerSplitsOnly}
+              onCheckedChange={(v) => setShowPartnerSplitsOnly(!!v)}
+            />
+            <span className="flex items-center gap-1">
+              <HeartHandshake className="h-3.5 w-3.5 text-pink-600 dark:text-pink-400" />
+              Partners split only
+              {partnerSplitCount > 0 && (
+                <span className="ml-1 rounded-full bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-bold text-pink-700 dark:text-pink-300">
+                  {partnerSplitCount}
+                </span>
+              )}
+            </span>
+          </label>
         </div>
       )}
 
