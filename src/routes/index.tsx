@@ -260,6 +260,19 @@ function LiveRosterPage() {
     });
   }, [dates, filterMonth, hidePastWeeks, todayStr]);
 
+  // Render the grid in chunks — the full year of Sundays × ~90 slots is far too
+  // much DOM to mount at once and makes the first paint feel frozen.
+  const ROW_CHUNK = 10;
+  const [visibleRows, setVisibleRows] = useState(ROW_CHUNK);
+  useEffect(() => {
+    setVisibleRows(ROW_CHUNK);
+  }, [filterMonth, hidePastWeeks, selectedTeam, showClashesOnly]);
+  const renderedDates = useMemo(
+    () => shownDates.slice(0, visibleRows),
+    [shownDates, visibleRows],
+  );
+
+
   // Workload stats calculation + Blackout Clash Detection
   const volunteerStatsMap = useMemo(() => {
     const map = new Map<string, VolunteerWorkloadStats>();
@@ -647,7 +660,7 @@ function LiveRosterPage() {
                   </td>
                 </tr>
               ) : (
-                shownDates.map((d) => {
+                renderedDates.map((d) => {
                   const dayClashesList = dateClashesMap.get(d) || [];
                   const rowHasClash = dayClashesList.length > 0;
                   if (showClashesOnly && !rowHasClash) return null;
@@ -829,7 +842,29 @@ function LiveRosterPage() {
             </tbody>
           </table>
         </div>
+        {visibleRows < shownDates.length && (
+          <div className="flex items-center justify-center gap-3 border-t bg-muted/30 p-3 text-xs print:hidden">
+            <span className="text-muted-foreground">
+              Showing {renderedDates.length} of {shownDates.length} Sundays
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setVisibleRows((n) => n + ROW_CHUNK)}
+            >
+              Show more
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setVisibleRows(shownDates.length)}
+            >
+              Show all
+            </Button>
+          </div>
+        )}
       </div>
+
 
       {!isShareView && (
         <>
