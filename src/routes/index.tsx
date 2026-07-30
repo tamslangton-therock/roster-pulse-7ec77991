@@ -363,10 +363,6 @@ function LiveRosterPage() {
     toast.success("Shareable link copied to clipboard!");
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="p-6 space-y-6">
       {/* CSS Print Stylesheet */}
