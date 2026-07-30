@@ -21,6 +21,7 @@ import {
   CalendarX,
   Plus,
   Trash2,
+  HeartHandshake,
 } from "lucide-react";
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
@@ -32,6 +33,12 @@ import {
   groupAllowed,
   rankSwapCandidates,
 } from "@/lib/roster-engine";
+import {
+  buildPartnerIndex,
+  partnerGapsByDate,
+  partnersStillRostered,
+  suggestSlotsForPartner,
+} from "@/lib/partners";
 import type { Assignment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,8 +121,14 @@ function LiveRosterPage() {
 
   // Local UI State
   const [showClashesOnly, setShowClashesOnly] = useState(false);
+  const [showPartnerSplitsOnly, setShowPartnerSplitsOnly] = useState(false);
   const [hidePastWeeks, setHidePastWeeks] = useState(true);
   const [swapTarget, setSwapTarget] = useState<Assignment | null>(null);
+  const [partnerTarget, setPartnerTarget] = useState<{
+    date: string;
+    person: string;
+    missing: string[];
+  } | null>(null);
   const [clashDetail, setClashDetail] = useState<{
     date: string;
     person: string;
@@ -266,7 +279,7 @@ function LiveRosterPage() {
   const [visibleRows, setVisibleRows] = useState(ROW_CHUNK);
   useEffect(() => {
     setVisibleRows(ROW_CHUNK);
-  }, [filterMonth, hidePastWeeks, selectedTeam, showClashesOnly]);
+  }, [filterMonth, hidePastWeeks, selectedTeam, showClashesOnly, showPartnerSplitsOnly]);
   const renderedDates = useMemo(
     () => shownDates.slice(0, visibleRows),
     [shownDates, visibleRows],
@@ -333,6 +346,76 @@ function LiveRosterPage() {
       ),
     [volunteers]
   );
+
+  // ---- Family / partner alignment -------------------------------------
+  // Linked partners should always serve on the same Sunday. Gaps are derived
+  // from the FULL assignment list (not the team filter) so a partner serving
+  // in another area still counts as aligned.
+  const partnerIndex = useMemo(
+    () => buildPartnerIndex(volunteers),
+    [volunteers]
+  );
+  const partnerGaps = useMemo(
+    () => partnerGapsByDate(assignments, partnerIndex),
+    [assignments, partnerIndex]
+  );
+
+  /** Dates (within the visible rows) that have at least one split couple. */
+  const partnerSplitDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of filteredAssignments) {
+      if (partnerGaps.has(`${a.date}||${a.person_name.toLowerCase()}`))
+        set.add(a.date);
+    }
+    return set;
+  }, [filteredAssignments, partnerGaps]);
+
+  const partnerSplitCount = useMemo(() => {
+    const visible = new Set(shownDates);
+    let n = 0;
+    const seen = new Set<string>();
+    for (const a of filteredAssignments) {
+      if (!visible.has(a.date)) continue;
+      const key = `${a.date}||${a.person_name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      if (partnerGaps.has(key)) {
+        seen.add(key);
+        n++;
+      }
+    }
+    return n;
+  }, [filteredAssignments, shownDates, partnerGaps]);
+
+  /**
+   * When someone is pulled off a date, their partner shouldn't be left serving
+   * alone — warn, and offer to pull them too.
+   */
+  const checkPartnerAfterRemoval = (date: string, removedPerson: string) => {
+    const stranded = partnersStillRostered(
+      removedPerson,
+      date,
+      assignments,
+      partnerIndex
+    );
+    if (stranded.length === 0) return;
+    const names = Array.from(new Set(stranded.map((s) => s.person_name)));
+    const pretty = format(parseISO(`${date}T12:00:00`), "d MMM");
+    toast.warning(
+      `${names.join(" & ")} ${names.length > 1 ? "are" : "is"} now serving alone on ${pretty}`,
+      {
+        duration: 12000,
+        action: {
+          label: names.length > 1 ? "Remove them too" : "Remove partner too",
+          onClick: () => {
+            for (const s of stranded) clearSlot(s.date, s.label);
+            toast.success(`Removed ${names.join(" & ")} from ${pretty}`);
+          },
+        },
+      }
+    );
+  };
+
+
 
   // Group clashes by date for Clashes column (including blackout clashes)
   const dateClashesMap = useMemo(() => {
@@ -573,6 +656,21 @@ function LiveRosterPage() {
             />
             Clashes & Blackouts only
           </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox
+              checked={showPartnerSplitsOnly}
+              onCheckedChange={(v) => setShowPartnerSplitsOnly(!!v)}
+            />
+            <span className="flex items-center gap-1">
+              <HeartHandshake className="h-3.5 w-3.5 text-pink-600 dark:text-pink-400" />
+              Partners split only
+              {partnerSplitCount > 0 && (
+                <span className="ml-1 rounded-full bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-bold text-pink-700 dark:text-pink-300">
+                  {partnerSplitCount}
+                </span>
+              )}
+            </span>
+          </label>
         </div>
       )}
 
@@ -664,6 +762,8 @@ function LiveRosterPage() {
                   const dayClashesList = dateClashesMap.get(d) || [];
                   const rowHasClash = dayClashesList.length > 0;
                   if (showClashesOnly && !rowHasClash) return null;
+                  if (showPartnerSplitsOnly && !partnerSplitDates.has(d))
+                    return null;
 
                   return (
                     <tr key={d} className="hover:bg-muted/20">
@@ -699,6 +799,8 @@ function LiveRosterPage() {
                                   statusMap[`${a.date}::${a.label}`] ||
                                   (a.status as AssignmentStatus) ||
                                   "pending";
+                                const missingPartners =
+                                  partnerGaps.get(`${a.date}||${key}`) ?? [];
 
                                 return (
                                   <StatusCellBadge
@@ -716,6 +818,14 @@ function LiveRosterPage() {
                                     subTeam={subTeamMap.get(
                                       `${a.label}||${a.person_name.trim().toLowerCase()}`
                                     )}
+                                    missingPartners={missingPartners}
+                                    onSelectPartner={() =>
+                                      setPartnerTarget({
+                                        date: a.date,
+                                        person: a.person_name,
+                                        missing: missingPartners,
+                                      })
+                                    }
                                     onStatusChange={(s) =>
                                       setAssignmentStatus(a.date, a.label, s)
                                     }
@@ -869,6 +979,10 @@ function LiveRosterPage() {
       {!isShareView && (
         <>
           <SwapDialog target={swapTarget} onClose={() => setSwapTarget(null)} />
+          <PartnerAlignDialog
+            target={partnerTarget}
+            onClose={() => setPartnerTarget(null)}
+          />
           <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
           <BlackoutManagementDialog
             volunteer={selectedVolunteerForBlackouts}
@@ -910,11 +1024,21 @@ function LiveRosterPage() {
             onClose={() => setSlotTarget(null)}
             onConfirm={(name: string) => {
               if (!slotTarget) return;
+              const previous = assignments.find(
+                (a) =>
+                  a.date === slotTarget.date && a.label === slotTarget.label
+              )?.person_name;
               if (name.trim()) {
                 assignSlot(slotTarget.date, slotTarget.label, name.trim());
                 toast.success(`${name.trim()} added to ${slotTarget.label}`);
               } else {
                 clearSlot(slotTarget.date, slotTarget.label);
+              }
+              if (
+                previous &&
+                previous.toLowerCase() !== name.trim().toLowerCase()
+              ) {
+                checkPartnerAfterRemoval(slotTarget.date, previous);
               }
               setSlotTarget(null);
             }}
@@ -940,6 +1064,8 @@ function StatusCellBadge({
   isBlackoutOnDate,
   isShareView,
   subTeam,
+  missingPartners = [],
+  onSelectPartner,
   onStatusChange,
   onSelectSwap,
   onSelectClash,
@@ -956,6 +1082,8 @@ function StatusCellBadge({
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
   subTeam?: { name: string; color: { bg: string; border: string; text: string } };
+  missingPartners?: string[];
+  onSelectPartner?: () => void;
   onStatusChange: (status: AssignmentStatus) => void;
   onSelectSwap: () => void;
   onSelectClash: () => void;
@@ -1068,6 +1196,21 @@ function StatusCellBadge({
       {/* Action buttons on badge */}
       {!isShareView && (
         <div className="flex items-center gap-0.5 print:hidden">
+          {missingPartners.length > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectPartner?.();
+              }}
+              className="flex items-center gap-0.5 rounded-full border border-pink-500/40 bg-pink-500/15 px-1 py-0.5 text-[10px] font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-500/25 cursor-pointer shrink-0"
+              title={`Partner not rostered: ${missingPartners.join(", ")}`}
+            >
+              <HeartHandshake className="h-2.5 w-2.5" />
+              <span className="hidden sm:inline">Partner</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={(e) => {
@@ -1502,6 +1645,158 @@ function FillSlotDialog({
             Assign
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Family / partner alignment dialog.
+ *
+ * Advisory only: shows which linked partner is missing on a date and offers
+ * one-click placement into an open slot (their own serving areas first).
+ */
+function PartnerAlignDialog({
+  target,
+  onClose,
+}: {
+  target: { date: string; person: string; missing: string[] } | null;
+  onClose: () => void;
+}) {
+  const volunteers = useRoster((s) => s.volunteers);
+  const assignments = useRoster((s) => s.assignments);
+  const blockouts = useRoster((s) => s.blockouts);
+  const assignSlot = useRoster((s) => s.assignSlot);
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+
+  const suggestions = useMemo(() => {
+    if (!target) return [];
+    return target.missing.map((p) => {
+      const dates = new Set(
+        blockouts
+          .filter(
+            (b) => b.person_name.trim().toLowerCase() === p.trim().toLowerCase()
+          )
+          .map((b) => b.date)
+      );
+      return suggestSlotsForPartner(p, target.date, {
+        slots: ROSTER_SLOTS,
+        assignments,
+        volunteers,
+        blockoutDates: dates,
+      });
+    });
+  }, [target, assignments, volunteers, blockouts]);
+
+  return (
+    <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        {target && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <HeartHandshake className="h-5 w-5 text-pink-600" />
+                Partner not rostered
+              </DialogTitle>
+              <DialogDescription>
+                {target.person} is serving on{" "}
+                {format(parseISO(`${target.date}T12:00:00`), "EEEE, d MMMM yyyy")}{" "}
+                — but their linked partner isn't. Pick an open slot to roster
+                them on the same day.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 max-h-[420px] overflow-auto pt-1">
+              {suggestions.map((s) => {
+                const preferred = s.slots.filter((x) => x.preferred);
+                const expanded = showAll[s.partner];
+                const list = (expanded ? s.slots : preferred).slice(0, 24);
+                return (
+                  <div
+                    key={s.partner}
+                    className="rounded-lg border bg-muted/20 p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold text-sm">{s.partner}</div>
+                      <div className="flex items-center gap-1.5">
+                        {s.paused && (
+                          <span className="rounded-full border border-blue-500/40 bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
+                            ⏸️ Paused
+                          </span>
+                        )}
+                        {s.blockedOut && (
+                          <span className="rounded-full border border-purple-500/40 bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                            Blackout date
+                          </span>
+                        )}
+                        {!s.volunteer && (
+                          <span className="rounded-full border bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
+                            Not in directory
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {list.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No open slots in their serving areas on this date.
+                        {s.slots.length > 0 && (
+                          <button
+                            type="button"
+                            className="ml-1 underline cursor-pointer"
+                            onClick={() =>
+                              setShowAll((m) => ({ ...m, [s.partner]: true }))
+                            }
+                          >
+                            Show all open slots
+                          </button>
+                        )}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {list.map((slot) => (
+                          <Button
+                            key={slot.label}
+                            size="sm"
+                            variant={slot.preferred ? "default" : "outline"}
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              assignSlot(target.date, slot.label, s.partner);
+                              toast.success(
+                                `${s.partner} rostered on ${slot.label}`
+                              );
+                              onClose();
+                            }}
+                          >
+                            {slot.label}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {!expanded && preferred.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground underline cursor-pointer"
+                        onClick={() =>
+                          setShowAll((m) => ({ ...m, [s.partner]: true }))
+                        }
+                      >
+                        Show slots outside their serving areas
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Leave as is
+              </Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
