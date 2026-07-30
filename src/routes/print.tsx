@@ -111,7 +111,7 @@ function PrintRosterPage() {
   const rangeLabel =
     selectedMonths.length > 0
       ? selectedMonths
-          .map((m) => format(parseISO(`${m}-01`), "MMMM yyyy"))
+          .map((m: string) => format(parseISO(`${m}-01`), "MMMM yyyy"))
           .join(" · ")
       : "No months selected";
 
