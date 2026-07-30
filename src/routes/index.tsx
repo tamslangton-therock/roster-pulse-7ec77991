@@ -989,11 +989,21 @@ function LiveRosterPage() {
             onClose={() => setSlotTarget(null)}
             onConfirm={(name: string) => {
               if (!slotTarget) return;
+              const previous = assignments.find(
+                (a) =>
+                  a.date === slotTarget.date && a.label === slotTarget.label
+              )?.person_name;
               if (name.trim()) {
                 assignSlot(slotTarget.date, slotTarget.label, name.trim());
                 toast.success(`${name.trim()} added to ${slotTarget.label}`);
               } else {
                 clearSlot(slotTarget.date, slotTarget.label);
+              }
+              if (
+                previous &&
+                previous.toLowerCase() !== name.trim().toLowerCase()
+              ) {
+                checkPartnerAfterRemoval(slotTarget.date, previous);
               }
               setSlotTarget(null);
             }}
