@@ -459,7 +459,25 @@ export const useRoster = create<RosterState>()((set, get) => ({
     }));
     scheduleRosterSync();
   },
+
+  // --- BLOCKOUTS ---
+  toggleBlockout: (personName, date, reason) => {
+    set((state) => {
+      const key = personName.trim().toLowerCase();
+      const exists = state.blockouts.some(
+        (b) => b.person_name.trim().toLowerCase() === key && b.date === date,
+      );
+      const blockouts = exists
+        ? state.blockouts.filter(
+            (b) => !(b.person_name.trim().toLowerCase() === key && b.date === date),
+          )
+        : [...state.blockouts, { person_name: personName.trim(), date, reason: reason ?? "" }];
+      return { blockouts };
+    });
+    scheduleBlockoutSync();
+  },
 }));
+
 
 // Helper used elsewhere in the app
 export function findVolunteer(volunteers: Volunteer[], name: string): Volunteer | undefined {
