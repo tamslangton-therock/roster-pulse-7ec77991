@@ -63,3 +63,8 @@ export const NUMBER_FIELDS: Record<SheetTab, readonly string[]> = {
 
 // Wide grid tab (dates as rows, serving-area slots as columns).
 export const LIVE_ROSTER_TAB = "Live_Roster";
+
+// Date block-outs / unavailability — editable directly in the sheet.
+export const BLOCKOUTS_TAB = "Blockouts";
+export const BLOCKOUTS_SCHEMA = ["person_name", "date", "reason"] as const;
+

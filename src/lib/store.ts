@@ -5,11 +5,15 @@ import {
   writeTab,
   fetchLiveRoster,
   writeLiveRoster,
+  fetchBlockouts,
+  writeBlockouts,
   type LiveRosterRow,
+  type BlockoutRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
+
 
 type SyncStatus = "idle" | "syncing" | "error";
 
@@ -17,6 +21,8 @@ interface RosterState {
   teams: Team[];
   volunteers: Volunteer[];
   assignments: Assignment[];
+  blockouts: BlockoutRow[];
+
 
   ready: boolean;
   loading: boolean;
@@ -53,7 +59,11 @@ interface RosterState {
   removeRosterDate: (date: string) => void;
   assignSlot: (date: string, label: string, personName: string) => void;
   clearSlot: (date: string, label: string) => void;
+
+  // Blockouts (date block-outs / unavailability) — two-way with the Blockouts tab
+  toggleBlockout: (personName: string, date: string, reason?: string) => void;
 }
+
 
 // --------- Background sync ---------
 const dirtyTimers: Partial<Record<SheetTab, ReturnType<typeof setTimeout>>> = {};
@@ -112,6 +122,39 @@ function scheduleRosterSync() {
     }
   }, 900);
 }
+
+let blockoutTimer: ReturnType<typeof setTimeout> | null = null;
+let blockoutInFlight = false;
+
+function scheduleBlockoutSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (blockoutTimer) clearTimeout(blockoutTimer);
+  blockoutTimer = setTimeout(async () => {
+    if (blockoutInFlight) {
+      scheduleBlockoutSync();
+      return;
+    }
+    blockoutInFlight = true;
+    try {
+      const rows = [...useRoster.getState().blockouts].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.person_name.localeCompare(b.person_name),
+      );
+      await writeBlockouts({ data: { rows } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[blockouts sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Blockouts", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      blockoutInFlight = false;
+    }
+  }, 800);
+}
+
 
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
@@ -174,6 +217,8 @@ export const useRoster = create<RosterState>()((set, get) => ({
   teams: [],
   volunteers: [],
   assignments: [],
+  blockouts: [],
+
 
   ready: false,
   loading: false,
@@ -187,7 +232,12 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows] = await Promise.all([fetchAllTabs(), fetchLiveRoster()]);
+      const [data, gridRows, blockouts] = await Promise.all([
+        fetchAllTabs(),
+        fetchLiveRoster(),
+        fetchBlockouts().catch(() => [] as BlockoutRow[]),
+      ]);
+
       const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
         ...v,
         id: v.id || `vol-${Math.random().toString(36).slice(2, 10)}`,
@@ -233,11 +283,13 @@ export const useRoster = create<RosterState>()((set, get) => ({
         volunteers,
         teams,
         assignments,
+        blockouts,
         rosterMeta,
         dates,
         ready: true,
         loading: false,
       });
+
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[sheets hydrate] failed", err);
@@ -440,7 +492,25 @@ export const useRoster = create<RosterState>()((set, get) => ({
     }));
     scheduleRosterSync();
   },
+
+  // --- BLOCKOUTS ---
+  toggleBlockout: (personName, date, reason) => {
+    set((state) => {
+      const key = personName.trim().toLowerCase();
+      const exists = state.blockouts.some(
+        (b) => b.person_name.trim().toLowerCase() === key && b.date === date,
+      );
+      const blockouts = exists
+        ? state.blockouts.filter(
+            (b) => !(b.person_name.trim().toLowerCase() === key && b.date === date),
+          )
+        : [...state.blockouts, { person_name: personName.trim(), date, reason: reason ?? "" }];
+      return { blockouts };
+    });
+    scheduleBlockoutSync();
+  },
 }));
+
 
 // Helper used elsewhere in the app
 export function findVolunteer(volunteers: Volunteer[], name: string): Volunteer | undefined {

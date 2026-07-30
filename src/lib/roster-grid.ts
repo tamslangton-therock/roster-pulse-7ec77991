@@ -97,20 +97,24 @@ export function headerRows(): string[][] {
 /**
  * Google Sheets clash formula for a data row — flags any person appearing in
  * more than one slot on that date and names the slots they clash in.
+ * NOTE: COUNTIF / IF over a range only expand elementwise inside ARRAYFORMULA;
+ * without it the whole check collapses to a single value and never fires.
  */
 export function clashFormula(row: number): string {
   const R = `$${FIRST_SLOT_COL}${row}:$${LAST_SLOT_COL}${row}`;
   const H1 = `$${FIRST_SLOT_COL}$1:$${LAST_SLOT_COL}$1`;
   const H2 = `$${FIRST_SLOT_COL}$2:$${LAST_SLOT_COL}$2`;
   return (
-    `=IFERROR(IF(COUNTA(${R})=0,"✓",LET(` +
-    `rowRange,${R},` +
-    `slotHeaders,${H1}&IF(${H2}="",""," — "&${H2}),` +
-    `clashList,UNIQUE(FILTER(rowRange,(COUNTIF(rowRange,rowRange)>1)*(rowRange<>""))),` +
-    `clashDetails,IFERROR(TEXTJOIN(" | ",TRUE,MAP(clashList,LAMBDA(n,n&" IN "&TEXTJOIN(" & ",TRUE,UNIQUE(FILTER(slotHeaders,rowRange=n)))))),""),` +
-    `IF(clashDetails="","✓","⚠️ CLASH: "&clashDetails))),"✓")`
+    `=IFERROR(LET(` +
+    `r,ARRAYFORMULA(TRIM(${R})),` +
+    `h,ARRAYFORMULA(${H1}&IF(${H2}="",""," — "&${H2})),` +
+    `names,TOCOL(ARRAYFORMULA(IF((COUNTIF(r,r)>1)*(r<>""),r,NA())),3),` +
+    `IF(COUNTA(names)=0,"✓","⚠️ CLASH: "&TEXTJOIN(" | ",TRUE,` +
+    `MAP(UNIQUE(names),LAMBDA(n,n&" IN "&TEXTJOIN(" & ",TRUE,TOCOL(ARRAYFORMULA(IF(r=n,h,NA())),3))))))` +
+    `),"✓")`
   );
 }
+
 
 /** ISO date strings for every Sunday between two dates (inclusive). */
 export function sundaysBetween(start: Date, end: Date): string[] {

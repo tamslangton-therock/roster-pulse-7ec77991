@@ -128,29 +128,28 @@ function LiveRosterPage() {
   const [selectedVolunteerForBlackouts, setSelectedVolunteerForBlackouts] =
     useState<{ id: string; name: string } | null>(null);
 
-  // Volunteer Blackouts Map state: volunteer_name (lowercase) -> Set<"YYYY-MM-DD">
-  const [blackoutsMap, setBlackoutsMap] = useState<Record<string, Set<string>>>(
-    {
-      // Sample mock blackout data for demonstration
-      "john doe": new Set(["2026-08-02", "2026-08-16"]),
-      "jane smith": new Set(["2026-08-09"]),
+  // Blockouts live in the Google Sheet ("Blockouts" tab) — editable from either side.
+  const blockouts = useRoster((s) => s.blockouts);
+  const toggleBlockout = useRoster((s) => s.toggleBlockout);
+
+  // volunteer_name (lowercase) -> Set<"YYYY-MM-DD">
+  const blackoutsMap = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const b of blockouts) {
+      const key = b.person_name.trim().toLowerCase();
+      if (!key || !b.date) continue;
+      (map[key] ??= new Set<string>()).add(b.date);
     }
-  );
+    return map;
+  }, [blockouts]);
 
   const toggleBlackoutDate = (volunteerName: string, dateStr: string) => {
-    const key = volunteerName.toLowerCase();
-    setBlackoutsMap((prev) => {
-      const currentSet = new Set(prev[key] || []);
-      if (currentSet.has(dateStr)) {
-        currentSet.delete(dateStr);
-        toast.info(`Removed blackout date ${dateStr} for ${volunteerName}`);
-      } else {
-        currentSet.add(dateStr);
-        toast.success(`Marked ${dateStr} as unavailable for ${volunteerName}`);
-      }
-      return { ...prev, [key]: currentSet };
-    });
+    const has = blackoutsMap[volunteerName.toLowerCase()]?.has(dateStr) ?? false;
+    toggleBlockout(volunteerName, dateStr);
+    if (has) toast.info(`Removed blackout date ${dateStr} for ${volunteerName}`);
+    else toast.success(`Marked ${dateStr} as unavailable for ${volunteerName}`);
   };
+
 
   // Status mapping stored by assignment ID
   const [statusMap, setStatusMap] = useState<Record<string, AssignmentStatus>>(
