@@ -460,9 +460,9 @@ function PrintRosterPage() {
                             <span
                               className="inline-block rounded-md border px-2 py-1 text-xs font-medium leading-tight"
                               style={{
-                                backgroundColor: c!.bg,
-                                borderColor: c!.border,
-                                color: c!.text,
+                                backgroundColor: c.bg,
+                                borderColor: c.border,
+                                color: c.text,
                               }}
                             >
                               {person}
