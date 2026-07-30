@@ -27,6 +27,8 @@ import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import {
   assignmentsByCell,
   detectClashes,
+  buildAllowedSet,
+  groupAllowed,
   rankSwapCandidates,
 } from "@/lib/roster-engine";
 import type { Assignment } from "@/lib/types";
@@ -199,9 +201,14 @@ function LiveRosterPage() {
     () => assignmentsByCell(filteredAssignments),
     [filteredAssignments]
   );
+  const allowedClashes = useRoster((s) => s.allowedClashes);
+  const allowedSet = useMemo(
+    () => buildAllowedSet(allowedClashes),
+    [allowedClashes]
+  );
   const clashes = useMemo(
-    () => detectClashes(filteredAssignments),
-    [filteredAssignments]
+    () => detectClashes(filteredAssignments, allowedSet),
+    [filteredAssignments, allowedSet]
   );
 
   const clashKey = useMemo(() => {
@@ -270,13 +277,14 @@ function LiveRosterPage() {
       const currentCount = (dateMap.get(a.date) || 0) + 1;
       dateMap.set(a.date, currentCount);
 
-      if (currentCount > 1) {
+      // Only a real clash when the pairing isn't an allowed exception.
+      if (currentCount > 1 && clashKey.has(`${a.date}||${key}`)) {
         stat.clashDates.add(a.date);
       }
     }
 
     return map;
-  }, [filteredAssignments, shownDates, blackoutsMap]);
+  }, [filteredAssignments, shownDates, blackoutsMap, clashKey]);
 
   // Double booked count & Blackout clashes count
   const doubleBookedVolunteersCount = useMemo(() => {
@@ -328,7 +336,7 @@ function LiveRosterPage() {
 
       for (const [person, items] of personMap.entries()) {
         const key = person.toLowerCase();
-        const hasDoubleBook = items.length > 1;
+        const hasDoubleBook = items.length > 1 && !groupAllowed(items, allowedSet);
         const isBlackout = blackoutsMap[key]?.has(d);
 
         if (hasDoubleBook || isBlackout) {
@@ -347,7 +355,7 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, dates, blackoutsMap]);
+  }, [filteredAssignments, dates, blackoutsMap, allowedSet]);
 
   const copyShareableLink = () => {
     const url = window.location.href;

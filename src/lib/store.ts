@@ -9,9 +9,11 @@ import {
   writeBlockouts,
   fetchStatuses,
   writeStatuses,
+  fetchAllowedClashes,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
+  type AllowedClashRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
@@ -31,6 +33,7 @@ interface RosterState {
   volunteers: Volunteer[];
   assignments: Assignment[];
   blockouts: BlockoutRow[];
+  allowedClashes: AllowedClashRow[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
 
@@ -311,6 +314,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   volunteers: [],
   assignments: [],
   blockouts: [],
+  allowedClashes: [],
   statuses: {},
 
 
@@ -327,11 +331,12 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows, blockouts, statusRows] = await Promise.all([
+      const [data, gridRows, blockouts, statusRows, allowedClashes] = await Promise.all([
         fetchAllTabs(),
         fetchLiveRoster(),
         fetchBlockouts().catch(() => [] as BlockoutRow[]),
         fetchStatuses().catch(() => [] as StatusRow[]),
+        fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
       ]);
 
       const statuses: Record<string, AssignmentStatus> = {};
@@ -385,6 +390,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         teams,
         assignments,
         blockouts,
+        allowedClashes,
         statuses,
         rosterMeta,
         dates,
