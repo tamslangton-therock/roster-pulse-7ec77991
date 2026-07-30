@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { subTeamColor } from "@/lib/person-colors";
 
 export const Route = createFileRoute("/teams")({
   head: () => ({
@@ -232,6 +233,7 @@ function SubTeamCard({
   onRemove: () => void;
   onApply: (date: string) => void;
 }) {
+  const color = subTeamColor(area, name);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [applyDate, setApplyDate] = useState("");
@@ -257,7 +259,10 @@ function SubTeamCard({
   }, [dates]);
 
   return (
-    <div className="rounded-lg border bg-background p-3 space-y-3">
+    <div
+      className="rounded-lg border bg-background p-3 space-y-3"
+      style={{ borderLeft: `5px solid ${color.border}` }}
+    >
       <div className="flex items-center justify-between gap-2">
         {editing ? (
           <div className="flex items-center gap-1 flex-1">
@@ -290,7 +295,18 @@ function SubTeamCard({
             </Button>
           </div>
         ) : (
-          <div className="font-medium text-sm">{name}</div>
+          <div className="flex items-center gap-2">
+            <span
+              className="h-3 w-3 rounded-full shrink-0"
+              style={{ backgroundColor: color.border }}
+            />
+            <span
+              className="rounded-md px-2 py-0.5 text-sm font-medium"
+              style={{ backgroundColor: color.bg, color: color.text }}
+            >
+              {name}
+            </span>
+          </div>
         )}
 
         {!editing && (

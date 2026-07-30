@@ -33,3 +33,17 @@ export function teamColor(team: string): PersonColor {
     text: `hsl(${hue} ${Math.min(sat + 10, 80)}% 26%)`,
   };
 }
+
+/** One consistent pastel per sub-team (unique within its serving area). */
+export function subTeamColor(area: string, subTeam: string): PersonColor {
+  const key = `${area.trim().toLowerCase()}::${subTeam.trim().toLowerCase()}`;
+  const h = hash(key);
+  const hue = HUES[h % HUES.length];
+  const sat = 58 + ((h >> 5) % 3) * 8;
+  const light = 88 + ((h >> 9) % 2) * 3;
+  return {
+    bg: `hsl(${hue} ${sat}% ${light}%)`,
+    border: `hsl(${hue} ${sat}% ${light - 16}%)`,
+    text: `hsl(${hue} ${Math.min(sat + 10, 80)}% 25%)`,
+  };
+}
