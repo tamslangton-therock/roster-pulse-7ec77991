@@ -386,6 +386,37 @@ function LiveRosterPage() {
     return n;
   }, [filteredAssignments, shownDates, partnerGaps]);
 
+  /**
+   * When someone is pulled off a date, their partner shouldn't be left serving
+   * alone — warn, and offer to pull them too.
+   */
+  const checkPartnerAfterRemoval = (date: string, removedPerson: string) => {
+    const stranded = partnersStillRostered(
+      removedPerson,
+      date,
+      assignments,
+      partnerIndex
+    );
+    if (stranded.length === 0) return;
+    const names = Array.from(new Set(stranded.map((s) => s.person_name)));
+    const pretty = format(parseISO(`${date}T12:00:00`), "d MMM");
+    toast.warning(
+      `${names.join(" & ")} ${names.length > 1 ? "are" : "is"} now serving alone on ${pretty}`,
+      {
+        duration: 12000,
+        action: {
+          label: names.length > 1 ? "Remove them too" : "Remove partner too",
+          onClick: () => {
+            for (const s of stranded) clearSlot(s.date, s.label);
+            toast.success(`Removed ${names.join(" & ")} from ${pretty}`);
+          },
+        },
+      }
+    );
+  };
+
+
+
   // Group clashes by date for Clashes column (including blackout clashes)
   const dateClashesMap = useMemo(() => {
     const map = new Map<
