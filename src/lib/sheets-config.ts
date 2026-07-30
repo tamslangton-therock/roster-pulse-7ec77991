@@ -84,3 +84,14 @@ export const STATUSES_SCHEMA = [
 // that a person MAY serve in on the same date. Everything else counts as a clash.
 export const ALLOWED_CLASHES_TAB = "Allowed_Clashes";
 export const ALLOWED_CLASHES_SCHEMA = ["area_a", "area_b", "notes"] as const;
+
+// Sub-teams: ideal groupings inside a serving area (e.g. Barista → "Team A"
+// with Milk / Coffee Shots / Cashier). One row per slot within a sub-team, so
+// the tab is easy to edit by hand.
+export const SUB_TEAMS_TAB = "Sub_Teams";
+export const SUB_TEAMS_SCHEMA = [
+  "serving_area",
+  "sub_team_name",
+  "slot_label",
+  "person_name",
+] as const;

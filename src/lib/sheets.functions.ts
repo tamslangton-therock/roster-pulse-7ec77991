@@ -13,6 +13,8 @@ import {
   STATUSES_SCHEMA,
   ALLOWED_CLASHES_TAB,
   ALLOWED_CLASHES_SCHEMA,
+  SUB_TEAMS_TAB,
+  SUB_TEAMS_SCHEMA,
   type SheetTab,
 } from "./sheets-config";
 
@@ -541,6 +543,97 @@ export const writeAllowedClashes = createServerFn({ method: "POST" })
     ];
     await gwFetch(
       `/spreadsheets/${SPREADSHEET_ID}/values/${ALLOWED_CLASHES_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
+
+// ---------- Sub_Teams (ideal groupings inside a serving area) ----------
+
+export interface SubTeamRow {
+  serving_area: string;
+  sub_team_name: string;
+  slot_label: string;
+  person_name: string;
+}
+
+async function ensureSubTeamsTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [SUB_TEAMS_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: { title: SUB_TEAMS_TAB, gridProperties: { frozenRowCount: 1 } },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [SUB_TEAMS_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchSubTeams = createServerFn({ method: "GET" }).handler(
+  async (): Promise<SubTeamRow[]> => {
+    await ensureSubTeamsTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1:D5000`,
+      );
+    } catch {
+      return [];
+    }
+    const out: SubTeamRow[] = [];
+    for (const r of (data.values ?? []).slice(1)) {
+      const serving_area = String(r[0] ?? "").trim();
+      const sub_team_name = String(r[1] ?? "").trim();
+      if (!serving_area || !sub_team_name) continue;
+      out.push({
+        serving_area,
+        sub_team_name,
+        slot_label: String(r[2] ?? "").trim(),
+        person_name: String(r[3] ?? "").trim(),
+      });
+    }
+    return out;
+  },
+);
+
+export const writeSubTeams = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: SubTeamRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureSubTeamsTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1:D5000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [
+      SUB_TEAMS_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.serving_area,
+        r.sub_team_name,
+        r.slot_label ?? "",
+        r.person_name ?? "",
+      ]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${SUB_TEAMS_TAB}!A1?valueInputOption=RAW`,
       { method: "PUT", body: JSON.stringify({ values }) },
     );
     return { ok: true, count: data.rows.length };
