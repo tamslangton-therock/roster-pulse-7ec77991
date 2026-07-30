@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 // CHANGE YOUR ACCESS CODE HERE
 const MASTER_PASSCODE = "1234";
+const SESSION_AUTH_KEY = "roster-pulse-authenticated";
 
 function NotFoundComponent() {
   return (
@@ -80,14 +81,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 function PasscodeGate({ children }: { children: ReactNode }) {
-  // Always defaults to unauthenticated on every fresh page load/reload
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState(false);
 
+  useEffect(() => {
+    if (window.sessionStorage.getItem(SESSION_AUTH_KEY) === "true") {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
     if (passcode === MASTER_PASSCODE) {
+      window.sessionStorage.setItem(SESSION_AUTH_KEY, "true");
       setIsAuthenticated(true);
       setError(false);
     } else {
@@ -96,6 +103,7 @@ function PasscodeGate({ children }: { children: ReactNode }) {
   };
 
   const handleLock = () => {
+    window.sessionStorage.removeItem(SESSION_AUTH_KEY);
     setIsAuthenticated(false);
     setPasscode("");
   };
