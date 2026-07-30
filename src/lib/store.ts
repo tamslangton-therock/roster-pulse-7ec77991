@@ -7,8 +7,11 @@ import {
   writeLiveRoster,
   fetchBlockouts,
   writeBlockouts,
+  fetchStatuses,
+  writeStatuses,
   type LiveRosterRow,
   type BlockoutRow,
+  type StatusRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
@@ -17,11 +20,19 @@ import { toast } from "sonner";
 
 type SyncStatus = "idle" | "syncing" | "error";
 
+export type AssignmentStatus =
+  | "pending"
+  | "reminder_sent"
+  | "declined"
+  | "confirmed";
+
 interface RosterState {
   teams: Team[];
   volunteers: Volunteer[];
   assignments: Assignment[];
   blockouts: BlockoutRow[];
+  // key: `${date}::${slot label}` -> status
+  statuses: Record<string, AssignmentStatus>;
 
 
   ready: boolean;
@@ -62,6 +73,9 @@ interface RosterState {
 
   // Blockouts (date block-outs / unavailability) — two-way with the Blockouts tab
   toggleBlockout: (personName: string, date: string, reason?: string) => void;
+
+  // Slot confirmation statuses — two-way with the Statuses tab
+  setAssignmentStatus: (date: string, label: string, status: AssignmentStatus) => void;
 }
 
 
@@ -218,6 +232,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   volunteers: [],
   assignments: [],
   blockouts: [],
+  statuses: {},
 
 
   ready: false,
@@ -232,11 +247,17 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows, blockouts] = await Promise.all([
+      const [data, gridRows, blockouts, statusRows] = await Promise.all([
         fetchAllTabs(),
         fetchLiveRoster(),
         fetchBlockouts().catch(() => [] as BlockoutRow[]),
+        fetchStatuses().catch(() => [] as StatusRow[]),
       ]);
+
+      const statuses: Record<string, AssignmentStatus> = {};
+      for (const r of statusRows) {
+        statuses[`${r.date}::${r.slot}`] = r.status as AssignmentStatus;
+      }
 
       const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
         ...v,
@@ -268,7 +289,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
             person_name: person,
             is_override: false,
             notes: "",
-            status: "pending",
+            status: statuses[`${row.date}::${label}`] ?? "pending",
           });
         }
       }
@@ -284,6 +305,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         teams,
         assignments,
         blockouts,
+        statuses,
         rosterMeta,
         dates,
         ready: true,
