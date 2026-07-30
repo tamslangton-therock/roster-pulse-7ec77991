@@ -54,7 +54,7 @@ function PrintRosterPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [assignments]);
 
-  const area = search.area || areas[0] || "";
+  const area = String(search.area || "") || areas[0] || "";
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
@@ -63,15 +63,18 @@ function PrintRosterPage() {
   }, [dates]);
 
   const selectedMonths = useMemo(() => {
-    const raw = (search.months || "").split(",").filter(Boolean);
+    const raw = String(search.months || "").split(",").filter(Boolean) as string[];
     return raw.length ? raw : monthOptions.slice(0, 3);
   }, [search.months, monthOptions]);
 
   const toggleMonth = (m: string) => {
     const next = selectedMonths.includes(m)
-      ? selectedMonths.filter((x) => x !== m)
+      ? selectedMonths.filter((x: string) => x !== m)
       : [...selectedMonths, m].sort();
-    navigate({ search: (prev) => ({ ...prev, months: next.join(",") }), replace: true });
+    navigate({
+      search: (prev: Record<string, unknown>) => ({ ...prev, months: next.join(",") }),
+      replace: true,
+    });
   };
 
   const slots = useMemo(
@@ -148,7 +151,10 @@ function PrintRosterPage() {
             <Select
               value={area}
               onValueChange={(v) =>
-                navigate({ search: (prev) => ({ ...prev, area: v }), replace: true })
+                navigate({
+                  search: (prev: Record<string, unknown>) => ({ ...prev, area: v }),
+                  replace: true,
+                })
               }
             >
               <SelectTrigger className="w-[220px]">
