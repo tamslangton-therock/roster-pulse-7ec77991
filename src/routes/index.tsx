@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
-import { subTeamColor } from "@/lib/person-colors";
+import { resolveSubTeamColor } from "@/lib/person-colors";
 import {
   assignmentsByCell,
   detectClashes,
@@ -206,12 +206,12 @@ function LiveRosterPage() {
   // Sub-team colour lookup: slot label + person → their sub-team pastel.
   const subTeams = useRoster((s) => s.subTeams);
   const subTeamMap = useMemo(() => {
-    const map = new Map<string, { name: string; color: ReturnType<typeof subTeamColor> }>();
+    const map = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
     for (const r of subTeams) {
       if (!r.person_name?.trim() || !r.slot_label?.trim()) continue;
       map.set(`${r.slot_label}||${r.person_name.trim().toLowerCase()}`, {
         name: r.sub_team_name,
-        color: subTeamColor(r.serving_area, r.sub_team_name),
+        color: resolveSubTeamColor(r.serving_area, r.sub_team_name, r.color),
       });
     }
     return map;

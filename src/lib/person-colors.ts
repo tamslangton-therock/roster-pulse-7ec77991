@@ -47,3 +47,51 @@ export function subTeamColor(area: string, subTeam: string): PersonColor {
     text: `hsl(${hue} ${Math.min(sat + 10, 80)}% 25%)`,
   };
 }
+
+/** Hand-picked pastel swatches users can assign to a sub-team. */
+export interface Swatch extends PersonColor {
+  id: string;
+  label: string;
+}
+
+function pastel(id: string, label: string, hue: number, sat = 62): Swatch {
+  return {
+    id,
+    label,
+    bg: `hsl(${hue} ${sat}% 90%)`,
+    border: `hsl(${hue} ${sat}% 74%)`,
+    text: `hsl(${hue} ${Math.min(sat + 10, 80)}% 26%)`,
+  };
+}
+
+export const PASTEL_SWATCHES: Swatch[] = [
+  pastel("blush", "Blush", 352),
+  pastel("coral", "Coral", 12),
+  pastel("apricot", "Apricot", 28),
+  pastel("butter", "Butter", 46),
+  pastel("lemon", "Lemon", 58),
+  pastel("lime", "Lime", 82),
+  pastel("sage", "Sage", 108, 40),
+  pastel("mint", "Mint", 152),
+  pastel("seafoam", "Seafoam", 172),
+  pastel("sky", "Sky", 196),
+  pastel("cornflower", "Cornflower", 216),
+  pastel("periwinkle", "Periwinkle", 238),
+  pastel("lavender", "Lavender", 262),
+  pastel("orchid", "Orchid", 288),
+  pastel("rose", "Rose", 322),
+  pastel("stone", "Stone", 24, 14),
+];
+
+/** Colour for a sub-team: a chosen swatch when set, otherwise the auto pastel. */
+export function resolveSubTeamColor(
+  area: string,
+  subTeam: string,
+  colorId?: string,
+): PersonColor {
+  if (colorId) {
+    const found = PASTEL_SWATCHES.find((s) => s.id === colorId);
+    if (found) return { bg: found.bg, border: found.border, text: found.text };
+  }
+  return subTeamColor(area, subTeam);
+}
