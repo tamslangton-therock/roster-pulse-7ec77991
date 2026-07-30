@@ -347,6 +347,33 @@ function PrintRosterPage() {
         });
       }
 
+      if (areaSubTeams.length > 0) {
+        y += 26;
+        if (y > rowBottom()) y = newPage() + 8;
+        doc.setTextColor(93, 101, 113);
+        text("SUB-TEAMS", margin, y, 8, "bold");
+        y += 16;
+        let x = margin;
+        areaSubTeams.forEach((st) => {
+          const pillW = Math.min(180, doc.getTextWidth(st.name) + 16);
+          if (x + pillW > pageWidth - margin) {
+            x = margin;
+            y += 22;
+          }
+          if (y > rowBottom()) {
+            y = newPage() + 8;
+            x = margin;
+          }
+          setRgb(hslToRgb(st.color.bg), "fill");
+          setRgb(hslToRgb(st.color.border), "draw");
+          doc.roundedRect(x, y - 11, pillW, 17, 5, 5, "FD");
+          setRgb(hslToRgb(st.color.text), "text");
+          text(st.name, x + 8, y, 8, "bold");
+          x += pillW + 6;
+        });
+      }
+
+
       const safeArea = area.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const monthPart = selectedMonths.join("-") || "roster";
       doc.save(`roster-pulse-${safeArea || "team"}-${monthPart}.pdf`);
