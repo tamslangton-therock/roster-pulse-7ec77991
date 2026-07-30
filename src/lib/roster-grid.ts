@@ -113,15 +113,15 @@ export function clashFormula(row: number): string {
     `r,ARRAYFORMULA(TRIM(${R})),` +
     `a,ARRAYFORMULA(TRIM(${A})),` +
     `h,ARRAYFORMULA(TRIM(${A})&IF(${H2}="",""," — "&${H2})),` +
-    `ex,IFERROR(TOCOL(ARRAYFORMULA(IF(TRIM(${EXA})="",NA(),LOWER(TRIM(${EXA})&"||"&TRIM(${EXB})&"~"&TRIM(${EXB})&"||"&TRIM(${EXA})))),3),""),` +
+    `ex,TEXTJOIN("~",TRUE,IFERROR(TOCOL(ARRAYFORMULA(IF(TRIM(${EXA})="",NA(),LOWER(TRIM(${EXA})&"||"&TRIM(${EXB})&"~"&TRIM(${EXB})&"||"&TRIM(${EXA})))),3),"")),` +
     `names,IFERROR(UNIQUE(TOCOL(ARRAYFORMULA(IF((COUNTIF(r,r)>1)*(r<>""),r,NA())),3)),""),` +
     `msg,IF(COUNTA(names)=0,"",TEXTJOIN(" | ",TRUE,MAP(names,LAMBDA(n,LET(` +
     `ar,TOCOL(ARRAYFORMULA(IF(r=n,a,NA())),3),` +
     `sl,TOCOL(ARRAYFORMULA(IF(r=n,h,NA())),3),` +
-    `k1,LOWER(INDEX(ar,1)&"||"&INDEX(ar,2)),` +
-    `k2,LOWER(INDEX(sl,1)&"||"&INDEX(sl,2)),` +
-    `ok,IF(COUNTA(ar)<>2,FALSE,(SUMPRODUCT(--ISNUMBER(SEARCH(k1,ex)))+SUMPRODUCT(--ISNUMBER(SEARCH(k2,ex))))>0),` +
-    `IF(ok,"",n&" IN "&TEXTJOIN(" & ",TRUE,sl))))))),` +
+    `pk,LOWER(INDEX(ar,1)&"||"&INDEX(ar,2)),` +
+    `ps,LOWER(INDEX(sl,1)&"||"&INDEX(sl,2)),` +
+    `okp,IF(COUNTA(ar)<>2,FALSE,ISNUMBER(SEARCH("~"&pk&"~","~"&ex&"~"))+ISNUMBER(SEARCH("~"&ps&"~","~"&ex&"~"))>0),` +
+    `IF(okp,"",n&" IN "&TEXTJOIN(" & ",TRUE,sl))))))),` +
     `IF(msg="","✓","⚠️ CLASH: "&msg)` +
     `),"✓")`
   );
