@@ -731,6 +731,8 @@ function LiveRosterPage() {
                   const dayClashesList = dateClashesMap.get(d) || [];
                   const rowHasClash = dayClashesList.length > 0;
                   if (showClashesOnly && !rowHasClash) return null;
+                  if (showPartnerSplitsOnly && !partnerSplitDates.has(d))
+                    return null;
 
                   return (
                     <tr key={d} className="hover:bg-muted/20">
