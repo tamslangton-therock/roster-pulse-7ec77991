@@ -201,6 +201,21 @@ function LiveRosterPage() {
     () => assignmentsByCell(filteredAssignments),
     [filteredAssignments]
   );
+
+  // Sub-team colour lookup: slot label + person → their sub-team pastel.
+  const subTeams = useRoster((s) => s.subTeams);
+  const subTeamMap = useMemo(() => {
+    const map = new Map<string, { name: string; color: ReturnType<typeof subTeamColor> }>();
+    for (const r of subTeams) {
+      if (!r.person_name?.trim() || !r.slot_label?.trim()) continue;
+      map.set(`${r.slot_label}||${r.person_name.trim().toLowerCase()}`, {
+        name: r.sub_team_name,
+        color: subTeamColor(r.serving_area, r.sub_team_name),
+      });
+    }
+    return map;
+  }, [subTeams]);
+
   const allowedClashes = useRoster((s) => s.allowedClashes);
   const allowedSet = useMemo(
     () => buildAllowedSet(allowedClashes),
