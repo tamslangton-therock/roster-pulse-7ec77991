@@ -9,6 +9,8 @@ import {
   LIVE_ROSTER_TAB,
   BLOCKOUTS_TAB,
   BLOCKOUTS_SCHEMA,
+  STATUSES_TAB,
+  STATUSES_SCHEMA,
   type SheetTab,
 } from "./sheets-config";
 
