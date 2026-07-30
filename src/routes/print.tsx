@@ -275,7 +275,7 @@ function PrintRosterPage() {
             text("—", x + 8, y + 7, 9);
             return;
           }
-          const color = teamColor(area);
+          const color = colorFor(person, slot.label);
           const bg = hslToRgb(color.bg);
           const border = hslToRgb(color.border);
           const fg = hslToRgb(color.text);
@@ -302,7 +302,7 @@ function PrintRosterPage() {
         y += 16;
         let x = margin;
         people.forEach((person) => {
-          const color = teamColor(area);
+          const color = colorFor(person);
           const pillW = Math.min(150, doc.getTextWidth(person) + 16);
           if (x + pillW > pageWidth - margin) {
             x = margin;
@@ -482,7 +482,7 @@ function PrintRosterPage() {
                     </td>
                     {slots.map((s) => {
                       const person = cellMap[d]?.[s.label] ?? "";
-                      const c = person ? teamColor(area) : null;
+                      const c = person ? colorFor(person, s.label) : null;
                       return (
                         <td
                           key={s.label}
@@ -517,7 +517,7 @@ function PrintRosterPage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {people.map((p) => {
-                    const c = teamColor(area);
+                    const c = colorFor(p);
                     return (
                       <span
                         key={p}
