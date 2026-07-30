@@ -55,6 +55,8 @@ function TeamsPage() {
     addSubTeam,
     removeSubTeam,
     renameSubTeam,
+    setSubTeamColor,
+
     setSubTeamSlot,
     applySubTeamToDate,
   } = useRoster();
