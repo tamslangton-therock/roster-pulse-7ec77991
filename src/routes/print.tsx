@@ -81,10 +81,23 @@ function PrintRosterPage() {
     });
   };
 
-  const slots = useMemo(
-    () => ROSTER_SLOTS.filter((s) => s.area.toLowerCase() === area.toLowerCase()),
-    [area],
-  );
+  const slots = useMemo(() => {
+    const fixed = ROSTER_SLOTS.filter(
+      (s) => s.area.toLowerCase() === area.toLowerCase(),
+    );
+    if (fixed.length) return fixed;
+    // Fallback: derive columns from the assignments themselves so teams that
+    // aren't in the fixed slot list still render.
+    const seen = new Map<string, { area: string; role: string; label: string }>();
+    for (const a of assignments) {
+      if (a.area.toLowerCase() !== area.toLowerCase()) continue;
+      if (!seen.has(a.label)) {
+        seen.set(a.label, { area: a.area, role: a.role ?? a.label, label: a.label });
+      }
+    }
+    return Array.from(seen.values()).sort((x, y) => x.label.localeCompare(y.label));
+  }, [area, assignments]);
+
 
   const shownDates = useMemo(
     () => dates.filter((d) => selectedMonths.includes(d.slice(0, 7))).sort(),
