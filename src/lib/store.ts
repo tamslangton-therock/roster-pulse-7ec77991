@@ -7,8 +7,11 @@ import {
   writeLiveRoster,
   fetchBlockouts,
   writeBlockouts,
+  fetchStatuses,
+  writeStatuses,
   type LiveRosterRow,
   type BlockoutRow,
+  type StatusRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
@@ -17,11 +20,19 @@ import { toast } from "sonner";
 
 type SyncStatus = "idle" | "syncing" | "error";
 
+export type AssignmentStatus =
+  | "pending"
+  | "reminder_sent"
+  | "declined"
+  | "confirmed";
+
 interface RosterState {
   teams: Team[];
   volunteers: Volunteer[];
   assignments: Assignment[];
   blockouts: BlockoutRow[];
+  // key: `${date}::${slot label}` -> status
+  statuses: Record<string, AssignmentStatus>;
 
 
   ready: boolean;
@@ -62,6 +73,9 @@ interface RosterState {
 
   // Blockouts (date block-outs / unavailability) — two-way with the Blockouts tab
   toggleBlockout: (personName: string, date: string, reason?: string) => void;
+
+  // Slot confirmation statuses — two-way with the Statuses tab
+  setAssignmentStatus: (date: string, label: string, status: AssignmentStatus) => void;
 }
 
 
@@ -156,6 +170,50 @@ function scheduleBlockoutSync() {
 }
 
 
+let statusTimer: ReturnType<typeof setTimeout> | null = null;
+let statusInFlight = false;
+
+function scheduleStatusSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(async () => {
+    if (statusInFlight) {
+      scheduleStatusSync();
+      return;
+    }
+    statusInFlight = true;
+    try {
+      const state = useRoster.getState();
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const byKey = new Map(state.assignments.map((a) => [`${a.date}::${a.label}`, a]));
+      const rows: StatusRow[] = Object.entries(state.statuses)
+        .map(([key, status]) => {
+          const [date, slot] = key.split("::");
+          return {
+            date,
+            slot,
+            person_name: byKey.get(key)?.person_name ?? "",
+            status,
+            updated_at: now,
+          };
+        })
+        .sort((a, b) => a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
+      await writeStatuses({ data: { rows } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[statuses sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      toast.error("Google Sheets sync failed for Statuses", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      statusInFlight = false;
+    }
+  }, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
@@ -218,6 +276,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   volunteers: [],
   assignments: [],
   blockouts: [],
+  statuses: {},
 
 
   ready: false,
@@ -232,11 +291,17 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows, blockouts] = await Promise.all([
+      const [data, gridRows, blockouts, statusRows] = await Promise.all([
         fetchAllTabs(),
         fetchLiveRoster(),
         fetchBlockouts().catch(() => [] as BlockoutRow[]),
+        fetchStatuses().catch(() => [] as StatusRow[]),
       ]);
+
+      const statuses: Record<string, AssignmentStatus> = {};
+      for (const r of statusRows) {
+        statuses[`${r.date}::${r.slot}`] = r.status as AssignmentStatus;
+      }
 
       const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
         ...v,
@@ -268,7 +333,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
             person_name: person,
             is_override: false,
             notes: "",
-            status: "pending",
+            status: statuses[`${row.date}::${label}`] ?? "pending",
           });
         }
       }
@@ -284,6 +349,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         teams,
         assignments,
         blockouts,
+        statuses,
         rosterMeta,
         dates,
         ready: true,
@@ -508,6 +574,23 @@ export const useRoster = create<RosterState>()((set, get) => ({
       return { blockouts };
     });
     scheduleBlockoutSync();
+  },
+
+  // --- STATUSES ---
+  setAssignmentStatus: (date, label, status) => {
+    set((state) => {
+      const key = `${date}::${label}`;
+      const statuses = { ...state.statuses };
+      if (status === "pending") delete statuses[key];
+      else statuses[key] = status;
+      return {
+        statuses,
+        assignments: state.assignments.map((a) =>
+          a.date === date && a.label === label ? { ...a, status } : a,
+        ),
+      };
+    });
+    scheduleStatusSync();
   },
 }));
 

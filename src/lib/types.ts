@@ -6,7 +6,11 @@ export type FatigueStatus =
   | "paused"
   | "inactive";
 
-export type RosterStatus = "approved" | "declined" | "pending" | "tentative";
+export type RosterStatus =
+  | "pending"
+  | "reminder_sent"
+  | "declined"
+  | "confirmed";
 
 export interface Volunteer {
   id: string;

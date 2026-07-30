@@ -22,7 +22,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useRoster, findVolunteer } from "@/lib/store";
+import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import {
   assignmentsByCell,
@@ -78,11 +78,7 @@ export const Route = createFileRoute("/")({
   component: LiveRosterPage,
 });
 
-export type AssignmentStatus =
-  | "pending"
-  | "reminder_sent"
-  | "declined"
-  | "confirmed";
+export type { AssignmentStatus } from "@/lib/store";
 
 interface VolunteerWorkloadStats {
   total: number;
@@ -151,10 +147,9 @@ function LiveRosterPage() {
   };
 
 
-  // Status mapping stored by assignment ID
-  const [statusMap, setStatusMap] = useState<Record<string, AssignmentStatus>>(
-    {}
-  );
+  // Slot statuses persist in the Google Sheet ("Statuses" tab).
+  const statusMap = useRoster((s) => s.statuses);
+  const persistStatus = useRoster((s) => s.setAssignmentStatus);
 
   const updateSearchParams = (
     updates: Partial<z.infer<typeof rosterSearchSchema>>
@@ -168,8 +163,12 @@ function LiveRosterPage() {
     });
   };
 
-  const setAssignmentStatus = (id: string, status: AssignmentStatus) => {
-    setStatusMap((prev) => ({ ...prev, [id]: status }));
+  const setAssignmentStatus = (
+    date: string,
+    label: string,
+    status: AssignmentStatus
+  ) => {
+    persistStatus(date, label, status);
     const labels: Record<AssignmentStatus, string> = {
       pending: "Pending",
       reminder_sent: "Reminder Sent",
@@ -652,8 +651,8 @@ function LiveRosterPage() {
                                 const isBlackoutOnDate =
                                   blackoutsMap[key]?.has(a.date) ?? false;
                                 const currentStatus: AssignmentStatus =
-                                  statusMap[a.id] ||
-                                  (a as any).status ||
+                                  statusMap[`${a.date}::${a.label}`] ||
+                                  (a.status as AssignmentStatus) ||
                                   "pending";
 
                                 return (
@@ -670,7 +669,7 @@ function LiveRosterPage() {
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
                                     onStatusChange={(s) =>
-                                      setAssignmentStatus(a.id, s)
+                                      setAssignmentStatus(a.date, a.label, s)
                                     }
                                     onSelectSwap={() => setSwapTarget(a)}
                                     onSelectClash={() => {
