@@ -199,7 +199,12 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows] = await Promise.all([fetchAllTabs(), fetchLiveRoster()]);
+      const [data, gridRows, blockouts] = await Promise.all([
+        fetchAllTabs(),
+        fetchLiveRoster(),
+        fetchBlockouts().catch(() => [] as BlockoutRow[]),
+      ]);
+
       const volunteers = (data.volunteers as unknown as Volunteer[]).map((v) => ({
         ...v,
         id: v.id || `vol-${Math.random().toString(36).slice(2, 10)}`,
