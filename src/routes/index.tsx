@@ -660,7 +660,7 @@ function LiveRosterPage() {
                   </td>
                 </tr>
               ) : (
-                shownDates.map((d) => {
+                renderedDates.map((d) => {
                   const dayClashesList = dateClashesMap.get(d) || [];
                   const rowHasClash = dayClashesList.length > 0;
                   if (showClashesOnly && !rowHasClash) return null;
