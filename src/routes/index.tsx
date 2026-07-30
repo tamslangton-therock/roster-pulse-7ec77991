@@ -23,6 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRoster, findVolunteer } from "@/lib/store";
+import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import {
   assignmentsByCell,
   detectClashes,
@@ -94,6 +95,12 @@ function LiveRosterPage() {
   const search = Route.useSearch();
 
   const { volunteers, assignments, dates } = useRoster();
+  const addRosterDate = useRoster((s) => s.addRosterDate);
+  const assignSlot = useRoster((s) => s.assignSlot);
+  const clearSlot = useRoster((s) => s.clearSlot);
+  const [addDateOpen, setAddDateOpen] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [slotTarget, setSlotTarget] = useState<{ date: string; label: string } | null>(null);
 
   // URL State
   const selectedTeam = search.team || "all";
@@ -200,15 +207,14 @@ function LiveRosterPage() {
     return m;
   }, [clashes]);
 
+  // Fixed column set from the Live_Roster grid schema, so empty slots stay visible
+  // and can be filled. When a team filter is active, narrow to that team's areas.
   const columns = useMemo(() => {
-    const seen = new Map<string, { area: string; label: string }>();
-    for (const a of filteredAssignments) {
-      if (!seen.has(a.label)) seen.set(a.label, { area: a.area, label: a.label });
-    }
-    return Array.from(seen.values()).sort((a, b) =>
-      a.label.localeCompare(b.label)
-    );
-  }, [filteredAssignments]);
+    const all = ROSTER_SLOTS.map((s) => ({ area: s.area, label: s.label }));
+    if (selectedTeam === "all") return all;
+    const areas = new Set(filteredAssignments.map((a) => a.area));
+    return all.filter((c) => areas.has(c.area));
+  }, [filteredAssignments, selectedTeam]);
 
   const months = useMemo(() => {
     const s = new Set<string>();
@@ -478,6 +484,14 @@ function LiveRosterPage() {
             Share Link
           </Button>
 
+          {/* Add Sunday */}
+          {!isShareView && (
+            <Button variant="outline" size="sm" onClick={() => setAddDateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Date
+            </Button>
+          )}
+
           {/* Print/Download Button */}
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-1.5" />
@@ -680,6 +694,17 @@ function LiveRosterPage() {
                                   />
                                 );
                               })}
+                              {list.length === 0 && !isShareView && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSlotTarget({ date: d, label: c.label })
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                >
+                                  <Plus className="h-3 w-3" /> Add
+                                </button>
+                              )}
                             </div>
                           </td>
                         );
