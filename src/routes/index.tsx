@@ -1649,3 +1649,155 @@ function FillSlotDialog({
     </Dialog>
   );
 }
+
+/**
+ * Family / partner alignment dialog.
+ *
+ * Advisory only: shows which linked partner is missing on a date and offers
+ * one-click placement into an open slot (their own serving areas first).
+ */
+function PartnerAlignDialog({
+  target,
+  onClose,
+}: {
+  target: { date: string; person: string; missing: string[] } | null;
+  onClose: () => void;
+}) {
+  const volunteers = useRoster((s) => s.volunteers);
+  const assignments = useRoster((s) => s.assignments);
+  const blockouts = useRoster((s) => s.blockouts);
+  const assignSlot = useRoster((s) => s.assignSlot);
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+
+  const suggestions = useMemo(() => {
+    if (!target) return [];
+    return target.missing.map((p) => {
+      const dates = new Set(
+        blockouts
+          .filter(
+            (b) => b.person_name.trim().toLowerCase() === p.trim().toLowerCase()
+          )
+          .map((b) => b.date)
+      );
+      return suggestSlotsForPartner(p, target.date, {
+        slots: ROSTER_SLOTS,
+        assignments,
+        volunteers,
+        blockoutDates: dates,
+      });
+    });
+  }, [target, assignments, volunteers, blockouts]);
+
+  return (
+    <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        {target && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <HeartHandshake className="h-5 w-5 text-pink-600" />
+                Partner not rostered
+              </DialogTitle>
+              <DialogDescription>
+                {target.person} is serving on{" "}
+                {format(parseISO(`${target.date}T12:00:00`), "EEEE, d MMMM yyyy")}{" "}
+                — but their linked partner isn't. Pick an open slot to roster
+                them on the same day.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 max-h-[420px] overflow-auto pt-1">
+              {suggestions.map((s) => {
+                const preferred = s.slots.filter((x) => x.preferred);
+                const expanded = showAll[s.partner];
+                const list = (expanded ? s.slots : preferred).slice(0, 24);
+                return (
+                  <div
+                    key={s.partner}
+                    className="rounded-lg border bg-muted/20 p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold text-sm">{s.partner}</div>
+                      <div className="flex items-center gap-1.5">
+                        {s.paused && (
+                          <span className="rounded-full border border-blue-500/40 bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
+                            ⏸️ Paused
+                          </span>
+                        )}
+                        {s.blockedOut && (
+                          <span className="rounded-full border border-purple-500/40 bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                            Blackout date
+                          </span>
+                        )}
+                        {!s.volunteer && (
+                          <span className="rounded-full border bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
+                            Not in directory
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {list.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No open slots in their serving areas on this date.
+                        {s.slots.length > 0 && (
+                          <button
+                            type="button"
+                            className="ml-1 underline cursor-pointer"
+                            onClick={() =>
+                              setShowAll((m) => ({ ...m, [s.partner]: true }))
+                            }
+                          >
+                            Show all open slots
+                          </button>
+                        )}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {list.map((slot) => (
+                          <Button
+                            key={slot.label}
+                            size="sm"
+                            variant={slot.preferred ? "default" : "outline"}
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              assignSlot(target.date, slot.label, s.partner);
+                              toast.success(
+                                `${s.partner} rostered on ${slot.label}`
+                              );
+                              onClose();
+                            }}
+                          >
+                            {slot.label}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {!expanded && preferred.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground underline cursor-pointer"
+                        onClick={() =>
+                          setShowAll((m) => ({ ...m, [s.partner]: true }))
+                        }
+                      >
+                        Show slots outside their serving areas
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Leave as is
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
