@@ -148,6 +148,19 @@ function PrintRosterPage() {
     return { bySlot, byPerson };
   }, [subTeams, area]);
 
+  const areaSubTeams = useMemo(() => {
+    const map = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
+    for (const r of subTeams) {
+      if (r.serving_area?.trim().toLowerCase() !== area.trim().toLowerCase()) continue;
+      const name = r.sub_team_name?.trim();
+      if (!name || map.has(name)) continue;
+      map.set(name, { name, color: resolveSubTeamColor(r.serving_area, name, r.color) });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [subTeams, area]);
+
+
+
   const colorFor = (person: string, slotLabel?: string) => {
     const key = person.trim().toLowerCase();
     const hit =
