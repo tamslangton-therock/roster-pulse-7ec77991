@@ -332,13 +332,13 @@ export const useRoster = create<RosterState>()((set, get) => ({
     scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));
     // Cascade: also sync teams + assignments if a rename happened
     scheduleSync("teams", () => get().teams.map(stripTeam));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
 
   // --- ASSIGNMENTS ---
   setAssignments: (assignments) => {
     set({ assignments, dates: computeDates(assignments) });
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   updateAssignment: (id, updates) => {
     set((state) => ({
@@ -346,7 +346,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         String(a.id) === String(id) ? { ...a, ...updates } : a,
       ),
     }));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   swapAssignment: (id, newPersonName) => {
     set((state) => ({
@@ -354,14 +354,14 @@ export const useRoster = create<RosterState>()((set, get) => ({
         String(a.id) === String(id) ? { ...a, person_name: newPersonName } : a,
       ),
     }));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   removeAssignment: (id) => {
     set((state) => {
       const next = state.assignments.filter((a) => String(a.id) !== String(id));
       return { assignments: next, dates: computeDates(next) };
     });
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
   },
   setOverride: (id, is_override) => {
     set((state) => ({
@@ -369,7 +369,76 @@ export const useRoster = create<RosterState>()((set, get) => ({
         String(a.id) === String(id) ? { ...a, is_override } : a,
       ),
     }));
-    scheduleSync("assignments", () => get().assignments.map(stripAssignment));
+    scheduleRosterSync();
+  },
+
+  // --- LIVE ROSTER GRID ---
+  addRosterDate: (date, label) => {
+    set((state) => {
+      if (state.dates.includes(date)) return {};
+      return {
+        dates: [...state.dates, date].sort(),
+        rosterMeta: {
+          ...state.rosterMeta,
+          [date]: { label: label || date, notes: "", detail: "" },
+        },
+      };
+    });
+    scheduleRosterSync();
+  },
+  removeRosterDate: (date) => {
+    set((state) => {
+      const rosterMeta = { ...state.rosterMeta };
+      delete rosterMeta[date];
+      return {
+        dates: state.dates.filter((d) => d !== date),
+        rosterMeta,
+        assignments: state.assignments.filter((a) => a.date !== date),
+      };
+    });
+    scheduleRosterSync();
+  },
+  assignSlot: (date, label, personName) => {
+    const slot = ROSTER_SLOTS.find((s) => s.label === label);
+    if (!slot) return;
+    set((state) => {
+      const id = `${date}::${label}`;
+      const exists = state.assignments.some((a) => a.id === id);
+      const assignments = exists
+        ? state.assignments.map((a) =>
+            a.id === id ? { ...a, person_name: personName } : a,
+          )
+        : [
+            ...state.assignments,
+            {
+              id,
+              date,
+              area: slot.area,
+              role: slot.role || slot.area,
+              label,
+              person_name: personName,
+              is_override: false,
+              notes: "",
+              status: "pending" as const,
+            },
+          ];
+      const dates = state.dates.includes(date)
+        ? state.dates
+        : [...state.dates, date].sort();
+      const rosterMeta = state.rosterMeta[date]
+        ? state.rosterMeta
+        : { ...state.rosterMeta, [date]: { label: date, notes: "", detail: "" } };
+      return { assignments, dates, rosterMeta };
+    });
+    scheduleRosterSync();
+  },
+  clearSlot: (date, label) => {
+    set((state) => ({
+      assignments: state.assignments.filter(
+        (a) => !(a.date === date && a.label === label),
+      ),
+    }));
+    scheduleRosterSync();
   },
 }));
 
