@@ -948,6 +948,10 @@ function LiveRosterPage() {
       {!isShareView && (
         <>
           <SwapDialog target={swapTarget} onClose={() => setSwapTarget(null)} />
+          <PartnerAlignDialog
+            target={partnerTarget}
+            onClose={() => setPartnerTarget(null)}
+          />
           <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
           <BlackoutManagementDialog
             volunteer={selectedVolunteerForBlackouts}
