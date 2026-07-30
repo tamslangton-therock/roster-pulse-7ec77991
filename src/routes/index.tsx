@@ -1019,6 +1019,8 @@ function StatusCellBadge({
   isBlackoutOnDate,
   isShareView,
   subTeam,
+  missingPartners = [],
+  onSelectPartner,
   onStatusChange,
   onSelectSwap,
   onSelectClash,
@@ -1035,6 +1037,8 @@ function StatusCellBadge({
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
   subTeam?: { name: string; color: { bg: string; border: string; text: string } };
+  missingPartners?: string[];
+  onSelectPartner?: () => void;
   onStatusChange: (status: AssignmentStatus) => void;
   onSelectSwap: () => void;
   onSelectClash: () => void;
