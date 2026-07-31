@@ -12,6 +12,7 @@ import {
   type HealthSettings,
 } from "@/lib/health-settings";
 import { StatusBadge } from "@/components/status-badge";
+import { VolunteerHistoryDrawer } from "@/components/volunteer-history-drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,7 @@ function HealthPage() {
   const { volunteers, assignments } = useRoster();
   const [statusFilter, setStatusFilter] = useState<FatigueStatus | "all">("all");
   const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settings, setSettings] = useState<HealthSettings>(DEFAULT_HEALTH_SETTINGS);
 
   useEffect(() => {
@@ -273,7 +275,11 @@ function HealthPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((r) => (
-                  <TableRow key={r.volunteer.id}>
+                  <TableRow
+                    key={r.volunteer.id}
+                    onClick={() => setSelectedId(r.volunteer.id)}
+                    className="cursor-pointer"
+                  >
                     <TableCell className="font-medium">{r.volunteer.full_name}</TableCell>
                     <TableCell><StatusBadge status={r.status} /></TableCell>
                     <TableCell className="text-center">
@@ -428,6 +434,11 @@ function HealthPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <VolunteerHistoryDrawer
+        row={rows.find((r) => r.volunteer.id === selectedId) ?? null}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+      />
     </div>
   );
 }
