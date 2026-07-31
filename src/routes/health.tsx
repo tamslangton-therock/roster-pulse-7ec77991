@@ -275,7 +275,11 @@ function HealthPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((r) => (
-                  <TableRow key={r.volunteer.id}>
+                  <TableRow
+                    key={r.volunteer.id}
+                    onClick={() => setSelectedId(r.volunteer.id)}
+                    className="cursor-pointer"
+                  >
                     <TableCell className="font-medium">{r.volunteer.full_name}</TableCell>
                     <TableCell><StatusBadge status={r.status} /></TableCell>
                     <TableCell className="text-center">
