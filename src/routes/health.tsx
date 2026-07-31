@@ -120,6 +120,7 @@ function HealthPage() {
   const { volunteers, assignments } = useRoster();
   const [statusFilter, setStatusFilter] = useState<FatigueStatus | "all">("all");
   const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settings, setSettings] = useState<HealthSettings>(DEFAULT_HEALTH_SETTINGS);
 
   useEffect(() => {
