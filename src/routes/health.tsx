@@ -434,6 +434,11 @@ function HealthPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <VolunteerHistoryDrawer
+        row={rows.find((r) => r.volunteer.id === selectedId) ?? null}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+      />
     </div>
   );
 }
