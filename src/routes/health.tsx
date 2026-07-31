@@ -12,6 +12,7 @@ import {
   type HealthSettings,
 } from "@/lib/health-settings";
 import { StatusBadge } from "@/components/status-badge";
+import { VolunteerHistoryDrawer } from "@/components/volunteer-history-drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
