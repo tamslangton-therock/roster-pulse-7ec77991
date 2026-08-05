@@ -224,14 +224,22 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  // The OAuth consent screen has its own sign-in and must not sit behind the
+  // shared passcode gate.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isOAuthConsent = pathname.startsWith("/.lovable/oauth/consent");
 
   return (
     <QueryClientProvider client={queryClient}>
       <HydrateStore>
-        <PasscodeGate>
+        {isOAuthConsent ? (
           <Outlet />
-          <SaveBar />
-        </PasscodeGate>
+        ) : (
+          <PasscodeGate>
+            <Outlet />
+            <SaveBar />
+          </PasscodeGate>
+        )}
         <Toaster position="top-right" />
       </HydrateStore>
     </QueryClientProvider>
