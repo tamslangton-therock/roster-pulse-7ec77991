@@ -76,7 +76,7 @@ function PrintRosterPage() {
       ? selectedMonths.filter((x: string) => x !== m)
       : [...selectedMonths, m].sort();
     navigate({
-      search: (prev) => ({ ...prev, months: next.join(",") }),
+      search: (prev: z.infer<typeof printSearchSchema>) => ({ ...prev, months: next.join(",") }),
       replace: true,
     });
   };
@@ -443,7 +443,7 @@ function PrintRosterPage() {
               value={area}
               onValueChange={(v) =>
                 navigate({
-                  search: (prev) => ({ ...prev, area: v }),
+                  search: (prev: z.infer<typeof printSearchSchema>) => ({ ...prev, area: v }),
                   replace: true,
                 })
               }
