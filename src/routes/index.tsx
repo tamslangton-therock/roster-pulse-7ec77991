@@ -171,7 +171,7 @@ function LiveRosterPage() {
     updates: Partial<z.infer<typeof rosterSearchSchema>>
   ) => {
     navigate({
-      search: (prev: Record<string, unknown>) => ({
+      search: (prev) => ({
         ...prev,
         ...updates,
       }),

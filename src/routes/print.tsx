@@ -76,7 +76,7 @@ function PrintRosterPage() {
       ? selectedMonths.filter((x: string) => x !== m)
       : [...selectedMonths, m].sort();
     navigate({
-      search: (prev: Record<string, unknown>) => ({ ...prev, months: next.join(",") }),
+      search: (prev) => ({ ...prev, months: next.join(",") }),
       replace: true,
     });
   };
@@ -443,7 +443,7 @@ function PrintRosterPage() {
               value={area}
               onValueChange={(v) =>
                 navigate({
-                  search: (prev: Record<string, unknown>) => ({ ...prev, area: v }),
+                  search: (prev) => ({ ...prev, area: v }),
                   replace: true,
                 })
               }
