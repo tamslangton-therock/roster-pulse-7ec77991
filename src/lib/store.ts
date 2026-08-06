@@ -324,6 +324,40 @@ function scheduleSubTeamSync() {
   subTeamTimer = setTimeout(run, 800);
 }
 
+let lifeGroupTimer: ReturnType<typeof setTimeout> | null = null;
+let lifeGroupInFlight = false;
+
+function scheduleLifeGroupSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (lifeGroupTimer) clearTimeout(lifeGroupTimer);
+  const run = async () => {
+    if (lifeGroupTimer) clearTimeout(lifeGroupTimer);
+    if (lifeGroupInFlight) {
+      scheduleLifeGroupSync();
+      return;
+    }
+    lifeGroupInFlight = true;
+    setPending("life_groups", null);
+    try {
+      await writeLifeGroups({ data: { rows: useRoster.getState().lifeGroups } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[life-groups sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      setPending("life_groups", run);
+      toast.error("Google Sheets sync failed for Life_Groups", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      lifeGroupInFlight = false;
+    }
+  };
+  setPending("life_groups", run);
+  lifeGroupTimer = setTimeout(run, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
@@ -405,7 +439,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows, blockouts, statusRows, allowedClashes, subTeams] =
+      const [data, gridRows, blockouts, statusRows, allowedClashes, subTeams, lifeGroups] =
         await Promise.all([
           fetchAllTabs(),
           fetchLiveRoster(),
@@ -413,6 +447,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
           fetchStatuses().catch(() => [] as StatusRow[]),
           fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
           fetchSubTeams().catch(() => [] as SubTeamRow[]),
+          fetchLifeGroups().catch(() => [] as LifeGroupRow[]),
         ]);
 
       const statuses: Record<string, AssignmentStatus> = {};
@@ -468,6 +503,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         blockouts,
         allowedClashes,
         subTeams,
+        lifeGroups,
         statuses,
         rosterMeta,
         dates,
@@ -795,6 +831,62 @@ export const useRoster = create<RosterState>()((set, get) => ({
     );
     for (const r of rows) get().assignSlot(date, r.slot_label, r.person_name);
     return rows.length;
+  },
+
+  // --- LIFE GROUPS ---
+  addLifeGroup: (name) => {
+    const id = `lg-${Math.random().toString(36).slice(2, 10)}`;
+    set((state) => ({
+      lifeGroups: [
+        ...state.lifeGroups,
+        {
+          GroupID: id,
+          GroupName: name,
+          Leaders: "",
+          MeetingDayTime: "",
+          LocationName: "",
+          StreetAddress: "",
+          Description: "",
+          MembersList: [],
+        },
+      ],
+    }));
+    scheduleLifeGroupSync();
+    return id;
+  },
+  updateLifeGroup: (id, updates) => {
+    set((state) => ({
+      lifeGroups: state.lifeGroups.map((g) =>
+        g.GroupID === id ? { ...g, ...updates } : g,
+      ),
+    }));
+    scheduleLifeGroupSync();
+  },
+  removeLifeGroup: (id) => {
+    set((state) => ({ lifeGroups: state.lifeGroups.filter((g) => g.GroupID !== id) }));
+    scheduleLifeGroupSync();
+  },
+  addLifeGroupMember: (id, personName) => {
+    const person = personName.trim();
+    if (!person) return;
+    set((state) => ({
+      lifeGroups: state.lifeGroups.map((g) =>
+        g.GroupID === id && !g.MembersList.includes(person)
+          ? { ...g, MembersList: [...g.MembersList, person] }
+          : g,
+      ),
+    }));
+    scheduleLifeGroupSync();
+  },
+  removeLifeGroupMember: (id, personName) => {
+    set((state) => ({
+      lifeGroups: state.lifeGroups.map((g) =>
+        g.GroupID === id
+          ? { ...g, MembersList: g.MembersList.filter((m) => m !== personName) }
+          : g,
+      ),
+    }));
+    scheduleLifeGroupSync();
   },
 }));
 
