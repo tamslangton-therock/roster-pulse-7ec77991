@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { personColor } from "@/lib/person-colors";
+import { teamColor } from "@/lib/person-colors";
 
 export const Route = createFileRoute("/life-groups")({
   head: () => ({
@@ -280,7 +280,7 @@ function LifeGroupsPage() {
               ) : (
                 <ul className="divide-y">
                   {group.MembersList.map((m) => {
-                    const c = personColor(m);
+                    const c = teamColor(m);
                     return (
                       <li key={m} className="flex items-center justify-between py-1.5">
                         <span

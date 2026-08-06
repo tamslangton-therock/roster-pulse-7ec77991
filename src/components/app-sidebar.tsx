@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer } from "lucide-react";
+import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +18,7 @@ const items = [
   { title: "Team Health", url: "/health", icon: Activity },
   { title: "Team Builder", url: "/teams", icon: LayoutGrid },
   { title: "Team Print", url: "/print", icon: Printer },
+  { title: "Life Groups", url: "/life-groups", icon: Home },
 ];
 
 export function AppSidebar() {
