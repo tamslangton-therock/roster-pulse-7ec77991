@@ -388,6 +388,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   blockouts: [],
   allowedClashes: [],
   subTeams: [],
+  lifeGroups: [],
   statuses: {},
 
 
