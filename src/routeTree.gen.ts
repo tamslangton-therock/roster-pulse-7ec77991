@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VolunteersRouteImport } from './routes/volunteers'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as PrintRouteImport } from './routes/print'
+import { Route as LifeGroupsRouteImport } from './routes/life-groups'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -30,6 +31,11 @@ const PrintRoute = PrintRouteImport.update({
   path: '/print',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LifeGroupsRoute = LifeGroupsRouteImport.update({
+  id: '/life-groups',
+  path: '/life-groups',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -44,6 +50,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
@@ -59,21 +67,36 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/health' | '/print' | '/teams' | '/volunteers'
+  fullPaths:
+    | '/'
+    | '/health'
+    | '/life-groups'
+    | '/print'
+    | '/teams'
+    | '/volunteers'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/health' | '/print' | '/teams' | '/volunteers'
-  id: '__root__' | '/' | '/health' | '/print' | '/teams' | '/volunteers'
+  to: '/' | '/health' | '/life-groups' | '/print' | '/teams' | '/volunteers'
+  id:
+    | '__root__'
+    | '/'
+    | '/health'
+    | '/life-groups'
+    | '/print'
+    | '/teams'
+    | '/volunteers'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HealthRoute: typeof HealthRoute
+  LifeGroupsRoute: typeof LifeGroupsRoute
   PrintRoute: typeof PrintRoute
   TeamsRoute: typeof TeamsRoute
   VolunteersRoute: typeof VolunteersRoute
@@ -102,6 +125,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrintRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/life-groups': {
+      id: '/life-groups'
+      path: '/life-groups'
+      fullPath: '/life-groups'
+      preLoaderRoute: typeof LifeGroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/health': {
       id: '/health'
       path: '/health'
@@ -122,6 +152,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HealthRoute: HealthRoute,
+  LifeGroupsRoute: LifeGroupsRoute,
   PrintRoute: PrintRoute,
   TeamsRoute: TeamsRoute,
   VolunteersRoute: VolunteersRoute,
