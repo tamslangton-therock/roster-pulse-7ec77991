@@ -40,6 +40,7 @@ interface RosterState {
   assignments: Assignment[];
   blockouts: BlockoutRow[];
   allowedClashes: AllowedClashRow[];
+  subTeams: SubTeamRow[];
   lifeGroups: LifeGroupRow[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
