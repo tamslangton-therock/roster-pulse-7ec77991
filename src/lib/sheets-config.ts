@@ -96,3 +96,16 @@ export const SUB_TEAMS_SCHEMA = [
   "person_name",
   "color",
 ] as const;
+
+// Life Groups — one row per group; members are pipe-separated names.
+export const LIFE_GROUPS_TAB = "Life_Groups";
+export const LIFE_GROUPS_SCHEMA = [
+  "GroupID",
+  "GroupName",
+  "Leaders",
+  "MeetingDayTime",
+  "LocationName",
+  "StreetAddress",
+  "Description",
+  "MembersList",
+] as const;
