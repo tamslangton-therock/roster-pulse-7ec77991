@@ -12,11 +12,14 @@ import {
   fetchAllowedClashes,
   fetchSubTeams,
   writeSubTeams,
+  fetchLifeGroups,
+  writeLifeGroups,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
   type AllowedClashRow,
   type SubTeamRow,
+  type LifeGroupRow,
 } from "./sheets.functions";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
