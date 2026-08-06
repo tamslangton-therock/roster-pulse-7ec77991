@@ -137,6 +137,8 @@ function scheduleSync(tab: SheetTab, getRows: () => Array<Record<string, unknown
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[sheets sync] ${tab} failed`, err);
       useRoster.setState({ syncStatus: "error", error: msg });
+      // Keep the failed write queued so "Save now" can retry it.
+      setPending(tab, run);
       toast.error(`Google Sheets sync failed for ${tab}`, { description: msg.slice(0, 200) });
     } finally {
       inFlight[tab] = false;
@@ -168,6 +170,8 @@ function scheduleRosterSync() {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[live roster sync] failed", err);
       useRoster.setState({ syncStatus: "error", error: msg });
+      // Keep the failed write queued so "Save now" can retry it.
+      setPending("live_roster", run);
       toast.error("Google Sheets sync failed for Live_Roster", {
         description: msg.slice(0, 200),
       });
@@ -204,6 +208,8 @@ function scheduleBlockoutSync() {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[blockouts sync] failed", err);
       useRoster.setState({ syncStatus: "error", error: msg });
+      // Keep the failed write queued so "Save now" can retry it.
+      setPending("blockouts", run);
       toast.error("Google Sheets sync failed for Blockouts", {
         description: msg.slice(0, 200),
       });
@@ -253,6 +259,8 @@ function scheduleStatusSync() {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[statuses sync] failed", err);
       useRoster.setState({ syncStatus: "error", error: msg });
+      // Keep the failed write queued so "Save now" can retry it.
+      setPending("statuses", run);
       toast.error("Google Sheets sync failed for Statuses", {
         description: msg.slice(0, 200),
       });
@@ -292,6 +300,8 @@ function scheduleSubTeamSync() {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[sub-teams sync] failed", err);
       useRoster.setState({ syncStatus: "error", error: msg });
+      // Keep the failed write queued so "Save now" can retry it.
+      setPending("sub_teams", run);
       toast.error("Google Sheets sync failed for Sub_Teams", {
         description: msg.slice(0, 200),
       });

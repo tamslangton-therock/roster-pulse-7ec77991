@@ -3,7 +3,6 @@ import {
   Outlet,
   createRootRouteWithContext,
   useRouter,
-  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -225,22 +224,14 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  // The OAuth consent screen has its own sign-in and must not sit behind the
-  // shared passcode gate.
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isOAuthConsent = pathname.startsWith("/.lovable/oauth/consent");
 
   return (
     <QueryClientProvider client={queryClient}>
       <HydrateStore>
-        {isOAuthConsent ? (
+        <PasscodeGate>
           <Outlet />
-        ) : (
-          <PasscodeGate>
-            <Outlet />
-            <SaveBar />
-          </PasscodeGate>
-        )}
+          <SaveBar />
+        </PasscodeGate>
         <Toaster position="top-right" />
       </HydrateStore>
     </QueryClientProvider>
