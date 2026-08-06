@@ -97,6 +97,13 @@ interface RosterState {
   setSubTeamColor: (area: string, name: string, color: string) => void;
   setSubTeamSlot: (area: string, name: string, slotLabel: string, person: string) => void;
   applySubTeamToDate: (area: string, name: string, date: string) => number;
+
+  // Life Groups — two-way with the Life_Groups tab
+  addLifeGroup: (name: string) => string;
+  updateLifeGroup: (id: string, updates: Partial<LifeGroupRow>) => void;
+  removeLifeGroup: (id: string) => void;
+  addLifeGroupMember: (id: string, personName: string) => void;
+  removeLifeGroupMember: (id: string, personName: string) => void;
 }
 
 
