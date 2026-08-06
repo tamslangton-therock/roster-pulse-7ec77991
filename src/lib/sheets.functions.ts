@@ -673,3 +673,109 @@ export const writeSubTeams = createServerFn({ method: "POST" })
     );
     return { ok: true, count: data.rows.length };
   });
+
+// ---------- Life_Groups ----------
+
+export interface LifeGroupRow {
+  GroupID: string;
+  GroupName: string;
+  Leaders: string;
+  MeetingDayTime: string;
+  LocationName: string;
+  StreetAddress: string;
+  Description: string;
+  MembersList: string[];
+}
+
+async function ensureLifeGroupsTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [LIFE_GROUPS_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: { title: LIFE_GROUPS_TAB, gridProperties: { frozenRowCount: 1 } },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [LIFE_GROUPS_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchLifeGroups = createServerFn({ method: "GET" }).handler(
+  async (): Promise<LifeGroupRow[]> => {
+    await ensureLifeGroupsTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1:H2000`,
+      );
+    } catch {
+      return [];
+    }
+    const out: LifeGroupRow[] = [];
+    for (const r of (data.values ?? []).slice(1)) {
+      const GroupID = String(r[0] ?? "").trim();
+      const GroupName = String(r[1] ?? "").trim();
+      if (!GroupID && !GroupName) continue;
+      out.push({
+        GroupID: GroupID || `lg-${Math.random().toString(36).slice(2, 10)}`,
+        GroupName,
+        Leaders: String(r[2] ?? "").trim(),
+        MeetingDayTime: String(r[3] ?? "").trim(),
+        LocationName: String(r[4] ?? "").trim(),
+        StreetAddress: String(r[5] ?? "").trim(),
+        Description: String(r[6] ?? "").trim(),
+        MembersList: String(r[7] ?? "")
+          .split(/\s*[|,;]\s*/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
+    }
+    return out;
+  },
+);
+
+export const writeLifeGroups = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: LifeGroupRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureLifeGroupsTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1:H2000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [
+      LIFE_GROUPS_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.GroupID,
+        r.GroupName ?? "",
+        r.Leaders ?? "",
+        r.MeetingDayTime ?? "",
+        r.LocationName ?? "",
+        r.StreetAddress ?? "",
+        r.Description ?? "",
+        (r.MembersList ?? []).join(" | "),
+      ]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
