@@ -15,6 +15,8 @@ import {
   ALLOWED_CLASHES_SCHEMA,
   SUB_TEAMS_TAB,
   SUB_TEAMS_SCHEMA,
+  LIFE_GROUPS_TAB,
+  LIFE_GROUPS_SCHEMA,
   type SheetTab,
 } from "./sheets-config";
 
