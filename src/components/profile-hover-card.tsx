@@ -5,7 +5,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { personColor } from "@/lib/person-colors";
+import { teamColor } from "@/lib/person-colors";
 
 function initials(name: string) {
   return name
@@ -41,7 +41,7 @@ export function ProfileHoverCard({
 }) {
   const volunteers = useRoster((s) => s.volunteers);
   const person = findVolunteer(volunteers, name);
-  const color = personColor(name);
+  const color = teamColor(name);
   const hasNotes = Boolean(
     person?.context?.trim() ||
       person?.challenges?.trim() ||
