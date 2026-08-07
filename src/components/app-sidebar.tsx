@@ -14,7 +14,7 @@ import {
 
 const items = [
   { title: "Live Roster", url: "/", icon: CalendarDays },
-  { title: "Volunteers", url: "/volunteers", icon: Users },
+  { title: "Individuals", url: "/volunteers", icon: Users },
   { title: "Team Health", url: "/health", icon: Activity },
   { title: "Team Builder", url: "/teams", icon: LayoutGrid },
   { title: "Team Print", url: "/print", icon: Printer },
