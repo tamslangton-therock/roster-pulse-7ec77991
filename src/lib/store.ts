@@ -388,6 +388,10 @@ function stripVolunteer(v: Volunteer): Record<string, unknown> {
     is_paused: !!v.is_paused,
     notes: v.notes ?? "",
     unavailable_dates: v.unavailable_dates ?? [],
+    is_volunteer: v.is_volunteer !== false,
+    context: v.context ?? "",
+    challenges: v.challenges ?? "",
+    praying_for: v.praying_for ?? "",
   };
 }
 
@@ -565,6 +569,10 @@ export const useRoster = create<RosterState>()((set, get) => ({
       is_paused: !!volunteer.is_paused,
       notes: (volunteer.notes as string) ?? "",
       unavailable_dates: (volunteer.unavailable_dates as string[]) ?? [],
+      is_volunteer: volunteer.is_volunteer !== false,
+      context: (volunteer.context as string) ?? "",
+      challenges: (volunteer.challenges as string) ?? "",
+      praying_for: (volunteer.praying_for as string) ?? "",
     };
     set((state) => ({ volunteers: [...state.volunteers, v] }));
     scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));

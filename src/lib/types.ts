@@ -25,6 +25,10 @@ export interface Volunteer {
   is_paused: boolean;
   notes: string;
   unavailable_dates?: string[]; // ISO dates when volunteer cannot serve
+  is_volunteer?: boolean; // false = directory-only individual (e.g. life group member)
+  context?: string;
+  challenges?: string;
+  praying_for?: string;
 }
 
 export interface Team {
