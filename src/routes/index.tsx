@@ -26,6 +26,7 @@ import {
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import { resolveSubTeamColor } from "@/lib/person-colors";
+import { ProfileHoverCard } from "@/components/profile-hover-card";
 import {
   assignmentsByCell,
   detectClashes,
@@ -1170,7 +1171,9 @@ function StatusCellBadge({
             title={`Sub-team: ${subTeam.name}`}
           />
         )}
-        <span className="truncate">{assignment.person_name}</span>
+        <ProfileHoverCard name={assignment.person_name}>
+          <span className="truncate">{assignment.person_name}</span>
+        </ProfileHoverCard>
 
         {clashDatesCount > 0 && (
           <span

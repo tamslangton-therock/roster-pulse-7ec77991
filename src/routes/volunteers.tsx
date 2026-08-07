@@ -27,21 +27,22 @@ import {
   type VolunteerDraft,
 } from "@/components/volunteer-form";
 import { toast } from "sonner";
+import { ProfileHoverCard } from "@/components/profile-hover-card";
 
 
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
     meta: [
-      { title: "Volunteers — Roster Pulse" },
+      { title: "Individuals — Roster Pulse" },
       {
         name: "description",
         content:
-          "Manage volunteer database, update serving areas, max serving frequency, and availability status.",
+          "Master directory of every individual — serving areas, availability, context, challenges and prayer notes.",
       },
-      { property: "og:title", content: "Volunteers — Roster Pulse" },
+      { property: "og:title", content: "Individuals — Roster Pulse" },
       {
         property: "og:description",
-        content: "Add, edit, and filter volunteer profiles and serving rules.",
+        content: "Add, edit, and filter individual profiles, volunteer flags and serving rules.",
       },
     ],
   }),
@@ -54,6 +55,7 @@ function VolunteersPage() {
 
   const [search, setSearch] = useState("");
   const [selectedArea, setSelectedArea] = useState<string>("all");
+  const [scope, setScope] = useState<"all" | "volunteers">("all");
   const [showAdd, setShowAdd] = useState(false);
 
   // New volunteer state
@@ -83,9 +85,15 @@ function VolunteersPage() {
         .includes(search.toLowerCase());
       const matchesArea =
         selectedArea === "all" || (v.serving_areas && v.serving_areas.includes(selectedArea));
-      return matchesSearch && matchesArea;
+      const matchesScope = scope === "all" || v.is_volunteer !== false;
+      return matchesSearch && matchesArea && matchesScope;
     });
-  }, [volunteers, search, selectedArea]);
+  }, [volunteers, search, selectedArea, scope]);
+
+  const volunteerCount = useMemo(
+    () => volunteers.filter((v: Volunteer) => v.is_volunteer !== false).length,
+    [volunteers]
+  );
 
   const startEditing = (volunteer: Volunteer) => {
     setEditingVolunteer(volunteer);
@@ -108,10 +116,31 @@ function VolunteersPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Volunteers</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Individuals</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {volunteers.length} volunteers in directory
+            {filtered.length} shown · {volunteers.length} in directory ·{" "}
+            {volunteerCount} active volunteers
           </p>
+          <div className="mt-3 inline-flex rounded-md border bg-muted/40 p-0.5">
+            {([
+              { key: "all", label: "All individuals" },
+              { key: "volunteers", label: "Active volunteers" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setScope(opt.key)}
+                className={
+                  "rounded-[5px] px-3 py-1.5 text-xs font-medium transition-colors " +
+                  (scope === opt.key
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -137,7 +166,7 @@ function VolunteersPage() {
           </Select>
 
           <Button onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Add volunteer
+            <Plus className="h-4 w-4 mr-1" /> Add individual
           </Button>
         </div>
       </div>
@@ -157,7 +186,14 @@ function VolunteersPage() {
             {filtered.map((v) => (
               <tr key={`${v.id}-${v.full_name}`} className="hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium text-foreground">
-                  {v.full_name}
+                  <ProfileHoverCard name={v.full_name}>
+                    <span className="cursor-default">{v.full_name}</span>
+                  </ProfileHoverCard>
+                  {v.is_volunteer === false && (
+                    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Non-serving
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">

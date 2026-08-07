@@ -26,6 +26,10 @@ export const SHEET_SCHEMAS: Record<SheetTab, readonly string[]> = {
     "is_paused",
     "notes",
     "unavailable_dates",
+    "is_volunteer",
+    "context",
+    "challenges",
+    "praying_for",
   ],
   teams: ["id", "team_name", "serving_area", "member_names"],
   assignments: [
@@ -50,7 +54,7 @@ export const ARRAY_FIELDS: Record<SheetTab, readonly string[]> = {
 };
 
 export const BOOL_FIELDS: Record<SheetTab, readonly string[]> = {
-  volunteers: ["is_paused"],
+  volunteers: ["is_paused", "is_volunteer"],
   teams: [],
   assignments: ["is_override"],
 };

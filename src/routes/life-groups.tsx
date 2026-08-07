@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
+import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { teamColor } from "@/lib/person-colors";
 
 export const Route = createFileRoute("/life-groups")({
@@ -283,12 +284,14 @@ function LifeGroupsPage() {
                     const c = teamColor(m);
                     return (
                       <li key={m} className="flex items-center justify-between py-1.5">
-                        <span
-                          className="rounded-md px-2 py-0.5 text-sm"
-                          style={{ backgroundColor: c.bg, color: c.text }}
-                        >
-                          {m}
-                        </span>
+                        <ProfileHoverCard name={m}>
+                          <span
+                            className="cursor-default rounded-md px-2 py-0.5 text-sm"
+                            style={{ backgroundColor: c.bg, color: c.text }}
+                          >
+                            {m}
+                          </span>
+                        </ProfileHoverCard>
                         <Button
                           size="icon"
                           variant="ghost"

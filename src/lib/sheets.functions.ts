@@ -105,6 +105,8 @@ function decodeCell(raw: unknown, field: string, tab: SheetTab): CellValue {
     return s.split(/\s*[|,;]\s*/).filter(Boolean);
   }
   if ((BOOL_FIELDS[tab] as readonly string[]).includes(field)) {
+    // Existing rows predate the is_volunteer flag — blank means "yes, volunteer".
+    if (field === "is_volunteer") return s === "" ? true : /^(true|1|yes|y)$/i.test(s);
     return /^(true|1|yes|y)$/i.test(s);
   }
   if ((NUMBER_FIELDS[tab] as readonly string[]).includes(field)) {

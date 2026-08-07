@@ -26,6 +26,10 @@ export type VolunteerDraft = {
   is_paused: boolean;
   notes: string;
   unavailable_dates: string[];
+  is_volunteer: boolean;
+  context: string;
+  challenges: string;
+  praying_for: string;
 };
 
 export const FREQUENCIES = [
@@ -49,6 +53,10 @@ export function emptyDraft(): VolunteerDraft {
     is_paused: false,
     notes: "",
     unavailable_dates: [],
+    is_volunteer: true,
+    context: "",
+    challenges: "",
+    praying_for: "",
   };
 }
 
@@ -65,6 +73,10 @@ export function toDraft(v: Volunteer): VolunteerDraft {
     is_paused: Boolean(v.is_paused),
     notes: v.notes ?? "",
     unavailable_dates: v.unavailable_dates ?? [],
+    is_volunteer: v.is_volunteer !== false,
+    context: v.context ?? "",
+    challenges: v.challenges ?? "",
+    praying_for: v.praying_for ?? "",
   };
 }
 
@@ -375,6 +387,49 @@ export function VolunteerForm({
           checked={draft.is_paused}
           onCheckedChange={(v) => set("is_paused", v)}
         />
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border p-3">
+        <div>
+          <p className="text-sm font-medium">Active volunteer</p>
+          <p className="text-xs text-muted-foreground">
+            Off = directory-only individual (e.g. life group member who doesn't serve).
+          </p>
+        </div>
+        <Switch
+          checked={draft.is_volunteer}
+          onCheckedChange={(v) => set("is_volunteer", v)}
+        />
+      </div>
+
+      <div className="rounded-md border p-3 space-y-3">
+        <div>
+          <Label>Context</Label>
+          <Textarea
+            rows={3}
+            value={draft.context}
+            onChange={(e) => set("context", e.target.value)}
+            placeholder="Background, family, season of life…"
+          />
+        </div>
+        <div>
+          <Label>Challenges</Label>
+          <Textarea
+            rows={3}
+            value={draft.challenges}
+            onChange={(e) => set("challenges", e.target.value)}
+            placeholder="What they're walking through…"
+          />
+        </div>
+        <div>
+          <Label>Praying for</Label>
+          <Textarea
+            rows={3}
+            value={draft.praying_for}
+            onChange={(e) => set("praying_for", e.target.value)}
+            placeholder="Current prayer points…"
+          />
+        </div>
       </div>
 
       <div>
