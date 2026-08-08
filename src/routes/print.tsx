@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { z } from "zod";
-import { Download, Printer, Users } from "lucide-react";
+import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
+import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
+
 import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
 import { Button } from "@/components/ui/button";
@@ -178,6 +180,54 @@ function PrintRosterPage() {
       : "No months selected";
 
   const canExport = shownDates.length > 0 && slots.length > 0 && !loading;
+
+  // ---- Sunday Docs builder ---------------------------------------------
+  const upcomingSunday = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return dates.find((d) => d >= today) ?? dates[dates.length - 1] ?? "";
+  }, [dates]);
+  const [docDate, setDocDate] = useState("");
+  const [docAreas, setDocAreas] = useState<string[] | null>(null);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const activeDocDate = docDate || upcomingSunday;
+  const activeDocAreas = docAreas ?? areas;
+
+  const docRoleRows = useMemo(() => {
+    const byRole = new Map<string, string[]>();
+    for (const slot of ROSTER_SLOTS) {
+      if (!activeDocAreas.includes(slot.area)) continue;
+      const person = assignments.find(
+        (a) => a.date === activeDocDate && a.label === slot.label,
+      )?.person_name;
+      const key = slot.role ? `${slot.area} — ${slot.role}` : slot.area;
+      const list = byRole.get(key) ?? [];
+      if (person) list.push(person);
+      byRole.set(key, list);
+    }
+    return Array.from(byRole.entries()).map(([role, names]) => ({
+      role,
+      names: names.join(", "),
+    }));
+  }, [assignments, activeDocAreas, activeDocDate]);
+
+  const hostNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          assignments
+            .filter(
+              (a) =>
+                a.date === activeDocDate &&
+                (a.area === "Hosting" || a.area === "Host" || a.area === "Welcome") &&
+                a.person_name,
+            )
+            .map((a) => a.person_name),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [assignments, activeDocDate],
+  );
+
+
 
   const exportPdf = async () => {
     if (!canExport || isExporting) return;
@@ -411,7 +461,24 @@ function PrintRosterPage() {
           tr { page-break-inside: avoid; }
           thead { display: table-header-group; }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          body[data-print-target="docs"] .print-sheet { display: none !important; }
+          body[data-print-target="docs"] .docs-sheet,
+          body[data-print-target="docs"] .docs-sheet * { visibility: visible !important; }
+          body[data-print-target="docs"] .docs-sheet {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            background: #fff !important;
+          }
+          body[data-print-target="docs"] .doc-module {
+            break-inside: avoid;
+            page-break-after: always;
+          }
+          body[data-print-target="docs"] .doc-module:last-child { page-break-after: auto; }
         }
+
       `}</style>
 
 
@@ -483,6 +550,78 @@ function PrintRosterPage() {
           </div>
         </div>
       </div>
+
+      {/* Sunday docs builder */}
+      <div className="no-print rounded-xl border bg-card p-4 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Sunday Print Builder</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Build the huddle overview, briefing, hosting tasks and floor plan pack for one Sunday.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <Select value={activeDocDate} onValueChange={setDocDate}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select Sunday" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {dates.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {format(parseISO(d), "d MMM yyyy")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => setDocsOpen(true)}
+            disabled={!activeDocDate || activeDocAreas.length === 0}
+          >
+            <FileText className="h-4 w-4 mr-1.5" />
+            Generate Sunday Docs
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {areas.map((a) => {
+            const on = activeDocAreas.includes(a);
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() =>
+                  setDocAreas(
+                    on ? activeDocAreas.filter((x) => x !== a) : [...activeDocAreas, a],
+                  )
+                }
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  on
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {a}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {docsOpen && (
+        <SundayDocs
+          date={activeDocDate}
+          areas={activeDocAreas}
+          roleRows={docRoleRows}
+          hostNames={hostNames}
+          onClose={() => setDocsOpen(false)}
+        />
+      )}
+
+
 
       {/* Printable sheet */}
       <div className="print-sheet rounded-xl border bg-card p-6 shadow-sm">
