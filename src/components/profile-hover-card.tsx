@@ -150,7 +150,12 @@ export function ProfileHoverCard({
       </HoverCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent
+          className="sm:max-w-2xl max-h-[85vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <DialogHeader>
             <DialogTitle>{person?.full_name ?? name}</DialogTitle>
             <DialogDescription>
