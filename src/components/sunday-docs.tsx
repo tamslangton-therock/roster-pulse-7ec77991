@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import floorPlan from "@/assets/venue-floor-plan.jpg";
+
 
 export interface DocRoleRow {
   id: string;
@@ -353,20 +353,6 @@ export function SundayDocs({ date, areas, roleRows, hostNames, onClose }: Props)
           />
         </section>
 
-        {/* Module 4 */}
-        <section className="doc-module rounded-lg border bg-card p-5 print:rounded-none print:border-0 print:bg-white print:p-0">
-          <DocHeader title="Venue Floor Plan" subtitle={dateLabel} />
-          <div className={cn("rounded-md bg-white p-3", border, "border-doc-line")}>
-            <img
-              src={floorPlan}
-              alt="Auditorium seating layout showing stage, seating blocks, foyer, coffee bar and welcome desk"
-              loading="lazy"
-              width={1408}
-              height={1008}
-              className="mx-auto h-auto w-full max-w-3xl"
-            />
-          </div>
-        </section>
       </div>
     </div>
   );
