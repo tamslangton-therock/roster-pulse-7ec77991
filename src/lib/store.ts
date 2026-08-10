@@ -14,6 +14,8 @@ import {
   writeSubTeams,
   fetchLifeGroups,
   writeLifeGroups,
+  fetchDocTemplate,
+  writeDocTemplate,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
@@ -21,6 +23,12 @@ import {
   type SubTeamRow,
   type LifeGroupRow,
 } from "./sheets.functions";
+import {
+  defaultDocTemplate,
+  rowsToSections,
+  sectionsToRows,
+  type DocSection,
+} from "./doc-template";
 import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
@@ -42,6 +50,7 @@ interface RosterState {
   allowedClashes: AllowedClashRow[];
   subTeams: SubTeamRow[];
   lifeGroups: LifeGroupRow[];
+  docTemplate: DocSection[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
 
@@ -104,6 +113,10 @@ interface RosterState {
   removeLifeGroup: (id: string) => void;
   addLifeGroupMember: (id: string, personName: string) => void;
   removeLifeGroupMember: (id: string, personName: string) => void;
+
+  // Sunday Docs template — two-way with the Doc_Template tab
+  setDocTemplate: (sections: DocSection[]) => void;
+  resetDocTemplate: () => void;
 }
 
 
@@ -358,6 +371,42 @@ function scheduleLifeGroupSync() {
   lifeGroupTimer = setTimeout(run, 800);
 }
 
+let docTemplateTimer: ReturnType<typeof setTimeout> | null = null;
+let docTemplateInFlight = false;
+
+function scheduleDocTemplateSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (docTemplateTimer) clearTimeout(docTemplateTimer);
+  const run = async () => {
+    if (docTemplateTimer) clearTimeout(docTemplateTimer);
+    if (docTemplateInFlight) {
+      scheduleDocTemplateSync();
+      return;
+    }
+    docTemplateInFlight = true;
+    setPending("doc_template", null);
+    try {
+      await writeDocTemplate({
+        data: { rows: sectionsToRows(useRoster.getState().docTemplate) },
+      });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[doc-template sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      setPending("doc_template", run);
+      toast.error("Google Sheets sync failed for Doc_Template", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      docTemplateInFlight = false;
+    }
+  };
+  setPending("doc_template", run);
+  docTemplateTimer = setTimeout(run, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
@@ -427,6 +476,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   allowedClashes: [],
   subTeams: [],
   lifeGroups: [],
+  docTemplate: defaultDocTemplate(),
   statuses: {},
 
 
@@ -443,7 +493,16 @@ export const useRoster = create<RosterState>()((set, get) => ({
     if (get().ready || get().loading) return;
     set({ loading: true, error: null });
     try {
-      const [data, gridRows, blockouts, statusRows, allowedClashes, subTeams, lifeGroups] =
+      const [
+        data,
+        gridRows,
+        blockouts,
+        statusRows,
+        allowedClashes,
+        subTeams,
+        lifeGroups,
+        docRows,
+      ] =
         await Promise.all([
           fetchAllTabs(),
           fetchLiveRoster(),
@@ -452,7 +511,10 @@ export const useRoster = create<RosterState>()((set, get) => ({
           fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
           fetchSubTeams().catch(() => [] as SubTeamRow[]),
           fetchLifeGroups().catch(() => [] as LifeGroupRow[]),
+          fetchDocTemplate().catch(() => []),
         ]);
+
+      const docSections = docRows.length ? rowsToSections(docRows) : defaultDocTemplate();
 
       const statuses: Record<string, AssignmentStatus> = {};
       for (const r of statusRows) {
@@ -508,6 +570,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         allowedClashes,
         subTeams,
         lifeGroups,
+        docTemplate: docSections,
         statuses,
         rosterMeta,
         dates,
@@ -839,6 +902,16 @@ export const useRoster = create<RosterState>()((set, get) => ({
     );
     for (const r of rows) get().assignSlot(date, r.slot_label, r.person_name);
     return rows.length;
+  },
+
+  // --- SUNDAY DOCS TEMPLATE ---
+  setDocTemplate: (sections) => {
+    set({ docTemplate: sections });
+    scheduleDocTemplateSync();
+  },
+  resetDocTemplate: () => {
+    set({ docTemplate: defaultDocTemplate() });
+    scheduleDocTemplateSync();
   },
 
   // --- LIFE GROUPS ---
