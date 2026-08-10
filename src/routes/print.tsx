@@ -49,6 +49,8 @@ function PrintRosterPage() {
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
   const { assignments, dates, loading, error } = useRoster();
+  const docTemplate = useRoster((s) => s.docTemplate);
+
   const [isExporting, setIsExporting] = useState(false);
 
   const areas = useMemo(() => {
