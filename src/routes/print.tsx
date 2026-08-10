@@ -556,7 +556,7 @@ function PrintRosterPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Sunday Print Builder</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Build the huddle overview, briefing, hosting tasks and floor plan pack for one Sunday.
+            Build the huddle overview, briefing and hosting tasks pack for one Sunday.
           </p>
         </div>
 

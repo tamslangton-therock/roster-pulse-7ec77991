@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import floorPlan from "@/assets/venue-floor-plan.jpg";
+
 
 export interface DocRoleRow {
   id: string;
@@ -94,6 +94,16 @@ export function SundayDocs({ date, areas, roleRows, hostNames, onClose }: Props)
     "Reminder: please arrive 60 minutes before the service and check in with your team leader.",
   );
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [steps, setSteps] = useState(() =>
+    HUDDLE_STEPS.map((s) => ({ id: uid(), ...s })),
+  );
+  const [groups, setGroups] = useState(() =>
+    HOST_CHECKLIST.map((g) => ({
+      id: uid(),
+      group: g.group,
+      items: g.items.map((text) => ({ id: uid(), text })),
+    })),
+  );
   const [tasks, setTasks] = useState<TaskRow[]>(() =>
     DEFAULT_HOST_TASKS.map((task, i) => ({
       id: uid(),
@@ -233,43 +243,142 @@ export function SundayDocs({ date, areas, roleRows, hostNames, onClose }: Props)
               </tr>
             </thead>
             <tbody>
-              {HUDDLE_STEPS.map((s) => (
-                <tr key={s.simple}>
-                  <td className={cn(border, "border-doc-line p-2 text-sm font-semibold")}>{s.simple}</td>
-                  <td className={cn(border, "border-doc-line p-2 text-sm")}>{s.detail}</td>
+              {steps.map((s) => (
+                <tr key={s.id}>
+                  <td className={cn(border, "border-doc-line p-1")}>
+                    <input
+                      className={cn(cellClass, "font-semibold")}
+                      value={s.simple}
+                      onChange={(e) =>
+                        setSteps((p) => p.map((x) => (x.id === s.id ? { ...x, simple: e.target.value } : x)))
+                      }
+                    />
+                  </td>
+                  <td className={cn(border, "border-doc-line p-1")}>
+                    <div className="flex items-center gap-1">
+                      <input
+                        className={cellClass}
+                        value={s.detail}
+                        onChange={(e) =>
+                          setSteps((p) => p.map((x) => (x.id === s.id ? { ...x, detail: e.target.value } : x)))
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="no-print h-6 w-6 shrink-0"
+                        onClick={() => setSteps((p) => p.filter((x) => x.id !== s.id))}
+                        aria-label="Remove step"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <Button
+            variant="outline"
+            size="sm"
+            className="no-print mt-2"
+            onClick={() => setSteps((p) => [...p, { id: uid(), simple: "", detail: "" }])}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add step
+          </Button>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-3 print:grid-cols-3">
-            {HOST_CHECKLIST.map((group) => (
-              <div key={group.group} className={cn("rounded-md p-3", border, "border-doc-line")}>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-doc-header">
-                  {group.group}
-                </p>
+            {groups.map((group) => (
+              <div key={group.id} className={cn("rounded-md p-3", border, "border-doc-line")}>
+                <input
+                  className={cn(cellClass, "mb-2 text-xs font-bold uppercase tracking-wide text-doc-header")}
+                  value={group.group}
+                  onChange={(e) =>
+                    setGroups((p) =>
+                      p.map((g) => (g.id === group.id ? { ...g, group: e.target.value } : g)),
+                    )
+                  }
+                />
                 <ul className="space-y-1.5">
-                  {group.items.map((item) => {
-                    const key = `${group.group}:${item}`;
-                    return (
-                      <li key={key} className="flex items-start gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--doc-header)]"
-                          checked={!!checked[key]}
-                          onChange={(e) =>
-                            setChecked((p) => ({ ...p, [key]: e.target.checked }))
-                          }
-                        />
-                        <span>{item}</span>
-                      </li>
-                    );
-                  })}
+                  {group.items.map((item) => (
+                    <li key={item.id} className="flex items-start gap-1 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1.5 h-3.5 w-3.5 shrink-0 accent-[var(--doc-header)]"
+                        checked={!!checked[item.id]}
+                        onChange={(e) =>
+                          setChecked((p) => ({ ...p, [item.id]: e.target.checked }))
+                        }
+                      />
+                      <input
+                        className={cellClass}
+                        value={item.text}
+                        onChange={(e) =>
+                          setGroups((p) =>
+                            p.map((g) =>
+                              g.id === group.id
+                                ? {
+                                    ...g,
+                                    items: g.items.map((it) =>
+                                      it.id === item.id ? { ...it, text: e.target.value } : it,
+                                    ),
+                                  }
+                                : g,
+                            ),
+                          )
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="no-print h-6 w-6 shrink-0"
+                        onClick={() =>
+                          setGroups((p) =>
+                            p.map((g) =>
+                              g.id === group.id
+                                ? { ...g, items: g.items.filter((it) => it.id !== item.id) }
+                                : g,
+                            ),
+                          )
+                        }
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
                 </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="no-print mt-2"
+                  onClick={() =>
+                    setGroups((p) =>
+                      p.map((g) =>
+                        g.id === group.id
+                          ? { ...g, items: [...g.items, { id: uid(), text: "" }] }
+                          : g,
+                      ),
+                    )
+                  }
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Add item
+                </Button>
               </div>
             ))}
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="no-print mt-2"
+            onClick={() =>
+              setGroups((p) => [...p, { id: uid(), group: "New section", items: [] }])
+            }
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add section
+          </Button>
         </section>
+
 
         {/* Module 3 */}
         <section className="doc-module rounded-lg border bg-card p-5 print:rounded-none print:border-0 print:bg-white print:p-0">
@@ -353,20 +462,6 @@ export function SundayDocs({ date, areas, roleRows, hostNames, onClose }: Props)
           />
         </section>
 
-        {/* Module 4 */}
-        <section className="doc-module rounded-lg border bg-card p-5 print:rounded-none print:border-0 print:bg-white print:p-0">
-          <DocHeader title="Venue Floor Plan" subtitle={dateLabel} />
-          <div className={cn("rounded-md bg-white p-3", border, "border-doc-line")}>
-            <img
-              src={floorPlan}
-              alt="Auditorium seating layout showing stage, seating blocks, foyer, coffee bar and welcome desk"
-              loading="lazy"
-              width={1408}
-              height={1008}
-              className="mx-auto h-auto w-full max-w-3xl"
-            />
-          </div>
-        </section>
       </div>
     </div>
   );
