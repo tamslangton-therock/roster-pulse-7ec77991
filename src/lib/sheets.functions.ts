@@ -17,6 +17,8 @@ import {
   SUB_TEAMS_SCHEMA,
   LIFE_GROUPS_TAB,
   LIFE_GROUPS_SCHEMA,
+  DOC_TEMPLATE_TAB,
+  DOC_TEMPLATE_SCHEMA,
   type SheetTab,
 } from "./sheets-config";
 
@@ -777,6 +779,108 @@ export const writeLifeGroups = createServerFn({ method: "POST" })
     ];
     await gwFetch(
       `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
+
+// ---------- Doc_Template ----------
+
+export interface DocTemplateSheetRow {
+  section_id: string;
+  section_title: string;
+  section_type: string;
+  page_break: string;
+  row_order: number;
+  col_a: string;
+  col_b: string;
+  col_c: string;
+}
+
+async function ensureDocTemplateTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [DOC_TEMPLATE_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: { title: DOC_TEMPLATE_TAB, gridProperties: { frozenRowCount: 1 } },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [DOC_TEMPLATE_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchDocTemplate = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DocTemplateSheetRow[]> => {
+    await ensureDocTemplateTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1:H2000`,
+      );
+    } catch {
+      return [];
+    }
+    const out: DocTemplateSheetRow[] = [];
+    for (const r of (data.values ?? []).slice(1)) {
+      const section_id = String(r[0] ?? "").trim();
+      if (!section_id) continue;
+      out.push({
+        section_id,
+        section_title: String(r[1] ?? ""),
+        section_type: String(r[2] ?? "").trim(),
+        page_break: String(r[3] ?? "").trim(),
+        row_order: Number(r[4] ?? 0) || 0,
+        col_a: String(r[5] ?? ""),
+        col_b: String(r[6] ?? ""),
+        col_c: String(r[7] ?? ""),
+      });
+    }
+    return out.sort((a, b) => a.row_order - b.row_order);
+  },
+);
+
+export const writeDocTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: DocTemplateSheetRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureDocTemplateTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1:H2000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: (string | number)[][] = [
+      DOC_TEMPLATE_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.section_id,
+        r.section_title ?? "",
+        r.section_type ?? "",
+        r.page_break ?? "no",
+        r.row_order ?? 0,
+        r.col_a ?? "",
+        r.col_b ?? "",
+        r.col_c ?? "",
+      ]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1?valueInputOption=RAW`,
       { method: "PUT", body: JSON.stringify({ values }) },
     );
     return { ok: true, count: data.rows.length };

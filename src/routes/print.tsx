@@ -49,6 +49,8 @@ function PrintRosterPage() {
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
   const { assignments, dates, loading, error } = useRoster();
+  const docTemplate = useRoster((s) => s.docTemplate);
+
   const [isExporting, setIsExporting] = useState(false);
 
   const areas = useMemo(() => {
@@ -474,12 +476,12 @@ function PrintRosterPage() {
           }
           body[data-print-target="docs"] .doc-module {
             break-inside: avoid;
-            page-break-after: always;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
           }
-          body[data-print-target="docs"] .doc-module:last-child { page-break-after: auto; }
+          body[data-print-target="docs"] .doc-page-break { page-break-before: always; }
+          body[data-print-target="docs"] .doc-page-break:first-child { page-break-before: auto; }
           body[data-print-target="docs"] .docs-sheet {
             max-width: none !important;
             margin: 0 !important;
@@ -645,6 +647,7 @@ function PrintRosterPage() {
         <SundayDocs
           date={activeDocDate}
           areas={activeDocAreas}
+          template={docTemplate}
           roleRows={docRoleRows}
           hostNames={hostNames}
           onClose={() => setDocsOpen(false)}

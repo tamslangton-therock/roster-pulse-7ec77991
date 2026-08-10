@@ -113,3 +113,16 @@ export const LIFE_GROUPS_SCHEMA = [
   "Description",
   "MembersList",
 ] as const;
+
+// Sunday Docs template — the editable draft the generator fills names into.
+export const DOC_TEMPLATE_TAB = "Doc_Template";
+export const DOC_TEMPLATE_SCHEMA = [
+  "section_id",
+  "section_title",
+  "section_type",
+  "page_break",
+  "row_order",
+  "col_a",
+  "col_b",
+  "col_c",
+] as const;
