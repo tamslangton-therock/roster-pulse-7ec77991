@@ -94,6 +94,16 @@ export function SundayDocs({ date, areas, roleRows, hostNames, onClose }: Props)
     "Reminder: please arrive 60 minutes before the service and check in with your team leader.",
   );
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [steps, setSteps] = useState(() =>
+    HUDDLE_STEPS.map((s) => ({ id: uid(), ...s })),
+  );
+  const [groups, setGroups] = useState(() =>
+    HOST_CHECKLIST.map((g) => ({
+      id: uid(),
+      group: g.group,
+      items: g.items.map((text) => ({ id: uid(), text })),
+    })),
+  );
   const [tasks, setTasks] = useState<TaskRow[]>(() =>
     DEFAULT_HOST_TASKS.map((task, i) => ({
       id: uid(),
