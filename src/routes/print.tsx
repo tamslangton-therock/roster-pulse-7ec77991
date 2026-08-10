@@ -475,8 +475,38 @@ function PrintRosterPage() {
           body[data-print-target="docs"] .doc-module {
             break-inside: avoid;
             page-break-after: always;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
           }
           body[data-print-target="docs"] .doc-module:last-child { page-break-after: auto; }
+          body[data-print-target="docs"] .docs-sheet {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 9.5pt;
+          }
+          body[data-print-target="docs"] .docs-sheet table {
+            width: 100% !important;
+            table-layout: fixed;
+            font-size: 9.5pt;
+            border-collapse: collapse;
+          }
+          body[data-print-target="docs"] .docs-sheet td,
+          body[data-print-target="docs"] .docs-sheet th { padding: 2pt 4pt !important; }
+          body[data-print-target="docs"] .docs-sheet input,
+          body[data-print-target="docs"] .docs-sheet textarea {
+            width: 100% !important;
+            font-size: 9.5pt;
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            white-space: normal;
+            overflow: visible !important;
+            resize: none !important;
+          }
+          body[data-print-target="docs"] .docs-sheet textarea { height: auto !important; }
+
         }
 
       `}</style>
