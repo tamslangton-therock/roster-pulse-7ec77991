@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home }  from "lucide-react";
+import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText }  from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
