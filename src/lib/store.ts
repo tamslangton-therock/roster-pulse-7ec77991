@@ -16,12 +16,15 @@ import {
   writeLifeGroups,
   fetchDocTemplate,
   writeDocTemplate,
+  fetchTasks,
+  writeTasks,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
   type AllowedClashRow,
   type SubTeamRow,
   type LifeGroupRow,
+  type TaskRow,
 } from "./sheets.functions";
 import {
   defaultDocTemplate,
@@ -50,6 +53,7 @@ interface RosterState {
   allowedClashes: AllowedClashRow[];
   subTeams: SubTeamRow[];
   lifeGroups: LifeGroupRow[];
+  tasks: TaskRow[];
   docTemplate: DocSection[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
@@ -113,6 +117,11 @@ interface RosterState {
   removeLifeGroup: (id: string) => void;
   addLifeGroupMember: (id: string, personName: string) => void;
   removeLifeGroupMember: (id: string, personName: string) => void;
+
+  // Tasks — two-way with the Tasks tab
+  addTask: (task: Partial<TaskRow> & { Title: string }) => string;
+  updateTask: (id: string, updates: Partial<TaskRow>) => void;
+  removeTask: (id: string) => void;
 
   // Sunday Docs template — two-way with the Doc_Template tab
   setDocTemplate: (sections: DocSection[]) => void;
@@ -371,6 +380,38 @@ function scheduleLifeGroupSync() {
   lifeGroupTimer = setTimeout(run, 800);
 }
 
+let taskTimer: ReturnType<typeof setTimeout> | null = null;
+let taskInFlight = false;
+
+function scheduleTaskSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (taskTimer) clearTimeout(taskTimer);
+  const run = async () => {
+    if (taskTimer) clearTimeout(taskTimer);
+    if (taskInFlight) {
+      scheduleTaskSync();
+      return;
+    }
+    taskInFlight = true;
+    setPending("tasks", null);
+    try {
+      await writeTasks({ data: { rows: useRoster.getState().tasks } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[tasks sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      setPending("tasks", run);
+      toast.error("Google Sheets sync failed for Tasks", { description: msg.slice(0, 200) });
+    } finally {
+      taskInFlight = false;
+    }
+  };
+  setPending("tasks", run);
+  taskTimer = setTimeout(run, 800);
+}
+
 let docTemplateTimer: ReturnType<typeof setTimeout> | null = null;
 let docTemplateInFlight = false;
 
@@ -476,6 +517,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   allowedClashes: [],
   subTeams: [],
   lifeGroups: [],
+  tasks: [],
   docTemplate: defaultDocTemplate(),
   statuses: {},
 
@@ -501,6 +543,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         allowedClashes,
         subTeams,
         lifeGroups,
+        tasks,
         docRows,
       ] =
         await Promise.all([
@@ -511,6 +554,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
           fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
           fetchSubTeams().catch(() => [] as SubTeamRow[]),
           fetchLifeGroups().catch(() => [] as LifeGroupRow[]),
+          fetchTasks().catch(() => [] as TaskRow[]),
           fetchDocTemplate().catch(() => []),
         ]);
 
@@ -570,6 +614,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         allowedClashes,
         subTeams,
         lifeGroups,
+        tasks,
         docTemplate: docSections,
         statuses,
         rosterMeta,
@@ -915,6 +960,52 @@ export const useRoster = create<RosterState>()((set, get) => ({
   },
 
   // --- LIFE GROUPS ---
+  addTask: (task) => {
+    const id = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    set((state) => ({
+      tasks: [
+        ...state.tasks,
+        {
+          TaskID: id,
+          Title: task.Title,
+          Notes: task.Notes ?? "",
+          Category: task.Category ?? "",
+          AssignedTo: task.AssignedTo ?? "",
+          Status: task.Status ?? "todo",
+          DueDate: task.DueDate ?? "",
+          RemindAt: task.RemindAt ?? "",
+          CreatedAt: new Date().toISOString(),
+          CompletedAt: "",
+        },
+      ],
+    }));
+    scheduleTaskSync();
+    return id;
+  },
+  updateTask: (id, updates) => {
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.TaskID === id
+          ? {
+              ...t,
+              ...updates,
+              CompletedAt:
+                updates.Status === "done"
+                  ? t.CompletedAt || new Date().toISOString()
+                  : updates.Status
+                    ? ""
+                    : t.CompletedAt,
+            }
+          : t,
+      ),
+    }));
+    scheduleTaskSync();
+  },
+  removeTask: (id) => {
+    set((state) => ({ tasks: state.tasks.filter((t) => t.TaskID !== id) }));
+    scheduleTaskSync();
+  },
+
   addLifeGroup: (name) => {
     const id = `lg-${Math.random().toString(36).slice(2, 10)}`;
     set((state) => ({
