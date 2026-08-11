@@ -19,6 +19,9 @@ import {
   LIFE_GROUPS_SCHEMA,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
+  TASKS_TAB,
+  TASKS_SCHEMA,
+
   type SheetTab,
 } from "./sheets-config";
 
