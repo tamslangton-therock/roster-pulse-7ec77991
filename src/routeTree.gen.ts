@@ -16,6 +16,7 @@ import { Route as PrintRouteImport } from './routes/print'
 import { Route as LifeGroupsRouteImport } from './routes/life-groups'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as DocsRouteImport } from './routes/docs'
+import { Route as IndexRouteImport } from './routes/index'
 
 const VolunteersRoute = VolunteersRouteImport.update({
   id: '/volunteers',
@@ -52,8 +53,14 @@ const DocsRoute = DocsRouteImport.update({
   path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
@@ -63,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/volunteers': typeof VolunteersRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
@@ -73,6 +81,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
@@ -84,6 +93,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/docs'
     | '/health'
     | '/life-groups'
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
     | '/volunteers'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/docs'
     | '/health'
     | '/life-groups'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/volunteers'
   id:
     | '__root__'
+    | '/'
     | '/docs'
     | '/health'
     | '/life-groups'
@@ -112,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   DocsRoute: typeof DocsRoute
   HealthRoute: typeof HealthRoute
   LifeGroupsRoute: typeof LifeGroupsRoute
@@ -172,10 +185,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   DocsRoute: DocsRoute,
   HealthRoute: HealthRoute,
   LifeGroupsRoute: LifeGroupsRoute,
