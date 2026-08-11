@@ -388,25 +388,15 @@ function SubTeamCard({
             <div className="w-36 shrink-0 text-xs text-muted-foreground truncate" title={s.label}>
               {s.role || s.label}
             </div>
-            <Select
-              value={personFor(s.label) || NONE}
-              onValueChange={(v) => onSetSlot(s.label, v === NONE ? "" : v)}
-            >
-              <SelectTrigger className="h-8 flex-1 text-sm">
-                <SelectValue placeholder="Empty" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                <SelectItem value={NONE}>— Empty —</SelectItem>
-                {candidates.map((v) => (
-                  <SelectItem key={v.id} value={v.full_name}>
-                    {v.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <LazyPersonSelect
+              value={personFor(s.label)}
+              candidates={candidates}
+              onChange={(v) => onSetSlot(s.label, v)}
+            />
           </div>
         ))}
       </div>
+
 
       <div className="flex items-center gap-2 pt-1">
         <Select value={applyDate} onValueChange={setApplyDate}>
