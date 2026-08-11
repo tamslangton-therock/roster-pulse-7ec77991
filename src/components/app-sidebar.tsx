@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText }  from "lucide-react";
+import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText, LayoutDashboard, ListTodo }  from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,14 +13,17 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Live Roster", url: "/", icon: CalendarDays },
+  { title: "Home", url: "/", icon: LayoutDashboard },
+  { title: "Live Roster", url: "/roster", icon: CalendarDays },
   { title: "Individuals", url: "/volunteers", icon: Users },
   { title: "Team Health", url: "/health", icon: Activity },
   { title: "Team Builder", url: "/teams", icon: LayoutGrid },
   { title: "Team Print", url: "/print", icon: Printer },
   { title: "Doc Templates", url: "/docs", icon: FileText },
   { title: "Life Groups", url: "/life-groups", icon: Home },
+  { title: "Tasks", url: "/tasks", icon: ListTodo },
 ];
+
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
