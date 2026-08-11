@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VolunteersRouteImport } from './routes/volunteers'
 import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as RosterRouteImport } from './routes/roster'
 import { Route as PrintRouteImport } from './routes/print'
 import { Route as LifeGroupsRouteImport } from './routes/life-groups'
 import { Route as HealthRouteImport } from './routes/health'
@@ -25,6 +27,16 @@ const VolunteersRoute = VolunteersRouteImport.update({
 const TeamsRoute = TeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RosterRoute = RosterRouteImport.update({
+  id: '/roster',
+  path: '/roster',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrintRoute = PrintRouteImport.update({
@@ -59,6 +71,8 @@ export interface FileRoutesByFullPath {
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
+  '/roster': typeof RosterRoute
+  '/tasks': typeof TasksRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
@@ -68,6 +82,8 @@ export interface FileRoutesByTo {
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
+  '/roster': typeof RosterRoute
+  '/tasks': typeof TasksRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
@@ -78,6 +94,8 @@ export interface FileRoutesById {
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
+  '/roster': typeof RosterRoute
+  '/tasks': typeof TasksRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
@@ -89,6 +107,8 @@ export interface FileRouteTypes {
     | '/health'
     | '/life-groups'
     | '/print'
+    | '/roster'
+    | '/tasks'
     | '/teams'
     | '/volunteers'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +118,8 @@ export interface FileRouteTypes {
     | '/health'
     | '/life-groups'
     | '/print'
+    | '/roster'
+    | '/tasks'
     | '/teams'
     | '/volunteers'
   id:
@@ -107,6 +129,8 @@ export interface FileRouteTypes {
     | '/health'
     | '/life-groups'
     | '/print'
+    | '/roster'
+    | '/tasks'
     | '/teams'
     | '/volunteers'
   fileRoutesById: FileRoutesById
@@ -117,6 +141,8 @@ export interface RootRouteChildren {
   HealthRoute: typeof HealthRoute
   LifeGroupsRoute: typeof LifeGroupsRoute
   PrintRoute: typeof PrintRoute
+  RosterRoute: typeof RosterRoute
+  TasksRoute: typeof TasksRoute
   TeamsRoute: typeof TeamsRoute
   VolunteersRoute: typeof VolunteersRoute
 }
@@ -135,6 +161,20 @@ declare module '@tanstack/react-router' {
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof TeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roster': {
+      id: '/roster'
+      path: '/roster'
+      fullPath: '/roster'
+      preLoaderRoute: typeof RosterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/print': {
@@ -181,6 +221,8 @@ const rootRouteChildren: RootRouteChildren = {
   HealthRoute: HealthRoute,
   LifeGroupsRoute: LifeGroupsRoute,
   PrintRoute: PrintRoute,
+  RosterRoute: RosterRoute,
+  TasksRoute: TasksRoute,
   TeamsRoute: TeamsRoute,
   VolunteersRoute: VolunteersRoute,
 }

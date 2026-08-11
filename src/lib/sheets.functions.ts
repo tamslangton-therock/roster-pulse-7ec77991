@@ -19,6 +19,9 @@ import {
   LIFE_GROUPS_SCHEMA,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
+  TASKS_TAB,
+  TASKS_SCHEMA,
+
   type SheetTab,
 } from "./sheets-config";
 
@@ -883,5 +886,117 @@ export const writeDocTemplate = createServerFn({ method: "POST" })
       `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1?valueInputOption=RAW`,
       { method: "PUT", body: JSON.stringify({ values }) },
     );
+    return { ok: true, count: data.rows.length };
+  });
+
+// ---------- Tasks ----------
+
+export interface TaskRow {
+  TaskID: string;
+  Title: string;
+  Notes: string;
+  Category: string;
+  AssignedTo: string;
+  Status: "todo" | "in_progress" | "done";
+  DueDate: string;
+  RemindAt: string;
+  CreatedAt: string;
+  CompletedAt: string;
+}
+
+async function ensureTasksTab() {
+  try {
+    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${TASKS_TAB}!1:1`);
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${TASKS_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [TASKS_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: { title: TASKS_TAB, gridProperties: { frozenRowCount: 1 } },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${TASKS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [TASKS_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchTasks = createServerFn({ method: "GET" }).handler(
+  async (): Promise<TaskRow[]> => {
+    await ensureTasksTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${TASKS_TAB}!A1:J5000`);
+    } catch {
+      return [];
+    }
+    const out: TaskRow[] = [];
+    for (const r of (data.values ?? []).slice(1)) {
+      const TaskID = String(r[0] ?? "").trim();
+      const Title = String(r[1] ?? "").trim();
+      if (!TaskID && !Title) continue;
+      const rawStatus = String(r[5] ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      const Status: TaskRow["Status"] =
+        rawStatus === "done" || rawStatus === "complete" || rawStatus === "completed"
+          ? "done"
+          : rawStatus === "in_progress" || rawStatus === "doing"
+            ? "in_progress"
+            : "todo";
+      out.push({
+        TaskID: TaskID || `task-${Math.random().toString(36).slice(2, 10)}`,
+        Title,
+        Notes: String(r[2] ?? "").trim(),
+        Category: String(r[3] ?? "").trim(),
+        AssignedTo: String(r[4] ?? "").trim(),
+        Status,
+        DueDate: String(r[6] ?? "").trim(),
+        RemindAt: String(r[7] ?? "").trim(),
+        CreatedAt: String(r[8] ?? "").trim(),
+        CompletedAt: String(r[9] ?? "").trim(),
+      });
+    }
+    return out;
+  },
+);
+
+export const writeTasks = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: TaskRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureTasksTab();
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${TASKS_TAB}!A1:J5000:clear`, {
+      method: "POST",
+      body: "{}",
+    });
+    const values: string[][] = [
+      TASKS_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.TaskID,
+        r.Title ?? "",
+        r.Notes ?? "",
+        r.Category ?? "",
+        r.AssignedTo ?? "",
+        r.Status ?? "todo",
+        r.DueDate ?? "",
+        r.RemindAt ?? "",
+        r.CreatedAt ?? "",
+        r.CompletedAt ?? "",
+      ]),
+    ];
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${TASKS_TAB}!A1?valueInputOption=RAW`, {
+      method: "PUT",
+      body: JSON.stringify({ values }),
+    });
     return { ok: true, count: data.rows.length };
   });
