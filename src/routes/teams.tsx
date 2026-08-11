@@ -424,3 +424,45 @@ function SubTeamCard({
     </div>
   );
 }
+
+/**
+ * Renders its option list only while the dropdown is open. Team Builder can
+ * mount 80+ of these at once, so eagerly building ~200 items per select is
+ * what made the page slow to open.
+ */
+function LazyPersonSelect({
+  value,
+  candidates,
+  onChange,
+}: {
+  value: string;
+  candidates: import("@/lib/types").Volunteer[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Select
+      open={open}
+      onOpenChange={setOpen}
+      value={value || NONE}
+      onValueChange={(v) => onChange(v === NONE ? "" : v)}
+    >
+      <SelectTrigger className="h-8 flex-1 text-sm">
+        <SelectValue placeholder="Empty" />
+      </SelectTrigger>
+      <SelectContent className="max-h-72">
+        <SelectItem value={NONE}>— Empty —</SelectItem>
+        {open
+          ? candidates.map((v) => (
+              <SelectItem key={v.id} value={v.full_name}>
+                {v.full_name}
+              </SelectItem>
+            ))
+          : value
+            ? <SelectItem value={value}>{value}</SelectItem>
+            : null}
+      </SelectContent>
+    </Select>
+  );
+}
