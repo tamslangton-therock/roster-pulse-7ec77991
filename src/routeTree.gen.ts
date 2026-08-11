@@ -11,11 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VolunteersRouteImport } from './routes/volunteers'
 import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as RosterRouteImport } from './routes/roster'
 import { Route as PrintRouteImport } from './routes/print'
 import { Route as LifeGroupsRouteImport } from './routes/life-groups'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as DocsRouteImport } from './routes/docs'
-import { Route as IndexRouteImport } from './routes/index'
 
 const VolunteersRoute = VolunteersRouteImport.update({
   id: '/volunteers',
@@ -25,6 +25,11 @@ const VolunteersRoute = VolunteersRouteImport.update({
 const TeamsRoute = TeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RosterRoute = RosterRouteImport.update({
+  id: '/roster',
+  path: '/roster',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrintRoute = PrintRouteImport.update({
@@ -47,76 +52,71 @@ const DocsRoute = DocsRouteImport.update({
   path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
+  '/roster': typeof RosterRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
+  '/roster': typeof RosterRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
   '/print': typeof PrintRoute
+  '/roster': typeof RosterRoute
   '/teams': typeof TeamsRoute
   '/volunteers': typeof VolunteersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
     | '/docs'
     | '/health'
     | '/life-groups'
     | '/print'
+    | '/roster'
     | '/teams'
     | '/volunteers'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/docs'
     | '/health'
     | '/life-groups'
     | '/print'
+    | '/roster'
     | '/teams'
     | '/volunteers'
   id:
     | '__root__'
-    | '/'
     | '/docs'
     | '/health'
     | '/life-groups'
     | '/print'
+    | '/roster'
     | '/teams'
     | '/volunteers'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   DocsRoute: typeof DocsRoute
   HealthRoute: typeof HealthRoute
   LifeGroupsRoute: typeof LifeGroupsRoute
   PrintRoute: typeof PrintRoute
+  RosterRoute: typeof RosterRoute
   TeamsRoute: typeof TeamsRoute
   VolunteersRoute: typeof VolunteersRoute
 }
@@ -135,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof TeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roster': {
+      id: '/roster'
+      path: '/roster'
+      fullPath: '/roster'
+      preLoaderRoute: typeof RosterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/print': {
@@ -165,25 +172,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   DocsRoute: DocsRoute,
   HealthRoute: HealthRoute,
   LifeGroupsRoute: LifeGroupsRoute,
   PrintRoute: PrintRoute,
+  RosterRoute: RosterRoute,
   TeamsRoute: TeamsRoute,
   VolunteersRoute: VolunteersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
