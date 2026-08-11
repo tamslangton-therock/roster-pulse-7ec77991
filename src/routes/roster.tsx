@@ -74,7 +74,7 @@ const rosterSearchSchema = z.object({
   view: z.enum(["edit", "share"]).optional().default("edit"),
 });
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/roster")({
   validateSearch: (search) => rosterSearchSchema.parse(search),
   head: () => ({
     meta: [
