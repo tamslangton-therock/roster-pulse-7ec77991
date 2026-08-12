@@ -95,10 +95,10 @@ export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose
       ),
     );
 
-  const addItem = (sid: string, a = "") =>
+  const addItem = (sid: string, a = "", c = "") =>
     setSections((prev) =>
       prev.map((s) =>
-        s.id === sid ? { ...s, items: [...s.items, { id: uid(), a, b: "", c: "" }] } : s,
+        s.id === sid ? { ...s, items: [...s.items, { id: uid(), a, b: "", c }] } : s,
       ),
     );
 
@@ -266,58 +266,17 @@ export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose
               )}
 
               {section.type === "tasks" && (
-                <>
-                  <table className={cn("w-full border-collapse", border, "border-doc-line")}>
-                    <thead>
-                      <tr className="bg-doc-header text-doc-header-foreground">
-                        <th className={cn(border, "border-doc-line p-2 text-left text-xs font-bold uppercase w-[45%]")}>Task</th>
-                        <th className={cn(border, "border-doc-line p-2 text-left text-xs font-bold uppercase")}>Assigned to</th>
-                        <th className={cn(border, "border-doc-line p-2 text-center text-xs font-bold uppercase w-[90px]")}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {section.items.map((it) => (
-                        <tr key={it.id}>
-                          <td className={cn(border, "border-doc-line p-1")}>
-                            <input
-                              className={cn(cellClass, "font-medium")}
-                              value={it.a}
-                              onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
-                            />
-                          </td>
-                          <td className={cn(border, "border-doc-line p-1")}>
-                            <div className="flex items-center gap-1">
-                              <input
-                                className={cellClass}
-                                list="sunday-docs-hosts"
-                                placeholder="—"
-                                value={it.b}
-                                onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
-                              />
-                              <RemoveBtn onClick={() => removeItem(section.id, it.id)} label="Remove task" />
-                            </div>
-                          </td>
-                          <td className={cn(border, "border-doc-line p-1 text-center")}>
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-[var(--doc-header)]"
-                              checked={!!checked[it.id]}
-                              onChange={(e) =>
-                                setChecked((p) => ({ ...p, [it.id]: e.target.checked }))
-                              }
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <datalist id="sunday-docs-hosts">
-                    {hostNames.map((n) => (
-                      <option key={n} value={n} />
-                    ))}
-                  </datalist>
-                  <AddBtn onClick={() => addItem(section.id)} label="Add task" />
-                </>
+                <TaskSection
+                  section={section}
+                  border={border}
+                  cellClass={cellClass}
+                  checked={checked}
+                  setChecked={setChecked}
+                  patch={patch}
+                  removeItem={removeItem}
+                  addItem={addItem}
+                  hostNames={hostNames}
+                />
               )}
             </section>
           );
@@ -343,7 +302,7 @@ interface ChecklistProps {
   setChecked: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   patch: (sid: string, itemId: string, key: "a" | "b" | "c", value: string) => void;
   removeItem: (sid: string, itemId: string) => void;
-  addItem: (sid: string, a?: string) => void;
+  addItem: (sid: string, a?: string, c?: string) => void;
 }
 
 function ChecklistSection({
@@ -420,5 +379,100 @@ function DocHeader({ title, subtitle }: { title: string; subtitle: string }) {
       <h3 className="text-base font-bold uppercase tracking-wide">{title}</h3>
       <span className="text-xs font-medium opacity-90">{subtitle}</span>
     </div>
+  );
+}
+
+interface TaskSectionProps extends ChecklistProps {
+  hostNames: string[];
+}
+
+function TaskSection({
+  section,
+  border,
+  cellClass,
+  checked,
+  setChecked,
+  patch,
+  removeItem,
+  addItem,
+  hostNames,
+}: TaskSectionProps) {
+  const groups: Array<{ name: string; items: DocTemplateItem[] }> = [];
+  for (const it of section.items) {
+    const name = it.c || "Tasks";
+    const existing = groups.find((g) => g.name === name);
+    if (existing) existing.items.push(it);
+    else groups.push({ name, items: [it] });
+  }
+
+  return (
+    <>
+      <div className="space-y-4">
+        {groups.map((group) => (
+          <div key={group.name} className={cn("rounded-md p-3", border, "border-doc-line")}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-doc-header">
+              {group.name}
+            </p>
+            <table className={cn("w-full border-collapse", border, "border-doc-line")}>
+              <thead>
+                <tr className="bg-doc-header text-doc-header-foreground">
+                  <th className={cn(border, "border-doc-line p-2 text-left text-xs font-bold uppercase w-[45%]")}>Task</th>
+                  <th className={cn(border, "border-doc-line p-2 text-left text-xs font-bold uppercase")}>Assigned to</th>
+                  <th className={cn(border, "border-doc-line p-2 text-center text-xs font-bold uppercase w-[90px]")}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.items.map((it) => (
+                  <tr key={it.id}>
+                    <td className={cn(border, "border-doc-line p-1")}>
+                      <input
+                        className={cn(cellClass, "font-medium")}
+                        value={it.a}
+                        onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
+                      />
+                    </td>
+                    <td className={cn(border, "border-doc-line p-1")}>
+                      <div className="flex items-center gap-1">
+                        <input
+                          className={cellClass}
+                          list="sunday-docs-hosts"
+                          placeholder="—"
+                          value={it.b}
+                          onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="no-print h-6 w-6 shrink-0"
+                          onClick={() => removeItem(section.id, it.id)}
+                          aria-label="Remove task"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                    <td className={cn(border, "border-doc-line p-1 text-center")}>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[var(--doc-header)]"
+                        checked={!!checked[it.id]}
+                        onChange={(e) => setChecked((p) => ({ ...p, [it.id]: e.target.checked }))}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <AddBtn onClick={() => addItem(section.id, "", group.name)} label="Add task" />
+          </div>
+        ))}
+      </div>
+      <datalist id="sunday-docs-hosts">
+        {hostNames.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <AddBtn onClick={() => addItem(section.id, "", "New group")} label="Add group" />
+    </>
   );
 }
