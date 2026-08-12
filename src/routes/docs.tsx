@@ -214,6 +214,14 @@ function SectionItems({
   const patch = (id: string, key: "a" | "b" | "c", value: string) =>
     onChange(items.map((it) => (it.id === id ? { ...it, [key]: value } : it)));
 
+  const moveItem = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
   return (
     <div className="space-y-2">
       {items.length > 0 && (
@@ -223,10 +231,10 @@ function SectionItems({
               {c}
             </span>
           ))}
-          <span className="w-8" />
+          <span className="w-[104px]" />
         </div>
       )}
-      {items.map((it) => (
+      {items.map((it, itemIndex) => (
         <div key={it.id} className="flex items-center gap-2">
           {section.type === "note" ? (
             <textarea
@@ -262,6 +270,26 @@ function SectionItems({
               )}
             </>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            disabled={itemIndex === 0}
+            onClick={() => moveItem(itemIndex, -1)}
+            aria-label="Move row up"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            disabled={itemIndex === items.length - 1}
+            onClick={() => moveItem(itemIndex, 1)}
+            aria-label="Move row down"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
