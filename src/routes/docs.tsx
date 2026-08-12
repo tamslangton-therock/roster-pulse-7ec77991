@@ -274,6 +274,26 @@ function SectionItems({
             variant="ghost"
             size="icon"
             className="shrink-0"
+            disabled={itemIndex === 0}
+            onClick={() => moveItem(itemIndex, -1)}
+            aria-label="Move row up"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            disabled={itemIndex === items.length - 1}
+            onClick={() => moveItem(itemIndex, 1)}
+            aria-label="Move row down"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
             onClick={() => onChange(items.filter((x) => x.id !== it.id))}
             aria-label="Remove row"
           >
