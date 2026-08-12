@@ -231,10 +231,10 @@ function SectionItems({
               {c}
             </span>
           ))}
-          <span className="w-8" />
+          <span className="w-[104px]" />
         </div>
       )}
-      {items.map((it) => (
+      {items.map((it, itemIndex) => (
         <div key={it.id} className="flex items-center gap-2">
           {section.type === "note" ? (
             <textarea
