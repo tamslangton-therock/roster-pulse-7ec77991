@@ -214,6 +214,14 @@ function SectionItems({
   const patch = (id: string, key: "a" | "b" | "c", value: string) =>
     onChange(items.map((it) => (it.id === id ? { ...it, [key]: value } : it)));
 
+  const moveItem = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
   return (
     <div className="space-y-2">
       {items.length > 0 && (
