@@ -8,7 +8,7 @@ export const SECTION_TYPE_LABELS: Record<DocSectionType, string> = {
   roles: "Role table (auto-filled from the roster)",
   steps: "Two-column list (Simple / Detail)",
   checklist: "Checklist groups",
-  tasks: "Task assignments (Task / Assigned / Status)",
+  tasks: "Task assignments, grouped (Task / Assigned / Status)",
   note: "Highlighted note banner",
 };
 
@@ -17,7 +17,7 @@ export const SECTION_COLUMNS: Record<DocSectionType, [string, string, string] | 
   roles: ["Role", "Default name(s)", "Comment"],
   steps: ["Simple", "Detail"],
   checklist: ["Group", "Item"],
-  tasks: ["Task", "Default assignee"],
+  tasks: ["Task", "Default assignee", "Group"],
   note: ["Text"],
 };
 
@@ -78,15 +78,16 @@ const HOST_CHECKLIST: Array<[string, string]> = [
   ["In-Between Services", "Brief the second-service hosts"],
 ];
 
-const HOST_TASKS = [
-  "Cut Communion Bread",
-  "Pour Communion Juice",
-  "Left Front Communion",
-  "Right Front Communion",
-  "Back Communion",
-  "Offering Bags",
-  "Door Greeting",
-  "Attendance Count",
+/** [task, group] — tasks are displayed grouped by the third column. */
+const HOST_TASKS: Array<[string, string]> = [
+  ["Cut Communion Bread", "Communion"],
+  ["Pour Communion Juice", "Communion"],
+  ["Left Front Communion", "Communion"],
+  ["Right Front Communion", "Communion"],
+  ["Back Communion", "Communion"],
+  ["Offering Bags", "Offering"],
+  ["Door Greeting", "Front of House"],
+  ["Attendance Count", "Front of House"],
 ];
 
 const item = (a: string, b = "", c = ""): DocTemplateItem => ({ id: uid(), a, b, c });
@@ -130,7 +131,7 @@ export function defaultDocTemplate(): DocSection[] {
       title: "Hosting Task Assignments",
       type: "tasks",
       pageBreak: true,
-      items: HOST_TASKS.map((t) => item(t)),
+      items: HOST_TASKS.map(([t, g]) => item(t, "", g)),
     },
     {
       id: uid(),
