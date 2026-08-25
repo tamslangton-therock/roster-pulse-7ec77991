@@ -386,6 +386,8 @@ interface TaskSectionProps extends ChecklistProps {
   hostNames: string[];
 }
 
+const DEFAULT_TASK_HEADERS: [string, string, string] = ["Task", "Assigned to", "Status"];
+
 function TaskSection({
   section,
   border,
@@ -397,6 +399,23 @@ function TaskSection({
   addItem,
   hostNames,
 }: TaskSectionProps) {
+  const [headers, setHeaders] = useState<[string, string, string]>(DEFAULT_TASK_HEADERS);
+  const [bold, setBold] = useState<[boolean, boolean, boolean]>([true, true, true]);
+
+  const setHeader = (i: 0 | 1 | 2, v: string) =>
+    setHeaders((p) => {
+      const n = [...p] as [string, string, string];
+      n[i] = v;
+      return n;
+    });
+
+  const toggleBold = (i: 0 | 1 | 2) =>
+    setBold((p) => {
+      const n = [...p] as [boolean, boolean, boolean];
+      n[i] = !n[i];
+      return n;
+    });
+
   const groups: Array<{ name: string; items: DocTemplateItem[] }> = [];
   for (const it of section.items) {
     const name = it.c || "Tasks";
@@ -405,64 +424,82 @@ function TaskSection({
     else groups.push({ name, items: [it] });
   }
 
+  const headerInput = (i: 0 | 1 | 2, extra = "") => (
+    <span className="flex items-center gap-0.5">
+      <input
+        className={cn(
+          "w-full min-w-0 bg-transparent text-[10px] uppercase tracking-wide outline-none placeholder:text-doc-header-foreground/60",
+          bold[i] ? "font-bold" : "font-normal",
+          extra,
+        )}
+        value={headers[i]}
+        onChange={(e) => setHeader(i, e.target.value)}
+      />
+      <button
+        type="button"
+        onClick={() => toggleBold(i)}
+        aria-label={`Toggle bold for ${headers[i]}`}
+        className={cn(
+          "no-print rounded px-1 text-[10px] leading-none",
+          bold[i] ? "bg-doc-header-foreground/25" : "opacity-60",
+        )}
+      >
+        B
+      </button>
+    </span>
+  );
+
   return (
     <>
-      <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 print:grid-cols-2">
         {groups.map((group) => (
           <div key={group.name} className={cn("rounded-md p-3", border, "border-doc-line")}>
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-doc-header">
               {group.name}
             </p>
-            <table className={cn("w-full border-collapse", border, "border-doc-line")}>
-              <thead>
-                <tr className="bg-doc-header text-doc-header-foreground">
-                  <th className={cn(border, "border-doc-line p-2 text-left text-xs font-bold uppercase w-[45%]")}>Task</th>
-                  <th className={cn(border, "border-doc-line p-2 text-left text-xs font-bold uppercase")}>Assigned to</th>
-                  <th className={cn(border, "border-doc-line p-2 text-center text-xs font-bold uppercase w-[90px]")}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.items.map((it) => (
-                  <tr key={it.id}>
-                    <td className={cn(border, "border-doc-line p-1")}>
-                      <input
-                        className={cn(cellClass, "font-medium")}
-                        value={it.a}
-                        onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
-                      />
-                    </td>
-                    <td className={cn(border, "border-doc-line p-1")}>
-                      <div className="flex items-center gap-1">
-                        <input
-                          className={cellClass}
-                          list="sunday-docs-hosts"
-                          placeholder="—"
-                          value={it.b}
-                          onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="no-print h-6 w-6 shrink-0"
-                          onClick={() => removeItem(section.id, it.id)}
-                          aria-label="Remove task"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                    <td className={cn(border, "border-doc-line p-1 text-center")}>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-[var(--doc-header)]"
-                        checked={!!checked[it.id]}
-                        onChange={(e) => setChecked((p) => ({ ...p, [it.id]: e.target.checked }))}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+            <div className="flex items-center gap-2 rounded-sm bg-doc-header px-2 py-1 text-doc-header-foreground">
+              <div className="flex-1">{headerInput(0)}</div>
+              <div className="w-[38%]">{headerInput(1)}</div>
+              <div className="w-[46px] shrink-0">{headerInput(2, "text-center")}</div>
+              <span className="no-print w-6 shrink-0" />
+            </div>
+
+            <ul className="mt-1 divide-y divide-doc-line">
+              {group.items.map((it) => (
+                <li key={it.id} className="flex items-center gap-2 py-1">
+                  <input
+                    className={cn(cellClass, "flex-1 font-medium")}
+                    value={it.a}
+                    onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
+                  />
+                  <input
+                    className={cn(cellClass, "w-[38%]")}
+                    list="sunday-docs-hosts"
+                    placeholder="—"
+                    value={it.b}
+                    onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
+                  />
+                  <span className="flex w-[46px] shrink-0 justify-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--doc-header)]"
+                      checked={!!checked[it.id]}
+                      onChange={(e) => setChecked((p) => ({ ...p, [it.id]: e.target.checked }))}
+                    />
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="no-print h-6 w-6 shrink-0"
+                    onClick={() => removeItem(section.id, it.id)}
+                    aria-label="Remove task"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
             <AddBtn onClick={() => addItem(section.id, "", group.name)} label="Add task" />
           </div>
         ))}
