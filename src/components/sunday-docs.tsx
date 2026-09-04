@@ -167,6 +167,9 @@ export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose
           <p className="font-semibold">Sunday Docs — {dateLabel}</p>
           <p className="text-xs text-muted-foreground">
             {areas.length ? areas.join(" · ") : "No teams selected"}
+            {savedAt
+              ? ` · Draft saved ${format(new Date(savedAt), "d MMM HH:mm")}`
+              : " · Not saved yet"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -175,6 +178,17 @@ export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose
             Bold borders
           </Label>
         </div>
+        <Button variant="outline" onClick={saveDraft}>
+          <Save className="mr-1.5 h-4 w-4" />
+          Save as draft
+        </Button>
+        <Button
+          variant={confirmReset ? "destructive" : "outline"}
+          onClick={() => (confirmReset ? resetDraft() : setConfirmReset(true))}
+        >
+          <RotateCcw className="mr-1.5 h-4 w-4" />
+          {confirmReset ? "Confirm reset" : "Reset to default"}
+        </Button>
         <Button onClick={doPrint}>
           <Printer className="mr-1.5 h-4 w-4" />
           Print / Save as PDF
