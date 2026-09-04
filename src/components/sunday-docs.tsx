@@ -400,11 +400,14 @@ function ChecklistSection({
                     checked={!!checked[it.id]}
                     onChange={(e) => setChecked((p) => ({ ...p, [it.id]: e.target.checked }))}
                   />
-                  <input
-                    className={cellClass}
-                    value={it.b}
-                    onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
-                  />
+                  <span className="min-w-0 flex-1">
+                    <input
+                      className={cn(cellClass, "print:hidden")}
+                      value={it.b}
+                      onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
+                    />
+                    <PrintText value={it.b} />
+                  </span>
                   <Button
                     variant="ghost"
                     size="icon"
