@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Plus, Printer, Trash2, X } from "lucide-react";
+import { Plus, Printer, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,24 @@ interface Props {
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+/**
+ * Print-only mirror of an editable field. Text inputs inside flex rows collapse
+ * to zero width when printing, so the on-screen input is hidden and this plain
+ * text is shown instead on paper.
+ */
+function PrintText({ value, className }: { value: string; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "hidden px-1 py-0.5 text-sm break-words whitespace-pre-wrap print:block",
+        className,
+      )}
+    >
+      {value || "\u00A0"}
+    </span>
+  );
+}
 
 /** Fill the draft with the people rostered on this Sunday. */
 function generate(
@@ -54,12 +73,57 @@ function generate(
   });
 }
 
+const draftKey = (date: string) => `roster-pulse:sunday-doc-draft:${date || "unset"}`;
+
+interface SavedDraft {
+  savedAt: string;
+  sections: DocSection[];
+  checked: Record<string, boolean>;
+}
+
+function readDraft(date: string): SavedDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(draftKey(date));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SavedDraft;
+    return Array.isArray(parsed?.sections) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose }: Props) {
   const [thickBorders, setThickBorders] = useState(false);
-  const [sections, setSections] = useState<DocSection[]>(() =>
-    generate(template, roleRows, hostNames),
+  const initialDraft = useMemo(() => readDraft(date), [date]);
+  const [sections, setSections] = useState<DocSection[]>(
+    () => initialDraft?.sections ?? generate(template, roleRows, hostNames),
   );
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [checked, setChecked] = useState<Record<string, boolean>>(
+    () => initialDraft?.checked ?? {},
+  );
+  const [savedAt, setSavedAt] = useState<string | null>(initialDraft?.savedAt ?? null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const saveDraft = () => {
+    const payload: SavedDraft = { savedAt: new Date().toISOString(), sections, checked };
+    try {
+      window.localStorage.setItem(draftKey(date), JSON.stringify(payload));
+      setSavedAt(payload.savedAt);
+      toast.success("Draft saved — reopen this Sunday to keep editing");
+    } catch {
+      toast.error("Could not save the draft on this device");
+    }
+  };
+
+  const resetDraft = () => {
+    window.localStorage.removeItem(draftKey(date));
+    setSections(generate(template, roleRows, hostNames));
+    setChecked({});
+    setSavedAt(null);
+    setConfirmReset(false);
+    toast.success("Reset to the default template");
+  };
 
   const dateLabel = useMemo(
     () => (date ? format(parseISO(date), "EEEE d MMMM yyyy") : "Sunday"),
@@ -121,6 +185,9 @@ export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose
           <p className="font-semibold">Sunday Docs — {dateLabel}</p>
           <p className="text-xs text-muted-foreground">
             {areas.length ? areas.join(" · ") : "No teams selected"}
+            {savedAt
+              ? ` · Draft saved ${format(new Date(savedAt), "d MMM HH:mm")}`
+              : " · Not saved yet"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -129,6 +196,17 @@ export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose
             Bold borders
           </Label>
         </div>
+        <Button variant="outline" onClick={saveDraft}>
+          <Save className="mr-1.5 h-4 w-4" />
+          Save as draft
+        </Button>
+        <Button
+          variant={confirmReset ? "destructive" : "outline"}
+          onClick={() => (confirmReset ? resetDraft() : setConfirmReset(true))}
+        >
+          <RotateCcw className="mr-1.5 h-4 w-4" />
+          {confirmReset ? "Confirm reset" : "Reset to default"}
+        </Button>
         <Button onClick={doPrint}>
           <Printer className="mr-1.5 h-4 w-4" />
           Print / Save as PDF
@@ -333,18 +411,21 @@ function ChecklistSection({
             </p>
             <ul className="space-y-1.5">
               {group.items.map((it) => (
-                <li key={it.id} className="flex items-start gap-1 text-sm">
+                <li key={it.id} className="doc-check-row flex items-start gap-1 text-sm">
                   <input
                     type="checkbox"
                     className="mt-1.5 h-3.5 w-3.5 shrink-0 accent-[var(--doc-header)]"
                     checked={!!checked[it.id]}
                     onChange={(e) => setChecked((p) => ({ ...p, [it.id]: e.target.checked }))}
                   />
-                  <input
-                    className={cellClass}
-                    value={it.b}
-                    onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
-                  />
+                  <span className="min-w-0 flex-1">
+                    <input
+                      className={cn(cellClass, "print:hidden")}
+                      value={it.b}
+                      onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
+                    />
+                    <PrintText value={it.b} />
+                  </span>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -467,19 +548,25 @@ function TaskSection({
 
             <ul className="mt-1 divide-y divide-doc-line">
               {group.items.map((it) => (
-                <li key={it.id} className="flex items-center gap-2 py-1">
-                  <input
-                    className={cn(cellClass, "flex-1 font-medium")}
-                    value={it.a}
-                    onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
-                  />
-                  <input
-                    className={cn(cellClass, "w-[38%]")}
-                    list="sunday-docs-hosts"
-                    placeholder="—"
-                    value={it.b}
-                    onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
-                  />
+                <li key={it.id} className="doc-task-row flex items-center gap-2 py-1">
+                  <span className="min-w-0 flex-1">
+                    <input
+                      className={cn(cellClass, "font-medium print:hidden")}
+                      value={it.a}
+                      onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
+                    />
+                    <PrintText value={it.a} className="font-medium" />
+                  </span>
+                  <span className="w-[38%] shrink-0">
+                    <input
+                      className={cn(cellClass, "print:hidden")}
+                      list="sunday-docs-hosts"
+                      placeholder="—"
+                      value={it.b}
+                      onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
+                    />
+                    <PrintText value={it.b} />
+                  </span>
                   <span className="flex w-[46px] shrink-0 justify-center">
                     <input
                       type="checkbox"
