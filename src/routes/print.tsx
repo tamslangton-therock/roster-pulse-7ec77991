@@ -508,6 +508,17 @@ function PrintRosterPage() {
             resize: none !important;
           }
           body[data-print-target="docs"] .docs-sheet textarea { height: auto !important; }
+          /* Inputs inside flex rows (checklists, task lists) collapse to zero
+             width when printing — force them to grow so the text shows. */
+          body[data-print-target="docs"] .docs-sheet li input:not([type="checkbox"]) {
+            flex: 1 1 auto !important;
+            width: auto !important;
+            min-width: 0 !important;
+            text-overflow: clip;
+          }
+          body[data-print-target="docs"] .docs-sheet li input.doc-col-name {
+            flex: 0 0 38% !important;
+          }
 
         }
 
