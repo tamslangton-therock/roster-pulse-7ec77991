@@ -55,12 +55,57 @@ function generate(
   });
 }
 
+const draftKey = (date: string) => `roster-pulse:sunday-doc-draft:${date || "unset"}`;
+
+interface SavedDraft {
+  savedAt: string;
+  sections: DocSection[];
+  checked: Record<string, boolean>;
+}
+
+function readDraft(date: string): SavedDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(draftKey(date));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SavedDraft;
+    return Array.isArray(parsed?.sections) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function SundayDocs({ date, areas, template, roleRows, hostNames, onClose }: Props) {
   const [thickBorders, setThickBorders] = useState(false);
-  const [sections, setSections] = useState<DocSection[]>(() =>
-    generate(template, roleRows, hostNames),
+  const initialDraft = useMemo(() => readDraft(date), [date]);
+  const [sections, setSections] = useState<DocSection[]>(
+    () => initialDraft?.sections ?? generate(template, roleRows, hostNames),
   );
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [checked, setChecked] = useState<Record<string, boolean>>(
+    () => initialDraft?.checked ?? {},
+  );
+  const [savedAt, setSavedAt] = useState<string | null>(initialDraft?.savedAt ?? null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const saveDraft = () => {
+    const payload: SavedDraft = { savedAt: new Date().toISOString(), sections, checked };
+    try {
+      window.localStorage.setItem(draftKey(date), JSON.stringify(payload));
+      setSavedAt(payload.savedAt);
+      toast.success("Draft saved — reopen this Sunday to keep editing");
+    } catch {
+      toast.error("Could not save the draft on this device");
+    }
+  };
+
+  const resetDraft = () => {
+    window.localStorage.removeItem(draftKey(date));
+    setSections(generate(template, roleRows, hostNames));
+    setChecked({});
+    setSavedAt(null);
+    setConfirmReset(false);
+    toast.success("Reset to the default template");
+  };
 
   const dateLabel = useMemo(
     () => (date ? format(parseISO(date), "EEEE d MMMM yyyy") : "Sunday"),
