@@ -474,7 +474,7 @@ function TaskSection({
                     onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
                   />
                   <input
-                    className={cn(cellClass, "w-[38%]")}
+                    className={cn(cellClass, "w-[38%] doc-col-name")}
                     list="sunday-docs-hosts"
                     placeholder="—"
                     value={it.b}
