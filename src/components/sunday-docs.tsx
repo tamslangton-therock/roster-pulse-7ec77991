@@ -21,6 +21,24 @@ interface Props {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
+/**
+ * Print-only mirror of an editable field. Text inputs inside flex rows collapse
+ * to zero width when printing, so the on-screen input is hidden and this plain
+ * text is shown instead on paper.
+ */
+function PrintText({ value, className }: { value: string; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "hidden px-1 py-0.5 text-sm break-words whitespace-pre-wrap print:block",
+        className,
+      )}
+    >
+      {value || "\u00A0"}
+    </span>
+  );
+}
+
 /** Fill the draft with the people rostered on this Sunday. */
 function generate(
   template: DocSection[],
