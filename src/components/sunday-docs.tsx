@@ -549,18 +549,24 @@ function TaskSection({
             <ul className="mt-1 divide-y divide-doc-line">
               {group.items.map((it) => (
                 <li key={it.id} className="flex items-center gap-2 py-1">
-                  <input
-                    className={cn(cellClass, "flex-1 font-medium")}
-                    value={it.a}
-                    onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
-                  />
-                  <input
-                    className={cn(cellClass, "w-[38%] doc-col-name")}
-                    list="sunday-docs-hosts"
-                    placeholder="—"
-                    value={it.b}
-                    onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
-                  />
+                  <span className="min-w-0 flex-1">
+                    <input
+                      className={cn(cellClass, "font-medium print:hidden")}
+                      value={it.a}
+                      onChange={(e) => patch(section.id, it.id, "a", e.target.value)}
+                    />
+                    <PrintText value={it.a} className="font-medium" />
+                  </span>
+                  <span className="w-[38%] shrink-0">
+                    <input
+                      className={cn(cellClass, "print:hidden")}
+                      list="sunday-docs-hosts"
+                      placeholder="—"
+                      value={it.b}
+                      onChange={(e) => patch(section.id, it.id, "b", e.target.value)}
+                    />
+                    <PrintText value={it.b} />
+                  </span>
                   <span className="flex w-[46px] shrink-0 justify-center">
                     <input
                       type="checkbox"
