@@ -508,6 +508,19 @@ function PrintRosterPage() {
             resize: none !important;
           }
           body[data-print-target="docs"] .docs-sheet textarea { height: auto !important; }
+          /* Chromium drops flex-grow when printing, which collapsed checklist
+             and task rows to zero width — lay them out on a grid instead. */
+          body[data-print-target="docs"] .docs-sheet .doc-check-row {
+            display: grid !important;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: start;
+          }
+          body[data-print-target="docs"] .docs-sheet .doc-task-row {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 34% 24px;
+            align-items: start;
+          }
+          body[data-print-target="docs"] .docs-sheet .doc-task-row > span { width: auto !important; }
 
         }
 

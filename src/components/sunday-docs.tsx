@@ -411,7 +411,7 @@ function ChecklistSection({
             </p>
             <ul className="space-y-1.5">
               {group.items.map((it) => (
-                <li key={it.id} className="flex items-start gap-1 text-sm">
+                <li key={it.id} className="doc-check-row flex items-start gap-1 text-sm">
                   <input
                     type="checkbox"
                     className="mt-1.5 h-3.5 w-3.5 shrink-0 accent-[var(--doc-header)]"
@@ -548,7 +548,7 @@ function TaskSection({
 
             <ul className="mt-1 divide-y divide-doc-line">
               {group.items.map((it) => (
-                <li key={it.id} className="flex items-center gap-2 py-1">
+                <li key={it.id} className="doc-task-row flex items-center gap-2 py-1">
                   <span className="min-w-0 flex-1">
                     <input
                       className={cn(cellClass, "font-medium print:hidden")}
