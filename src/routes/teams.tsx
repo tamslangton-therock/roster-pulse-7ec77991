@@ -94,29 +94,32 @@ function TeamsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Team Builder</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {totalSubTeams} sub-teams across {ROSTER_AREAS.length} serving areas — saved to
+            {totalSubTeams} sub-teams across {allAreas.length} serving areas — saved to
             the <span className="font-medium">Sub_Teams</span> tab in Google Sheets.
           </p>
         </div>
 
-        <Select value={selectedArea} onValueChange={setSelectedArea}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter area" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All serving areas</SelectItem>
-            {ROSTER_AREAS.map((a) => (
-              <SelectItem key={a} value={a}>
-                {a}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <ManageColumnsDialog />
+          <Select value={selectedArea} onValueChange={setSelectedArea}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter area" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All serving areas</SelectItem>
+              {allAreas.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {areas.map((area) => {
-          const slots = ROSTER_SLOTS.filter((s) => s.area === area);
+          const slots = slots.filter((s) => s.area === area);
           const names = byArea.get(area) ?? [];
           return (
             <section key={area} className="rounded-xl border bg-card p-4 shadow-sm space-y-4">
