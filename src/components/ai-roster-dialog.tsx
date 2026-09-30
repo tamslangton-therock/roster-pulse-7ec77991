@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Sparkles, Loader2, AlertTriangle, Users2, Check } from "lucide-react";
+import {
+  Sparkles,
+  Loader2,
+  AlertTriangle,
+  Users2,
+  Check,
+  Minus,
+  Plus,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -32,6 +41,10 @@ import {
 } from "@/lib/ai-roster.functions";
 
 const TAG_BADGES: Record<string, { label: string; className: string }> = {
+  sub_team: {
+    label: "🧩 Sub-team",
+    className: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  },
   partner_aligned: {
     label: "👥 Partner aligned",
     className: "bg-emerald-100 text-emerald-800 border-emerald-200",
@@ -56,6 +69,10 @@ const TAG_BADGES: Record<string, { label: string; className: string }> = {
     label: "✔ Allowed pairing",
     className: "bg-stone-100 text-stone-700 border-stone-200",
   },
+  proven_role: {
+    label: "🏆 Proven role",
+    className: "bg-rose-100 text-rose-800 border-rose-200",
+  },
 };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -72,6 +89,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
   const allowedClashes = useRoster((s) => s.allowedClashes);
   const assignments = useRoster((s) => s.assignments);
   const dates = useRoster((s) => s.dates);
+  const subTeams = useRoster((s) => s.subTeams);
   const addRosterDate = useRoster((s) => s.addRosterDate);
   const assignSlot = useRoster((s) => s.assignSlot);
   const clearSlot = useRoster((s) => s.clearSlot);
@@ -83,6 +101,8 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AiRosterResult | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [targetOverrides, setTargetOverrides] = useState<Record<string, number>>({});
+  const [notes, setNotes] = useState("");
 
   const today = todayISO();
   const upcoming = useMemo(
@@ -136,6 +156,145 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
     [slots, selectedAreas],
   );
 
+  /** Typical headcount per area per Sunday, learned from past Sundays (median of the last 12). */
+  const defaultTargets = useMemo(() => {
+    const slotArea = new Map(slots.map((s) => [s.label, s.area] as const));
+    const pastDates = Array.from(
+      new Set(
+        assignments.filter((a) => a.date < today).map((a) => a.date),
+      ),
+    )
+      .sort()
+      .slice(-12);
+    const counts = new Map<string, number[]>();
+    for (const d of pastDates) {
+      const perArea = new Map<string, Set<string>>();
+      for (const a of assignments) {
+        if (a.date !== d) continue;
+        const area = slotArea.get(a.label);
+        if (!area) continue;
+        if (!perArea.has(area)) perArea.set(area, new Set());
+        perArea.get(area)!.add(a.person_name.toLowerCase());
+      }
+      for (const [area, people] of perArea) {
+        if (!counts.has(area)) counts.set(area, []);
+        counts.get(area)!.push(people.size);
+      }
+    }
+    const res: Record<string, number> = {};
+    for (const area of areas) {
+      const arr = (counts.get(area) ?? []).sort((a, b) => a - b);
+      if (arr.length === 0) {
+        res[area] = slots.filter((s) => s.area === area).length;
+      } else {
+        const mid = Math.floor(arr.length / 2);
+        const median =
+          arr.length % 2 ? arr[mid] : Math.round((arr[mid - 1] + arr[mid]) / 2);
+        res[area] = Math.max(1, median);
+      }
+    }
+    return res;
+  }, [assignments, slots, areas, today]);
+
+  /** Ideal sub-teams grouped from the Team Builder. */
+  const subTeamGroups = useMemo(() => {
+    const m = new Map<
+      string,
+      { area: string; name: string; members: { slot_label: string; person_name: string }[] }
+    >();
+    for (const st of subTeams) {
+      const key = `${st.serving_area}||${st.sub_team_name}`;
+      if (!m.has(key))
+        m.set(key, { area: st.serving_area, name: st.sub_team_name, members: [] });
+      m.get(key)!.members.push({ slot_label: st.slot_label, person_name: st.person_name });
+    }
+    return Array.from(m.values()).filter((g) => g.members.length > 0);
+  }, [subTeams]);
+
+  /** Verified candidate pool per slot label: qualified by area + sub-team members. */
+  const slotCandidates = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const slot of slots) {
+      const set = new Map<string, string>(); // lower -> canonical
+      for (const n of qualifiedByArea.get(slot.area) ?? []) {
+        set.set(n.toLowerCase(), n);
+      }
+      for (const st of subTeams) {
+        if (st.slot_label !== slot.label) continue;
+        const v = volunteers.find(
+          (x) =>
+            x.full_name.toLowerCase() === st.person_name.toLowerCase() &&
+            x.is_volunteer !== false &&
+            !x.is_paused,
+        );
+        if (v) set.set(st.person_name.toLowerCase(), st.person_name);
+      }
+      map.set(slot.label, Array.from(set.values()).sort());
+    }
+    return map;
+  }, [slots, qualifiedByArea, subTeams, volunteers]);
+
+  /** Exact slots each person has actually served in the last 12 weeks. */
+  const provenRoles = useMemo(() => {
+    const cutoff = new Date(Date.now() - 84 * 86400000).toISOString().slice(0, 10);
+    const m = new Map<string, Set<string>>();
+    const canon = new Map<string, string>();
+    for (const a of assignments) {
+      if (a.date >= today || a.date < cutoff) continue;
+      const key = a.person_name.toLowerCase();
+      if (!m.has(key)) m.set(key, new Set());
+      m.get(key)!.add(a.label);
+      canon.set(key, a.person_name);
+    }
+    return Array.from(m.entries())
+      .map(([key, set]) => ({ name: canon.get(key) ?? key, slots: Array.from(set) }))
+      .filter((r) => r.slots.length > 0);
+  }, [assignments, today]);
+
+  /** Pairs who regularly served together in the same area (co-serving chemistry). */
+  const affinity = useMemo(() => {
+    const slotArea = new Map(slots.map((s) => [s.label, s.area] as const));
+    const pastDates = Array.from(
+      new Set(assignments.filter((a) => a.date < today).map((a) => a.date)),
+    )
+      .sort()
+      .slice(-12);
+    const pairCount = new Map<string, number>();
+    const canon = new Map<string, string>();
+    for (const d of pastDates) {
+      const perArea = new Map<string, string[]>();
+      for (const a of assignments) {
+        if (a.date !== d) continue;
+        const area = slotArea.get(a.label);
+        if (!area) continue;
+        if (!perArea.has(area)) perArea.set(area, []);
+        perArea.get(area)!.push(a.person_name);
+        canon.set(a.person_name.toLowerCase(), a.person_name);
+      }
+      for (const [, people] of perArea) {
+        const uniq = Array.from(new Set(people.map((p) => p.toLowerCase())));
+        for (let i = 0; i < uniq.length; i++) {
+          for (let j = i + 1; j < uniq.length; j++) {
+            const key = `${uniq[i]}||${uniq[j]}`;
+            pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
+          }
+        }
+      }
+    }
+    return Array.from(pairCount.entries())
+      .filter(([, times]) => times >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 80)
+      .map(([key, times]) => {
+        const [a, b] = key.split("||");
+        return {
+          area: "",
+          people: [canon.get(a) ?? a, canon.get(b) ?? b],
+          times,
+        };
+      });
+  }, [assignments, slots, today]);
+
   const toggleDate = (d: string, on: boolean) => {
     setSelectedDates((prev) => {
       const next = new Set(prev);
@@ -161,6 +320,8 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
     setError(null);
     setResult(null);
     setOverrides({});
+    setTargetOverrides({});
+    setNotes("");
   };
 
   const generate = async () => {
@@ -197,6 +358,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
 
       const dateList = Array.from(selectedDates).sort();
       const dateSet = new Set(dateList);
+      const scopedAreaSet = new Set(scopedSlots.map((s) => s.area));
 
       const payload = {
         dates: dateList,
@@ -207,6 +369,28 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
           area: s.area,
           role: s.role,
         })),
+        targets: areas
+          .filter((a) => scopedAreaSet.has(a))
+          .map((a) => ({
+            area: a,
+            target: targetOverrides[a] ?? defaultTargets[a] ?? 0,
+          })),
+        subTeams: subTeamGroups
+          .filter((g) => scopedAreaSet.has(g.area))
+          .map((g) => ({
+            area: g.area,
+            name: g.name,
+            members: g.members.filter((m) =>
+              scopedSlots.some((s) => s.label === m.slot_label),
+            ),
+          }))
+          .filter((g) => g.members.length > 0),
+        candidates: scopedSlots.map((s) => ({
+          slot_label: s.label,
+          people: slotCandidates.get(s.label) ?? [],
+        })),
+        provenRoles,
+        affinity,
         blockouts: blockouts
           .filter((b) => dateSet.has(b.date))
           .map((b) => ({
@@ -226,6 +410,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
             person_name: a.person_name,
           })),
         recent,
+        priorities: notes.trim() || undefined,
       };
 
       const res = await suggestRoster({ data: payload });
@@ -246,19 +431,22 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
     for (const s of result.suggestions) {
       if (!valid.has(s.slot_label)) continue;
       if (!selectedDates.has(s.date)) continue;
-      const person = overrides[keyOf(s)] || s.person_name;
       const slot = slots.find((x) => x.label === s.slot_label);
-      if (!slot || !person) continue;
-      const qualified = (qualifiedByArea.get(slot.area) ?? []).some(
-        (n) => n.toLowerCase() === person.toLowerCase(),
-      );
-      if (!qualified) continue;
+      if (!slot) continue;
+      const chosen = overrides[keyOf(s)] || s.person_name;
+      if (!chosen) continue;
+      // Safety filter: the person must be in the verified candidate pool for
+      // this exact slot (case-insensitive match onto the canonical name).
+      const pool = slotCandidates.get(s.slot_label) ?? [];
+      const canonical =
+        pool.find((n) => n.toLowerCase() === chosen.toLowerCase()) ?? "";
+      if (!canonical) continue;
       if (mode === "draft_full" && !cleared.has(s.date)) {
         for (const sl of scopedSlots) clearSlot(s.date, sl.label);
         cleared.add(s.date);
       }
       if (!dates.includes(s.date)) addRosterDate(s.date);
-      assignSlot(s.date, s.slot_label, person);
+      assignSlot(s.date, s.slot_label, canonical);
     }
     setOpen(false);
     reset();
@@ -294,7 +482,8 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
           <DialogTitle>AI Auto-Roster</DialogTitle>
           <DialogDescription>
             Pick service dates and staffing scope, then review the AI's
-            suggested assignments before applying anything.
+            suggested assignments before applying anything. Suggestions follow
+            your sub-teams, proven roles and typical team sizes.
           </DialogDescription>
         </DialogHeader>
 
@@ -344,33 +533,90 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                 </div>
               </div>
 
-              {/* Areas */}
+              {/* Areas + staffing targets */}
               <div>
                 <Label className="text-sm font-medium">Staffing needs</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Leave all unticked to include every serving area.
+                  Leave all unticked to include every serving area. The number
+                  is how many people that area normally needs on a Sunday
+                  (learned from recent Sundays) — extra slots stay as backup
+                  and won't be force-filled.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {areas.map((a) => (
-                    <label
-                      key={a}
-                      className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm cursor-pointer hover:bg-accent"
-                    >
-                      <Checkbox
-                        checked={selectedAreas.has(a)}
-                        onCheckedChange={(v) =>
-                          setSelectedAreas((prev) => {
-                            const next = new Set(prev);
-                            if (v === true) next.add(a);
-                            else next.delete(a);
-                            return next;
-                          })
-                        }
-                      />
-                      {a}
-                    </label>
-                  ))}
+                <div className="space-y-1.5">
+                  {areas.map((a) => {
+                    const slotCount = slots.filter((s) => s.area === a).length;
+                    const target =
+                      targetOverrides[a] ?? defaultTargets[a] ?? slotCount;
+                    const capped = Math.min(slotCount, Math.max(1, target));
+                    return (
+                      <div
+                        key={a}
+                        className="flex items-center gap-2 rounded-md border px-2.5 py-1.5"
+                      >
+                        <Checkbox
+                          checked={selectedAreas.has(a)}
+                          onCheckedChange={(v) =>
+                            setSelectedAreas((prev) => {
+                              const next = new Set(prev);
+                              if (v === true) next.add(a);
+                              else next.delete(a);
+                              return next;
+                            })
+                          }
+                        />
+                        <span className="flex-1 text-sm">{a}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {capped} of {slotCount} slot{slotCount === 1 ? "" : "s"}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() =>
+                            setTargetOverrides((prev) => ({
+                              ...prev,
+                              [a]: Math.max(1, capped - 1),
+                            }))
+                          }
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-5 text-center text-sm tabular-nums">
+                          {capped}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() =>
+                            setTargetOverrides((prev) => ({
+                              ...prev,
+                              [a]: Math.min(slotCount, capped + 1),
+                            }))
+                          }
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
+              </div>
+
+              {/* Optional notes */}
+              <div>
+                <Label className="text-sm font-medium" htmlFor="ai-notes">
+                  Notes for the AI (optional)
+                </Label>
+                <Input
+                  id="ai-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. Prioritise the car park on 5 Oct, skip tea team this month"
+                  className="mt-1.5"
+                />
               </div>
 
               {/* Mode */}
@@ -427,7 +673,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                     {list.map((s) => {
                       const slot = slots.find((x) => x.label === s.slot_label);
                       const qualified = slot
-                        ? qualifiedByArea.get(slot.area) ?? []
+                        ? slotCandidates.get(slot.label) ?? []
                         : [];
                       const chosen =
                         overrides[keyOf(s)] || s.person_name || "";
