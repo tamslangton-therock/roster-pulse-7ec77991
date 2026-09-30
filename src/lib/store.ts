@@ -101,6 +101,16 @@ interface RosterState {
   assignSlot: (date: string, label: string, personName: string) => void;
   clearSlot: (date: string, label: string) => void;
 
+  // Live Roster column layout — add extra slots, whole serving areas, reorder
+  addSlotToArea: (area: string, role?: string) => void;
+  addServingArea: (area: string, roles: { role: string; count: number }[]) => void;
+  removeArea: (area: string) => void;
+  renameArea: (oldArea: string, newArea: string) => void;
+  renameSlotRole: (label: string, role: string) => void;
+  removeSlot: (label: string) => void;
+  moveArea: (area: string, dir: -1 | 1) => void;
+  moveSlot: (label: string, dir: -1 | 1) => void;
+
   // Blockouts (date block-outs / unavailability) — two-way with the Blockouts tab
   toggleBlockout: (personName: string, date: string, reason?: string) => void;
 
