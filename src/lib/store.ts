@@ -22,7 +22,6 @@ import {
   type AllowedClashRow,
   type SubTeamRow,
   type LifeGroupRow,
-  type TaskRow,
 } from "./sheets.functions";
 import {
   defaultDocTemplate,
@@ -51,7 +50,6 @@ interface RosterState {
   allowedClashes: AllowedClashRow[];
   subTeams: SubTeamRow[];
   lifeGroups: LifeGroupRow[];
-  tasks: TaskRow[];
   docTemplate: DocSection[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
@@ -115,11 +113,6 @@ interface RosterState {
   removeLifeGroup: (id: string) => void;
   addLifeGroupMember: (id: string, personName: string) => void;
   removeLifeGroupMember: (id: string, personName: string) => void;
-
-  // Tasks — two-way with the Tasks tab
-  addTask: (task: Partial<TaskRow> & { Title: string }) => string;
-  updateTask: (id: string, updates: Partial<TaskRow>) => void;
-  removeTask: (id: string) => void;
 
   // Sunday Docs template — two-way with the Doc_Template tab
   setDocTemplate: (sections: DocSection[]) => void;
@@ -378,38 +371,6 @@ function scheduleLifeGroupSync() {
   lifeGroupTimer = setTimeout(run, 800);
 }
 
-let taskTimer: ReturnType<typeof setTimeout> | null = null;
-let taskInFlight = false;
-
-function scheduleTaskSync() {
-  if (typeof window === "undefined") return;
-  useRoster.setState({ syncStatus: "syncing" });
-  if (taskTimer) clearTimeout(taskTimer);
-  const run = async () => {
-    if (taskTimer) clearTimeout(taskTimer);
-    if (taskInFlight) {
-      scheduleTaskSync();
-      return;
-    }
-    taskInFlight = true;
-    setPending("tasks", null);
-    try {
-      await writeTasks({ data: { rows: useRoster.getState().tasks } });
-      useRoster.setState({ syncStatus: "idle", error: null });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[tasks sync] failed", err);
-      useRoster.setState({ syncStatus: "error", error: msg });
-      setPending("tasks", run);
-      toast.error("Google Sheets sync failed for Tasks", { description: msg.slice(0, 200) });
-    } finally {
-      taskInFlight = false;
-    }
-  };
-  setPending("tasks", run);
-  taskTimer = setTimeout(run, 800);
-}
-
 let docTemplateTimer: ReturnType<typeof setTimeout> | null = null;
 let docTemplateInFlight = false;
 
@@ -515,7 +476,6 @@ export const useRoster = create<RosterState>()((set, get) => ({
   allowedClashes: [],
   subTeams: [],
   lifeGroups: [],
-  tasks: [],
   docTemplate: defaultDocTemplate(),
   statuses: {},
 
