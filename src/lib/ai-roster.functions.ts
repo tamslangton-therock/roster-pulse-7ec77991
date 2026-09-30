@@ -179,14 +179,19 @@ export const suggestRoster = createServerFn({ method: "POST" })
       mode: data.mode,
       slots: data.slots,
       volunteers: data.volunteers,
+      staffingTargets: data.targets,
+      subTeams: data.subTeams,
+      candidatePools: data.candidates,
+      provenRoles: data.provenRoles,
+      affinityGroups: data.affinity,
       blockouts: data.blockouts,
       allowedClashes: data.allowedClashes,
       existingAssignments: data.existing,
       recentHistory: data.recent,
       notes:
         data.mode === "fill_empty"
-          ? "Keep existingAssignments; only fill slots with no person."
-          : "Draft a full roster; you may reassign any slot. Treat existingAssignments as last month's pattern to learn from.",
+          ? "Keep existingAssignments; only fill slots with no person, up to each area's staffing target."
+          : "Draft a full roster; you may reassign any slot. Treat existingAssignments as the recent pattern to learn from — replicate sub-teams and affinity groups that worked.",
     };
 
     const response = await runIdFetch.fetch(
