@@ -206,7 +206,10 @@ function scheduleRosterSync() {
     rosterInFlight = true;
     setPending("live_roster", null);
     try {
-      await writeLiveRoster({ data: { rows: buildRosterRows(useRoster.getState()) } });
+      const state = useRoster.getState();
+      await writeLiveRoster({
+        data: { slots: state.slots, rows: buildRosterRows(state) },
+      });
       useRoster.setState({ syncStatus: "idle", error: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
