@@ -664,7 +664,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                 </RadioGroup>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {result && (
