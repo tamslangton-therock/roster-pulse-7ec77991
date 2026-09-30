@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { CalendarPlus, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
-import { ROSTER_AREAS, ROSTER_SLOTS } from "@/lib/roster-grid";
+import { areasOf } from "@/lib/roster-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -52,6 +52,7 @@ function TeamsPage() {
     subTeams,
     volunteers,
     dates,
+    slots,
     addSubTeam,
     removeSubTeam,
     renameSubTeam,
@@ -65,9 +66,10 @@ function TeamsPage() {
   const [newFor, setNewFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
+  const allAreas = useMemo(() => areasOf(slots), [slots]);
   const areas = useMemo(
-    () => (selectedArea === "all" ? ROSTER_AREAS : [selectedArea]),
-    [selectedArea],
+    () => (selectedArea === "all" ? allAreas : [selectedArea]),
+    [selectedArea, allAreas],
   );
 
   const byArea = useMemo(() => {
