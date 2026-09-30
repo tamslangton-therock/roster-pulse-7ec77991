@@ -535,14 +535,26 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
 
               {/* Areas + staffing targets */}
               <div>
-                <Label className="text-sm font-medium">Staffing needs</Label>
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Staffing needs — all {areas.length} serving areas
+                  </Label>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:underline"
+                    onClick={() => setTargetOverrides({})}
+                  >
+                    Reset sizes
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Leave all unticked to include every serving area. The number
-                  is how many people that area normally needs on a Sunday
-                  (learned from recent Sundays) — extra slots stay as backup
-                  and won't be force-filled.
+                  Every area is listed below. Leave all unticked to include them
+                  all, or tick only the ones you want drafted. The number is how
+                  many people that area normally needs on a Sunday (learned from
+                  recent Sundays) — extra slots stay as backup and won't be
+                  force-filled.
                 </p>
-                <div className="space-y-1.5">
+                <div className="grid gap-1.5 sm:grid-cols-2">
                   {areas.map((a) => {
                     const slotCount = slots.filter((s) => s.area === a).length;
                     const target =
