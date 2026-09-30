@@ -444,6 +444,77 @@ function computeDates(assignments: Assignment[]): string[] {
   return Array.from(new Set(assignments.map((a) => a.date))).sort();
 }
 
+/**
+ * Rebuild the slot layout from an ordered list of (area, role) pairs.
+ * Old slot objects are reused (by area+role, then in order) so renames and
+ * reorders can be mapped back onto existing assignments, statuses and
+ * sub-teams; removed slots drop their data.
+ */
+function relabelSlots(
+  oldSlots: SlotDef[],
+  pairs: Array<{ area: string; role: string }>,
+): { slots: SlotDef[]; labelMap: Map<string, string> } {
+  const groupSize = new Map<string, number>();
+  for (const p of pairs) {
+    const k = `${p.area}\u0000${p.role}`;
+    groupSize.set(k, (groupSize.get(k) ?? 0) + 1);
+  }
+  const labelMap = new Map<string, string>();
+  const used = new Set<SlotDef>();
+  const newSlots: SlotDef[] = [];
+  let col = 2; // column B
+  const seen = new Map<string, number>();
+  for (const p of pairs) {
+    const src =
+      oldSlots.find((s) => !used.has(s) && s.area === p.area && s.role === p.role) ??
+      oldSlots.find((s) => !used.has(s));
+    if (src) used.add(src);
+    const k = `${p.area}\u0000${p.role}`;
+    const occ = (seen.get(k) ?? 0) + 1;
+    seen.set(k, occ);
+    const size = groupSize.get(k) ?? 1;
+    const base = p.role ? `${p.area} — ${p.role}` : p.area;
+    const label = size > 1 ? `${base} ${occ}` : base;
+    if (src && src.label !== label) labelMap.set(src.label, label);
+    newSlots.push({
+      col: colLetter(col),
+      area: p.area,
+      role: p.role,
+      label,
+    });
+    col++;
+  }
+  return { slots: newSlots, labelMap };
+}
+
+/** Apply a new column layout, remapping assignments/statuses/sub-teams to it. */
+function applyLayout(
+  state: RosterState,
+  pairs: Array<{ area: string; role: string }>,
+): Partial<RosterState> {
+  const { slots, labelMap } = relabelSlots(state.slots, pairs);
+  const kept = new Set(slots.map((s) => s.label));
+  const dropped = new Set(
+    state.slots.filter((s) => !kept.has(s.label) && !labelMap.has(s.label)).map((s) => s.label),
+  );
+  const mapLabel = (l: string) => labelMap.get(l) ?? l;
+  const assignments = state.assignments
+    .filter((a) => !dropped.has(a.label))
+    .map((a) => ({ ...a, label: mapLabel(a.label) }));
+  const statuses: Record<string, AssignmentStatus> = {};
+  for (const [k, v] of Object.entries(state.statuses)) {
+    const idx = k.indexOf("::");
+    const date = k.slice(0, idx);
+    const label = k.slice(idx + 2);
+    if (dropped.has(label)) continue;
+    statuses[`${date}::${mapLabel(label)}`] = v;
+  }
+  const subTeams = state.subTeams
+    .filter((r) => !dropped.has(r.slot_label))
+    .map((r) => ({ ...r, slot_label: mapLabel(r.slot_label) }));
+  return { slots, assignments, statuses, subTeams };
+}
+
 function stripVolunteer(v: Volunteer): Record<string, unknown> {
   return {
     id: v.id,
