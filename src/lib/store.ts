@@ -435,6 +435,40 @@ function scheduleDocTemplateSync() {
   docTemplateTimer = setTimeout(run, 800);
 }
 
+let userAccessTimer: ReturnType<typeof setTimeout> | null = null;
+let userAccessInFlight = false;
+
+function scheduleUserAccessSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (userAccessTimer) clearTimeout(userAccessTimer);
+  const run = async () => {
+    if (userAccessTimer) clearTimeout(userAccessTimer);
+    if (userAccessInFlight) {
+      scheduleUserAccessSync();
+      return;
+    }
+    userAccessInFlight = true;
+    setPending("user_access", null);
+    try {
+      await writeUserAccess({ data: { rows: useRoster.getState().userAccess } });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[user-access sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      setPending("user_access", run);
+      toast.error("Google Sheets sync failed for User_Access", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      userAccessInFlight = false;
+    }
+  };
+  setPending("user_access", run);
+  userAccessTimer = setTimeout(run, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
