@@ -87,7 +87,7 @@ function PrintRosterPage() {
   };
 
   const slots = useMemo(() => {
-    const fixed = ROSTER_SLOTS.filter(
+    const fixed = layoutSlots.filter(
       (s) => s.area.toLowerCase() === area.toLowerCase(),
     );
     if (fixed.length) return fixed;
