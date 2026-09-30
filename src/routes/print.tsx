@@ -6,7 +6,6 @@ import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
 import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
 
-import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
 import { Button } from "@/components/ui/button";
 import {
