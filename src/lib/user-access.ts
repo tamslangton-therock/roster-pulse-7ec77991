@@ -32,19 +32,14 @@ export interface SessionUser {
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
-  const split = (s: string | undefined) =>
-    (s ?? "")
-      .split(/[|;]/)
-      .map((x) => x.trim())
-      .filter(Boolean);
   return {
     username: t.username ?? "",
     password: t.password ?? "",
     displayName: t.display_name ?? "",
-    rosterViewAreas: split(t.roster_view_areas),
-    rosterEditAreas: split(t.roster_edit_areas),
-    canViewHealth: (t.can_view_health ?? "").toUpperCase() === "TRUE",
-    teamEditAreas: split(t.team_edit_areas),
+    rosterViewAreas: t.roster_view_areas ?? [],
+    rosterEditAreas: t.roster_edit_areas ?? [],
+    canViewHealth: t.can_view_health === true,
+    teamEditAreas: t.team_edit_areas ?? [],
     individualsAccess:
       t.individuals_access === "edit" || t.individuals_access === "view"
         ? t.individuals_access
