@@ -25,6 +25,9 @@ import { toast } from "sonner";
 import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
 import { resolveSubTeamColor, PASTEL_SWATCHES } from "@/lib/person-colors";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAuth } from "@/lib/auth";
+import { canEditTeamsArea } from "@/lib/user-access";
+import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/teams")({
   head: () => ({
@@ -63,6 +66,10 @@ function TeamsPage() {
     applySubTeamToDate,
   } = useRoster();
 
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+  const canEditThisArea = (area: string) => canEditTeamsArea(isMaster, authUser, area);
+
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [newFor, setNewFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
@@ -89,6 +96,12 @@ function TeamsPage() {
     [byArea],
   );
 
+  if (!isMaster && (authUser?.teamEditAreas ?? []).length === 0) {
+    return (
+      <AccessNotice title="Team Builder is not switched on for your login" />
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -97,11 +110,16 @@ function TeamsPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {totalSubTeams} sub-teams across {allAreas.length} serving areas — saved to
             the <span className="font-medium">Sub_Teams</span> tab in Google Sheets.
+            {!isMaster && authUser && (
+              <>
+                {" "}You can edit: <span className="font-medium">{authUser.teamEditAreas.join(", ")}</span>.
+              </>
+            )}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <ManageColumnsDialog />
+          {isMaster && <ManageColumnsDialog />}
           <Select value={selectedArea} onValueChange={setSelectedArea}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Filter area" />
@@ -132,16 +150,18 @@ function TeamsPage() {
                     {names.length} sub-team{names.length === 1 ? "" : "s"}
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setNewFor(area);
-                    setNewName(`${area} Team ${names.length + 1}`);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Sub-team
-                </Button>
+                {canEditThisArea(area) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setNewFor(area);
+                      setNewName(`${area} Team ${names.length + 1}`);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Sub-team
+                  </Button>
+                )}
               </div>
 
               {names.length === 0 && (
@@ -186,6 +206,7 @@ function TeamsPage() {
                       { description: `${n} slot${n === 1 ? "" : "s"} filled — override any slot on the Live Roster.` },
                     );
                   }}
+                  readOnly={!canEditThisArea(area)}
                 />
               ))}
             </section>
