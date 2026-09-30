@@ -477,8 +477,8 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
           AI Roster
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl h-[88vh] max-h-[88vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="shrink-0">
           <DialogTitle>AI Auto-Roster</DialogTitle>
           <DialogDescription>
             Pick service dates and staffing scope, then review the AI's
@@ -488,7 +488,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
         </DialogHeader>
 
         {!result && (
-          <ScrollArea className="max-h-[55vh] pr-3">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-1">
             <div className="space-y-5 py-1">
               {/* Dates */}
               <div>
