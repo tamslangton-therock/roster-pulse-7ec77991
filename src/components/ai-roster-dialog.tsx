@@ -622,7 +622,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
               {/* Optional notes */}
               <div>
                 <Label className="text-sm font-medium" htmlFor="ai-notes">
-                  Notes for the AI (optional)
+                  Notes for the AI (optional) — covers every area
                 </Label>
                 <Input
                   id="ai-notes"
