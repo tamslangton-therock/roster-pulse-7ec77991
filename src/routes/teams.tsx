@@ -431,39 +431,47 @@ function SubTeamCard({
             <div className="w-36 shrink-0 text-xs text-muted-foreground truncate" title={s.label}>
               {s.role || s.label}
             </div>
-            <LazyPersonSelect
-              value={personFor(s.label)}
-              candidates={candidates}
-              onChange={(v) => onSetSlot(s.label, v)}
-            />
+            {readOnly ? (
+              <div className="h-8 flex-1 flex items-center rounded-md border bg-muted/30 px-3 text-sm">
+                {personFor(s.label) || <span className="text-muted-foreground">Empty</span>}
+              </div>
+            ) : (
+              <LazyPersonSelect
+                value={personFor(s.label)}
+                candidates={candidates}
+                onChange={(v) => onSetSlot(s.label, v)}
+              />
+            )}
           </div>
         ))}
       </div>
 
 
-      <div className="flex items-center gap-2 pt-1">
-        <Select value={applyDate} onValueChange={setApplyDate}>
-          <SelectTrigger className="h-8 flex-1 text-sm">
-            <SelectValue placeholder="Apply to Sunday…" />
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {upcoming.map((d) => (
-              <SelectItem key={d} value={d}>
-                {format(parseISO(d), "EEE d MMM yyyy")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          disabled={!applyDate}
-          onClick={() => {
-            if (applyDate) onApply(applyDate);
-          }}
-        >
-          <CalendarPlus className="h-4 w-4 mr-1" /> Apply
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex items-center gap-2 pt-1">
+          <Select value={applyDate} onValueChange={setApplyDate}>
+            <SelectTrigger className="h-8 flex-1 text-sm">
+              <SelectValue placeholder="Apply to Sunday…" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {upcoming.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {format(parseISO(d), "EEE d MMM yyyy")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            disabled={!applyDate}
+            onClick={() => {
+              if (applyDate) onApply(applyDate);
+            }}
+          >
+            <CalendarPlus className="h-4 w-4 mr-1" /> Apply
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
