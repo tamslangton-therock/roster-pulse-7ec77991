@@ -668,7 +668,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
         )}
 
         {result && (
-          <ScrollArea className="max-h-[55vh] pr-3">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-1">
             <div className="space-y-4 py-1">
               {result.summary && (
                 <p className="text-sm text-muted-foreground">{result.summary}</p>
