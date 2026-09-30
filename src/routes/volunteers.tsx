@@ -28,6 +28,9 @@ import {
 } from "@/components/volunteer-form";
 import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
+import { useAuth } from "@/lib/auth";
+import { canEditIndividuals, canViewIndividuals } from "@/lib/user-access";
+import { AccessNotice } from "@/components/access-notice";
 
 
 export const Route = createFileRoute("/volunteers")({
@@ -111,6 +114,13 @@ function VolunteersPage() {
     toast.success("Volunteer updated");
   };
 
+
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+  const canEditPeople = canEditIndividuals(isMaster, authUser);
+  if (!canViewIndividuals(isMaster, authUser)) {
+    return <AccessNotice title="Individuals is not switched on for your login" />;
+  }
 
   return (
     <div className="p-6 space-y-6">
