@@ -842,7 +842,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
     scheduleRosterSync();
   },
   assignSlot: (date, label, personName) => {
-    const slot = ROSTER_SLOTS.find((s) => s.label === label);
+    const slot = get().slots.find((s) => s.label === label);
     if (!slot) return;
     set((state) => {
       const id = `${date}::${label}`;
@@ -925,7 +925,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         (r) => r.serving_area === area && r.sub_team_name === name,
       );
       if (exists) return {};
-      const slots = ROSTER_SLOTS.filter((s) => s.area === area);
+      const slots = state.slots.filter((s) => s.area === area);
       return {
         subTeams: [
           ...state.subTeams,
