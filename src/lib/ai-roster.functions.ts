@@ -25,6 +25,28 @@ const inputSchema = z.object({
   slots: z.array(
     z.object({ label: z.string(), area: z.string(), role: z.string() }),
   ),
+  /** Per-area target headcount for a normal Sunday (extra slots are optional). */
+  targets: z.array(z.object({ area: z.string(), target: z.number() })),
+  /** Ideal team compositions configured in Team Builder. */
+  subTeams: z.array(
+    z.object({
+      area: z.string(),
+      name: z.string(),
+      members: z.array(z.object({ slot_label: z.string(), person_name: z.string() })),
+    }),
+  ),
+  /** Verified candidate pool per slot label — the model may only pick from these. */
+  candidates: z.array(
+    z.object({ slot_label: z.string(), people: z.array(z.string()) }),
+  ),
+  /** Which exact slots each person has actually served recently. */
+  provenRoles: z.array(
+    z.object({ name: z.string(), slots: z.array(z.string()) }),
+  ),
+  /** Groups that regularly served together in the same area on the same Sunday. */
+  affinity: z.array(
+    z.object({ area: z.string(), people: z.array(z.string()), times: z.number() }),
+  ),
   blockouts: z.array(
     z.object({ person_name: z.string(), date: z.string(), reason: z.string() }),
   ),
@@ -42,6 +64,7 @@ const inputSchema = z.object({
     }),
   ),
 });
+
 
 export type AiRosterInput = z.infer<typeof inputSchema>;
 
