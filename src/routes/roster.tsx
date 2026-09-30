@@ -27,6 +27,7 @@ import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
 import { resolveSubTeamColor } from "@/lib/person-colors";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
+import { AiRosterDialog } from "@/components/ai-roster-dialog";
 import {
   assignmentsByCell,
   detectClashes,
@@ -608,7 +609,12 @@ function LiveRosterPage() {
           </Button>
 
           {/* Manage columns / serving teams */}
-          {!isShareView && <ManageColumnsDialog />}
+          {!isShareView && (
+            <>
+              <AiRosterDialog disabled={isShareView} />
+              <ManageColumnsDialog />
+            </>
+          )}
 
           {/* Add Sunday */}
           {!isShareView && (
