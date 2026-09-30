@@ -563,7 +563,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                     return (
                       <div
                         key={a}
-                        className="flex items-center gap-2 rounded-md border px-2.5 py-1.5"
+                        className="flex items-center gap-2 rounded-md border px-2 py-1.5"
                       >
                         <Checkbox
                           checked={selectedAreas.has(a)}
@@ -576,15 +576,17 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                             })
                           }
                         />
-                        <span className="flex-1 text-sm">{a}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm" title={a}>
+                          {a}
+                        </span>
                         <span className="text-[11px] text-muted-foreground">
-                          {capped} of {slotCount} slot{slotCount === 1 ? "" : "s"}
+                          {capped}/{slotCount}
                         </span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 shrink-0"
                           onClick={() =>
                             setTargetOverrides((prev) => ({
                               ...prev,
@@ -601,7 +603,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 shrink-0"
                           onClick={() =>
                             setTargetOverrides((prev) => ({
                               ...prev,
