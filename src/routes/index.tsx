@@ -10,6 +10,12 @@ import {
   Users,
 } from "lucide-react";
 import { useRoster } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import {
+  canEditTeamsArea,
+  canViewHealth,
+  canViewIndividuals,
+} from "@/lib/user-access";
 
 export const Route = createFileRoute("/")({
   head: () => ({
