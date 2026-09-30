@@ -154,7 +154,7 @@ function TeamsPage() {
                   key={`${area}::${name}`}
                   area={area}
                   name={name}
-                  slots={slots}
+                  slots={areaSlots}
                   rows={subTeams.filter(
                     (r) => r.serving_area === area && r.sub_team_name === name,
                   )}
