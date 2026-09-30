@@ -610,6 +610,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   subTeams: [],
   lifeGroups: [],
   docTemplate: defaultDocTemplate(),
+  userAccess: [],
   statuses: {},
 
 
@@ -636,6 +637,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         subTeams,
         lifeGroups,
         docRows,
+        userAccess,
       ] =
         await Promise.all([
           fetchAllTabs(),
@@ -646,6 +648,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
           fetchSubTeams().catch(() => [] as SubTeamRow[]),
           fetchLifeGroups().catch(() => [] as LifeGroupRow[]),
           fetchDocTemplate().catch(() => []),
+          fetchUserAccess().catch(() => [] as UserAccessTabValues[]),
         ]);
 
       const docSections = docRows.length ? rowsToSections(docRows) : defaultDocTemplate();
@@ -709,6 +712,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         subTeams,
         lifeGroups,
         docTemplate: docSections,
+        userAccess,
         statuses,
         rosterMeta,
         dates,
