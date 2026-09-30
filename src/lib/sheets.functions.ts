@@ -17,6 +17,9 @@ import {
   SUB_TEAMS_SCHEMA,
   LIFE_GROUPS_TAB,
   LIFE_GROUPS_SCHEMA,
+  USER_ACCESS_TAB,
+  USER_ACCESS_SCHEMA,
+  type UserAccessTabValues,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
 
@@ -892,6 +895,101 @@ export const writeDocTemplate = createServerFn({ method: "POST" })
     ];
     await gwFetch(
       `/spreadsheets/${SPREADSHEET_ID}/values/${DOC_TEMPLATE_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: data.rows.length };
+  });
+
+// ---------- User_Access ----------
+
+async function ensureUserAccessTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [USER_ACCESS_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: { title: USER_ACCESS_TAB, gridProperties: { frozenRowCount: 1 } },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [USER_ACCESS_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
+  async (): Promise<UserAccessTabValues[]> => {
+    await ensureUserAccessTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:H2000`,
+      );
+    } catch {
+      return [];
+    }
+    const rows = (data.values ?? []) as string[][];
+    const out: UserAccessTabValues[] = [];
+    for (const r of rows.slice(1)) {
+      const username = String(r[0] ?? "").trim();
+      if (!username) continue;
+      const toList = (s: string) =>
+        String(s ?? "").split(/\s*[|,;]\s*/).map((x) => x.trim()).filter(Boolean);
+      const toBool = (s: string) => /^(true|1|yes|y)$/i.test(String(s ?? "").trim());
+      out.push({
+        username,
+        password: String(r[1] ?? "").trim(),
+        display_name: String(r[2] ?? "").trim(),
+        roster_view_areas: toList(String(r[3] ?? "")),
+        roster_edit_areas: toList(String(r[4] ?? "")),
+        can_view_health: toBool(String(r[5] ?? "")),
+        team_edit_areas: toList(String(r[6] ?? "")),
+        individuals_access: String(r[7] ?? "").trim() || "none",
+      });
+    }
+    return out;
+  },
+);
+
+export const writeUserAccess = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: UserAccessTabValues[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureUserAccessTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:H2000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = [
+      USER_ACCESS_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.username ?? "",
+        r.password ?? "",
+        r.display_name ?? "",
+        (r.roster_view_areas ?? []).join(" | "),
+        (r.roster_edit_areas ?? []).join(" | "),
+        r.can_view_health ? "TRUE" : "FALSE",
+        (r.team_edit_areas ?? []).join(" | "),
+        r.individuals_access ?? "none",
+      ]),
+    ];
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1?valueInputOption=RAW`,
       { method: "PUT", body: JSON.stringify({ values }) },
     );
     return { ok: true, count: data.rows.length };

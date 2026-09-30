@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useRoster } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { AccessNotice } from "@/components/access-notice";
 import {
   SECTION_COLUMNS,
   SECTION_TYPE_LABELS,
@@ -43,7 +45,7 @@ export const Route = createFileRoute("/docs")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: DocsTemplatePage,
+  component: MasterOnlyDocs,
 });
 
 const TYPES: DocSectionType[] = ["roles", "steps", "checklist", "tasks", "note"];
@@ -318,4 +320,12 @@ function SectionItems({
       </Button>
     </div>
   );
+}
+
+function MasterOnlyDocs() {
+  const isMaster = useAuth((s) => s.master);
+  if (!isMaster) {
+    return <AccessNotice title="Doc Templates are admin-only" />;
+  }
+  return <DocsTemplatePage />;
 }

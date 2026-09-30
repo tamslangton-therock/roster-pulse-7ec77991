@@ -67,6 +67,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { canEditSlotLabel, canViewArea } from "@/lib/user-access";
 
 // Zod schema for URL search parameters
 const rosterSearchSchema = z.object({
@@ -120,6 +122,12 @@ function LiveRosterPage() {
   const selectedTeam = search.team || "all";
   const filterMonth = search.month || "all";
   const isShareView = search.view === "share";
+
+  // Signed-in session — team leaders can only edit their own serving areas.
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+  const canEditSlot = (label: string) =>
+    !isShareView && canEditSlotLabel(isMaster, authUser, label, slots);
 
   // Local UI State
   const [showClashesOnly, setShowClashesOnly] = useState(false);
@@ -254,11 +262,13 @@ function LiveRosterPage() {
   // active, narrow to that team's areas.
   const slots = useRoster((s) => s.slots);
   const columns = useMemo(() => {
-    const all = slots.map((s) => ({ area: s.area, label: s.label }));
+    const all = slots
+      .filter((s) => canViewArea(isMaster, authUser, s.area))
+      .map((s) => ({ area: s.area, label: s.label }));
     if (selectedTeam === "all") return all;
     const areas = new Set(filteredAssignments.map((a) => a.area));
     return all.filter((c) => areas.has(c.area));
-  }, [slots, filteredAssignments, selectedTeam]);
+  }, [slots, filteredAssignments, selectedTeam, isMaster, authUser]);
 
   const months = useMemo(() => {
     const s = new Set<string>();
@@ -608,16 +618,16 @@ function LiveRosterPage() {
             Share Link
           </Button>
 
-          {/* Manage columns / serving teams */}
-          {!isShareView && (
+          {/* Manage columns / serving teams — layout changes are admin-only */}
+          {!isShareView && isMaster && (
             <>
               <AiRosterDialog disabled={isShareView} />
               <ManageColumnsDialog />
             </>
           )}
 
-          {/* Add Sunday */}
-          {!isShareView && (
+          {/* Add Sunday — admin-only */}
+          {!isShareView && isMaster && (
             <Button variant="outline" size="sm" onClick={() => setAddDateOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Date
@@ -827,6 +837,7 @@ function LiveRosterPage() {
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
+                                    canEdit={canEditSlot(a.label)}
                                     subTeam={subTeamMap.get(
                                       `${a.label}||${a.person_name.trim().toLowerCase()}`
                                     )}
@@ -868,7 +879,7 @@ function LiveRosterPage() {
                                   />
                                 );
                               })}
-                              {list.length === 0 && !isShareView && (
+                              {list.length === 0 && canEditSlot(c.label) && (
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -995,7 +1006,7 @@ function LiveRosterPage() {
             target={partnerTarget}
             onClose={() => setPartnerTarget(null)}
           />
-          <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
+          <ClashDialog detail={clashDetail} canOverride={isMaster} onClose={() => setClashDetail(null)} />
           <BlackoutManagementDialog
             volunteer={selectedVolunteerForBlackouts}
             blackouts={
@@ -1075,6 +1086,7 @@ function StatusCellBadge({
   isDoubleBookedOnDate,
   isBlackoutOnDate,
   isShareView,
+  canEdit = false,
   subTeam,
   missingPartners = [],
   onSelectPartner,
@@ -1093,6 +1105,7 @@ function StatusCellBadge({
   isDoubleBookedOnDate: boolean;
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
+  canEdit?: boolean;
   subTeam?: { name: string; color: { bg: string; border: string; text: string } };
   missingPartners?: string[];
   onSelectPartner?: () => void;
@@ -1160,12 +1173,13 @@ function StatusCellBadge({
     >
       <button
         type="button"
-        disabled={isShareView}
+        disabled={isShareView || (!canEdit && !isClash && !isBlackoutOnDate)}
         onClick={() => {
           if (isShareView) return;
           if ((isClash && !overridden) || isBlackoutOnDate) {
             onSelectClash();
           } else {
+            if (!canEdit) return;
             onSelectSwap();
           }
         }}
@@ -1207,8 +1221,8 @@ function StatusCellBadge({
         </span>
       </button>
 
-      {/* Action buttons on badge */}
-      {!isShareView && (
+      {/* Action buttons on badge — editing only */}
+      {!isShareView && canEdit && (
         <div className="flex items-center gap-0.5 print:hidden">
           {missingPartners.length > 0 && (
             <button
@@ -1479,6 +1493,7 @@ function SwapDialog({
 
 function ClashDialog({
   detail,
+  canOverride = false,
   onClose,
 }: {
   detail: {
@@ -1487,6 +1502,7 @@ function ClashDialog({
     items: Assignment[];
     isBlackout?: boolean;
   } | null;
+  canOverride?: boolean;
   onClose: () => void;
 }) {
   const { assignments, setOverride, removeAssignment } = useRoster();
@@ -1543,6 +1559,7 @@ function ClashDialog({
                   <Button
                     variant="ghost"
                     size="sm"
+                    disabled={!canOverride}
                     onClick={() => removeAssignment(a.id)}
                   >
                     Remove
@@ -1550,15 +1567,17 @@ function ClashDialog({
                 </div>
               ))}
             </div>
-            <label className="flex items-center gap-2 pt-2 text-sm">
-              <Checkbox
-                checked={allOverride}
-                onCheckedChange={(v) => {
-                  live.forEach((a) => setOverride(a.id, !!v));
-                }}
-              />
-              Allow as exception (approved assignment)
-            </label>
+            {canOverride && (
+              <label className="flex items-center gap-2 pt-2 text-sm">
+                <Checkbox
+                  checked={allOverride}
+                  onCheckedChange={(v) => {
+                    live.forEach((a) => setOverride(a.id, !!v));
+                  }}
+                />
+                Allow as exception (approved assignment)
+              </label>
+            )}
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close

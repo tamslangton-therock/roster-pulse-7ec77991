@@ -28,6 +28,9 @@ import {
 } from "@/components/volunteer-form";
 import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
+import { useAuth } from "@/lib/auth";
+import { canEditIndividuals, canViewIndividuals } from "@/lib/user-access";
+import { AccessNotice } from "@/components/access-notice";
 
 
 export const Route = createFileRoute("/volunteers")({
@@ -112,6 +115,13 @@ function VolunteersPage() {
   };
 
 
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+  const canEditPeople = canEditIndividuals(isMaster, authUser);
+  if (!canViewIndividuals(isMaster, authUser)) {
+    return <AccessNotice title="Individuals is not switched on for your login" />;
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -165,9 +175,11 @@ function VolunteersPage() {
             </SelectContent>
           </Select>
 
-          <Button onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Add individual
-          </Button>
+          {canEditPeople && (
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Add individual
+            </Button>
+          )}
         </div>
       </div>
 
@@ -203,47 +215,51 @@ function VolunteersPage() {
                         className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
                       >
                         {area}
-                        <button
-                          className="text-muted-foreground hover:text-foreground"
-                          onClick={() =>
-                            updateVolunteer(v.id, {
-                              serving_areas: v.serving_areas.filter(
-                                (a) => a !== area
-                              ),
-                            })
-                          }
-                          title={`Remove ${area}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                        {canEditPeople && (
+                          <button
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() =>
+                              updateVolunteer(v.id, {
+                                serving_areas: v.serving_areas.filter(
+                                  (a) => a !== area
+                                ),
+                              })
+                            }
+                            title={`Remove ${area}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>
                 </td>
                 <td className="px-4 py-3">{v.max_serving_per_month} serves</td>
                 <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => startEditing(v)}
-                      className="h-8 gap-1.5 px-2.5"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                      <span>Edit</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        removeVolunteer(v.id);
-                        toast.info(`Removed ${v.full_name}`);
-                      }}
-                      className="h-8 w-8 text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {canEditPeople ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startEditing(v)}
+                        className="h-8 gap-1.5 px-2.5"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          removeVolunteer(v.id);
+                          toast.info(`Removed ${v.full_name}`);
+                        }}
+                        className="h-8 w-8 text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
             ))}

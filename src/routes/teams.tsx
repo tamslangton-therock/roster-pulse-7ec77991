@@ -25,6 +25,9 @@ import { toast } from "sonner";
 import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
 import { resolveSubTeamColor, PASTEL_SWATCHES } from "@/lib/person-colors";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAuth } from "@/lib/auth";
+import { canEditTeamsArea } from "@/lib/user-access";
+import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/teams")({
   head: () => ({
@@ -63,6 +66,10 @@ function TeamsPage() {
     applySubTeamToDate,
   } = useRoster();
 
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+  const canEditThisArea = (area: string) => canEditTeamsArea(isMaster, authUser, area);
+
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [newFor, setNewFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
@@ -89,6 +96,12 @@ function TeamsPage() {
     [byArea],
   );
 
+  if (!isMaster && (authUser?.teamEditAreas ?? []).length === 0) {
+    return (
+      <AccessNotice title="Team Builder is not switched on for your login" />
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -97,11 +110,16 @@ function TeamsPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {totalSubTeams} sub-teams across {allAreas.length} serving areas — saved to
             the <span className="font-medium">Sub_Teams</span> tab in Google Sheets.
+            {!isMaster && authUser && (
+              <>
+                {" "}You can edit: <span className="font-medium">{authUser.teamEditAreas.join(", ")}</span>.
+              </>
+            )}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <ManageColumnsDialog />
+          {isMaster && <ManageColumnsDialog />}
           <Select value={selectedArea} onValueChange={setSelectedArea}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Filter area" />
@@ -132,16 +150,18 @@ function TeamsPage() {
                     {names.length} sub-team{names.length === 1 ? "" : "s"}
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setNewFor(area);
-                    setNewName(`${area} Team ${names.length + 1}`);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Sub-team
-                </Button>
+                {canEditThisArea(area) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setNewFor(area);
+                      setNewName(`${area} Team ${names.length + 1}`);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Sub-team
+                  </Button>
+                )}
               </div>
 
               {names.length === 0 && (
@@ -186,6 +206,7 @@ function TeamsPage() {
                       { description: `${n} slot${n === 1 ? "" : "s"} filled — override any slot on the Live Roster.` },
                     );
                   }}
+                  readOnly={!canEditThisArea(area)}
                 />
               ))}
             </section>
@@ -241,6 +262,7 @@ function SubTeamCard({
   onApply,
   colorId,
   onSetColor,
+  readOnly = false,
 
 }: {
   area: string;
@@ -255,6 +277,7 @@ function SubTeamCard({
   onApply: (date: string) => void;
   colorId?: string;
   onSetColor: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const color = resolveSubTeamColor(area, name, colorId);
   const [editing, setEditing] = useState(false);
@@ -319,42 +342,56 @@ function SubTeamCard({
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  title="Choose sub-team colour"
-                  className="h-4 w-4 rounded-full shrink-0 border border-black/10 hover:ring-2 hover:ring-offset-1 hover:ring-muted-foreground/30"
-                  style={{ backgroundColor: color.border }}
-                />
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-3" align="start">
-                <div className="text-xs font-medium mb-2">Sub-team colour</div>
-                <div className="grid grid-cols-6 gap-2">
-                  {PASTEL_SWATCHES.map((sw) => (
-                    <button
-                      key={sw.id}
-                      type="button"
-                      title={sw.label}
-                      onClick={() => onSetColor(sw.id)}
-                      className={`h-6 w-6 rounded-full border transition ${
-                        colorId === sw.id
-                          ? "ring-2 ring-offset-1 ring-foreground/50"
-                          : "hover:scale-110"
-                      }`}
-                      style={{ backgroundColor: sw.bg, borderColor: sw.border }}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="mt-3 text-xs text-muted-foreground underline"
-                  onClick={() => onSetColor("")}
-                >
-                  Reset to automatic
-                </button>
-              </PopoverContent>
-            </Popover>
+        {readOnly ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                tabIndex={-1}
+                title="Sub-team colour (edit is not enabled for your login)"
+                className="h-4 w-4 rounded-full shrink-0 border border-black/10 cursor-default"
+                style={{ backgroundColor: color.border }}
+              />
+            </PopoverTrigger>
+          </Popover>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                title="Choose sub-team colour"
+                className="h-4 w-4 rounded-full shrink-0 border border-black/10 hover:ring-2 hover:ring-offset-1 hover:ring-muted-foreground/30"
+                style={{ backgroundColor: color.border }}
+              />
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="start">
+              <div className="text-xs font-medium mb-2">Sub-team colour</div>
+              <div className="grid grid-cols-6 gap-2">
+                {PASTEL_SWATCHES.map((sw) => (
+                  <button
+                    key={sw.id}
+                    type="button"
+                    title={sw.label}
+                    onClick={() => onSetColor(sw.id)}
+                    className={`h-6 w-6 rounded-full border transition ${
+                      colorId === sw.id
+                        ? "ring-2 ring-offset-1 ring-foreground/50"
+                        : "hover:scale-110"
+                    }`}
+                    style={{ backgroundColor: sw.bg, borderColor: sw.border }}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                className="mt-3 text-xs text-muted-foreground underline"
+                onClick={() => onSetColor("")}
+              >
+                Reset to automatic
+              </button>
+            </PopoverContent>
+          </Popover>
+        )}
             <span
               className="rounded-md px-2 py-0.5 text-sm font-medium"
               style={{ backgroundColor: color.bg, color: color.text }}
@@ -364,7 +401,7 @@ function SubTeamCard({
           </div>
         )}
 
-        {!editing && (
+        {!editing && !readOnly && (
           <div className="flex items-center gap-1">
             <Button
               size="icon"
@@ -394,39 +431,47 @@ function SubTeamCard({
             <div className="w-36 shrink-0 text-xs text-muted-foreground truncate" title={s.label}>
               {s.role || s.label}
             </div>
-            <LazyPersonSelect
-              value={personFor(s.label)}
-              candidates={candidates}
-              onChange={(v) => onSetSlot(s.label, v)}
-            />
+            {readOnly ? (
+              <div className="h-8 flex-1 flex items-center rounded-md border bg-muted/30 px-3 text-sm">
+                {personFor(s.label) || <span className="text-muted-foreground">Empty</span>}
+              </div>
+            ) : (
+              <LazyPersonSelect
+                value={personFor(s.label)}
+                candidates={candidates}
+                onChange={(v) => onSetSlot(s.label, v)}
+              />
+            )}
           </div>
         ))}
       </div>
 
 
-      <div className="flex items-center gap-2 pt-1">
-        <Select value={applyDate} onValueChange={setApplyDate}>
-          <SelectTrigger className="h-8 flex-1 text-sm">
-            <SelectValue placeholder="Apply to Sunday…" />
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {upcoming.map((d) => (
-              <SelectItem key={d} value={d}>
-                {format(parseISO(d), "EEE d MMM yyyy")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          disabled={!applyDate}
-          onClick={() => {
-            if (applyDate) onApply(applyDate);
-          }}
-        >
-          <CalendarPlus className="h-4 w-4 mr-1" /> Apply
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex items-center gap-2 pt-1">
+          <Select value={applyDate} onValueChange={setApplyDate}>
+            <SelectTrigger className="h-8 flex-1 text-sm">
+              <SelectValue placeholder="Apply to Sunday…" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {upcoming.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {format(parseISO(d), "EEE d MMM yyyy")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            disabled={!applyDate}
+            onClick={() => {
+              if (applyDate) onApply(applyDate);
+            }}
+          >
+            <CalendarPlus className="h-4 w-4 mr-1" /> Apply
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

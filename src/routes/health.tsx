@@ -34,6 +34,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Activity, AlertTriangle, Pause, TrendingDown, Users } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { canViewHealth } from "@/lib/user-access";
+import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/health")({
   head: () => ({
@@ -117,7 +120,12 @@ function NumberField({
 }
 
 function HealthPage() {
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
   const { volunteers, assignments } = useRoster();
+  if (!canViewHealth(isMaster, authUser)) {
+    return <AccessNotice title="Team Health is not switched on for your login" />;
+  }
   const [statusFilter, setStatusFilter] = useState<FatigueStatus | "all">("all");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);

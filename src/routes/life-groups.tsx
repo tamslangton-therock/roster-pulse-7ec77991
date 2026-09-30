@@ -33,6 +33,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { teamColor } from "@/lib/person-colors";
+import { useAuth } from "@/lib/auth";
+import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/life-groups")({
   head: () => ({
@@ -53,7 +55,7 @@ export const Route = createFileRoute("/life-groups")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: LifeGroupsPage,
+  component: MasterOnlyLifeGroups,
 });
 
 const DAYS = [
@@ -448,4 +450,12 @@ function LeaderPicker({
       </PopoverContent>
     </Popover>
   );
+}
+
+function MasterOnlyLifeGroups() {
+  const isMaster = useAuth((s) => s.master);
+  if (!isMaster) {
+    return <AccessNotice title="Life Groups is admin-only" />;
+  }
+  return <LifeGroupsPage />;
 }
