@@ -24,11 +24,13 @@ import {
 } from "./sheets-config";
 
 import {
-  ROSTER_SLOTS,
-  DETAIL_COL,
+  FIRST_SLOT_COL,
   FIRST_DATA_ROW,
+  colLetter,
   headerRows,
+  slotsFromHeaders,
   clashFormula,
+  type SlotDef,
 } from "./roster-grid";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
