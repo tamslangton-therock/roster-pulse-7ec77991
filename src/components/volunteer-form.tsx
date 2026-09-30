@@ -144,7 +144,8 @@ export function VolunteerForm({
     set("serving_areas", [...draft.serving_areas, a]);
   };
 
-  const availableAreas = ROSTER_AREAS.filter(
+  const allAreas = areasOf(useRoster((s) => s.slots));
+  const availableAreas = allAreas.filter(
     (a) => !draft.serving_areas.includes(a)
   );
 
@@ -219,11 +220,11 @@ export function VolunteerForm({
             <SelectTrigger>
               <SelectValue placeholder="Choose area" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No priority</SelectItem>
-              {Array.from(
-                new Set([...ROSTER_AREAS, ...draft.serving_areas])
-              ).map((a) => (
+              <SelectContent>
+                <SelectItem value="none">No priority</SelectItem>
+                {Array.from(
+                  new Set([...allAreas, ...draft.serving_areas])
+                ).map((a) => (
                 <SelectItem key={a} value={a}>
                   {a}
                 </SelectItem>
