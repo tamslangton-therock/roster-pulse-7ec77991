@@ -93,6 +93,8 @@ function HomeMenu() {
 
   const allowedTiles = tiles.filter((tile) => {
     switch (tile.to) {
+      case "/roster":
+        return true;
       case "/volunteers":
         return canViewIndividuals(isMaster, authUser);
       case "/health":
@@ -129,7 +131,7 @@ function HomeMenu() {
       </header>
 
       <nav className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {tiles.map((tile) => (
+        {allowedTiles.map((tile) => (
           <Link
             key={tile.to}
             to={tile.to}
