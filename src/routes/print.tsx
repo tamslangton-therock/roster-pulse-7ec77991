@@ -6,7 +6,6 @@ import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
 import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
 
-import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,14 +49,15 @@ function PrintRosterPage() {
   const search = Route.useSearch();
   const { assignments, dates, loading, error } = useRoster();
   const docTemplate = useRoster((s) => s.docTemplate);
+  const layoutSlots = useRoster((s) => s.slots);
 
   const [isExporting, setIsExporting] = useState(false);
 
   const areas = useMemo(() => {
-    const set = new Set<string>(ROSTER_SLOTS.map((s) => s.area));
+    const set = new Set<string>(layoutSlots.map((s) => s.area));
     for (const a of assignments) if (a.area) set.add(a.area);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [assignments]);
+  }, [assignments, layoutSlots]);
 
   const area = String(search.area || "") || areas[0] || "";
 
@@ -86,7 +86,7 @@ function PrintRosterPage() {
   };
 
   const slots = useMemo(() => {
-    const fixed = ROSTER_SLOTS.filter(
+    const fixed = layoutSlots.filter(
       (s) => s.area.toLowerCase() === area.toLowerCase(),
     );
     if (fixed.length) return fixed;
@@ -196,7 +196,7 @@ function PrintRosterPage() {
 
   const docRoleRows = useMemo(() => {
     const byRole = new Map<string, string[]>();
-    for (const slot of ROSTER_SLOTS) {
+    for (const slot of layoutSlots) {
       if (!activeDocAreas.includes(slot.area)) continue;
       const person = assignments.find(
         (a) => a.date === activeDocDate && a.label === slot.label,
@@ -210,7 +210,7 @@ function PrintRosterPage() {
       role,
       names: names.join(", "),
     }));
-  }, [assignments, activeDocAreas, activeDocDate]);
+  }, [assignments, activeDocAreas, activeDocDate, layoutSlots]);
 
   const hostNames = useMemo(
     () =>

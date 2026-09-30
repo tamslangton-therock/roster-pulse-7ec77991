@@ -29,7 +29,12 @@ import {
   sectionsToRows,
   type DocSection,
 } from "./doc-template";
-import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
+import {
+  ROSTER_SLOTS,
+  defaultSundayWindow,
+  colLetter,
+  type SlotDef,
+} from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
 
@@ -53,6 +58,8 @@ interface RosterState {
   docTemplate: DocSection[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
+  /** Current column layout of the Live_Roster grid (areas × roles), synced two-way. */
+  slots: SlotDef[];
 
 
   ready: boolean;
@@ -92,6 +99,16 @@ interface RosterState {
   removeRosterDate: (date: string) => void;
   assignSlot: (date: string, label: string, personName: string) => void;
   clearSlot: (date: string, label: string) => void;
+
+  // Live Roster column layout — add extra slots, whole serving areas, reorder
+  addSlotToArea: (area: string, role?: string) => void;
+  addServingArea: (area: string, roles: { role: string; count: number }[]) => void;
+  removeArea: (area: string) => void;
+  renameArea: (oldArea: string, newArea: string) => void;
+  renameSlotRole: (label: string, role: string) => void;
+  removeSlot: (label: string) => void;
+  moveArea: (area: string, dir: -1 | 1) => void;
+  moveSlot: (label: string, dir: -1 | 1) => void;
 
   // Blockouts (date block-outs / unavailability) — two-way with the Blockouts tab
   toggleBlockout: (personName: string, date: string, reason?: string) => void;
@@ -188,7 +205,10 @@ function scheduleRosterSync() {
     rosterInFlight = true;
     setPending("live_roster", null);
     try {
-      await writeLiveRoster({ data: { rows: buildRosterRows(useRoster.getState()) } });
+      const state = useRoster.getState();
+      await writeLiveRoster({
+        data: { slots: state.slots, rows: buildRosterRows(state) },
+      });
       useRoster.setState({ syncStatus: "idle", error: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -423,6 +443,77 @@ function computeDates(assignments: Assignment[]): string[] {
   return Array.from(new Set(assignments.map((a) => a.date))).sort();
 }
 
+/**
+ * Rebuild the slot layout from an ordered list of (area, role) pairs.
+ * Old slot objects are reused (by area+role, then in order) so renames and
+ * reorders can be mapped back onto existing assignments, statuses and
+ * sub-teams; removed slots drop their data.
+ */
+function relabelSlots(
+  oldSlots: SlotDef[],
+  pairs: Array<{ area: string; role: string }>,
+): { slots: SlotDef[]; labelMap: Map<string, string> } {
+  const groupSize = new Map<string, number>();
+  for (const p of pairs) {
+    const k = `${p.area}\u0000${p.role}`;
+    groupSize.set(k, (groupSize.get(k) ?? 0) + 1);
+  }
+  const labelMap = new Map<string, string>();
+  const used = new Set<SlotDef>();
+  const newSlots: SlotDef[] = [];
+  let col = 2; // column B
+  const seen = new Map<string, number>();
+  for (const p of pairs) {
+    const src =
+      oldSlots.find((s) => !used.has(s) && s.area === p.area && s.role === p.role) ??
+      oldSlots.find((s) => !used.has(s));
+    if (src) used.add(src);
+    const k = `${p.area}\u0000${p.role}`;
+    const occ = (seen.get(k) ?? 0) + 1;
+    seen.set(k, occ);
+    const size = groupSize.get(k) ?? 1;
+    const base = p.role ? `${p.area} — ${p.role}` : p.area;
+    const label = size > 1 ? `${base} ${occ}` : base;
+    if (src && src.label !== label) labelMap.set(src.label, label);
+    newSlots.push({
+      col: colLetter(col),
+      area: p.area,
+      role: p.role,
+      label,
+    });
+    col++;
+  }
+  return { slots: newSlots, labelMap };
+}
+
+/** Apply a new column layout, remapping assignments/statuses/sub-teams to it. */
+function applyLayout(
+  state: RosterState,
+  pairs: Array<{ area: string; role: string }>,
+): Partial<RosterState> {
+  const { slots, labelMap } = relabelSlots(state.slots, pairs);
+  const kept = new Set(slots.map((s) => s.label));
+  const dropped = new Set(
+    state.slots.filter((s) => !kept.has(s.label) && !labelMap.has(s.label)).map((s) => s.label),
+  );
+  const mapLabel = (l: string) => labelMap.get(l) ?? l;
+  const assignments = state.assignments
+    .filter((a) => !dropped.has(a.label))
+    .map((a) => ({ ...a, label: mapLabel(a.label) }));
+  const statuses: Record<string, AssignmentStatus> = {};
+  for (const [k, v] of Object.entries(state.statuses)) {
+    const idx = k.indexOf("::");
+    const date = k.slice(0, idx);
+    const label = k.slice(idx + 2);
+    if (dropped.has(label)) continue;
+    statuses[`${date}::${mapLabel(label)}`] = v;
+  }
+  const subTeams = state.subTeams
+    .filter((r) => !dropped.has(r.slot_label))
+    .map((r) => ({ ...r, slot_label: mapLabel(r.slot_label) }));
+  return { slots, assignments, statuses, subTeams };
+}
+
 function stripVolunteer(v: Volunteer): Record<string, unknown> {
   return {
     id: v.id,
@@ -488,6 +579,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
 
   dates: [],
   rosterMeta: {},
+  slots: ROSTER_SLOTS,
 
   hydrate: async () => {
     if (get().ready || get().loading) return;
@@ -495,7 +587,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
     try {
       const [
         data,
-        gridRows,
+        liveGrid,
         blockouts,
         statusRows,
         allowedClashes,
@@ -505,7 +597,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
       ] =
         await Promise.all([
           fetchAllTabs(),
-          fetchLiveRoster(),
+          fetchLiveRoster().catch(() => ({ slots: [], rows: [] as LiveRosterRow[] })),
           fetchBlockouts().catch(() => [] as BlockoutRow[]),
           fetchStatuses().catch(() => [] as StatusRow[]),
           fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
@@ -530,7 +622,11 @@ export const useRoster = create<RosterState>()((set, get) => ({
         id: t.id || `team-${Math.random().toString(36).slice(2, 10)}`,
       }));
 
-      const slotByLabel = new Map(ROSTER_SLOTS.map((s) => [s.label, s]));
+      // The Live_Roster header rows are the source of truth for the column
+      // layout, so teams added/renamed directly in Google Sheets flow in here.
+      const gridRows = liveGrid.rows;
+      const slots: SlotDef[] = liveGrid.slots?.length ? liveGrid.slots : ROSTER_SLOTS;
+      const slotByLabel = new Map(slots.map((s) => [s.label, s]));
       const assignments: Assignment[] = [];
       const rosterMeta: RosterState["rosterMeta"] = {};
       for (const row of gridRows) {
@@ -574,6 +670,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         statuses,
         rosterMeta,
         dates,
+        slots,
         ready: true,
         loading: false,
       });
@@ -743,7 +840,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
     scheduleRosterSync();
   },
   assignSlot: (date, label, personName) => {
-    const slot = ROSTER_SLOTS.find((s) => s.label === label);
+    const slot = get().slots.find((s) => s.label === label);
     if (!slot) return;
     set((state) => {
       const id = `${date}::${label}`;
@@ -783,6 +880,127 @@ export const useRoster = create<RosterState>()((set, get) => ({
       ),
     }));
     scheduleRosterSync();
+  },
+
+  // --- LIVE ROSTER COLUMN LAYOUT ---
+  addSlotToArea: (area, role) => {
+    let changed = false;
+    set((state) => {
+      const areaSlots = state.slots.filter((s) => s.area === area);
+      const useRole = role !== undefined ? role : areaSlots[areaSlots.length - 1]?.role ?? "";
+      const pairs = state.slots.map((s) => ({ area: s.area, role: s.role }));
+      let lastIdx = -1;
+      pairs.forEach((p, i) => {
+        if (p.area === area) lastIdx = i;
+      });
+      pairs.splice(lastIdx + 1, 0, { area, role: useRole });
+      changed = true;
+      return applyLayout(state, pairs);
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  addServingArea: (area, roles) => {
+    let changed = false;
+    set((state) => {
+      if (state.slots.some((s) => s.area.toLowerCase() === area.toLowerCase())) return {};
+      const pairs = state.slots.map((s) => ({ area: s.area, role: s.role }));
+      for (const r of roles) {
+        for (let i = 0; i < Math.max(1, r.count); i++) pairs.push({ area, role: r.role });
+      }
+      changed = true;
+      return applyLayout(state, pairs);
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  removeArea: (area) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.area === area)) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.filter((s) => s.area !== area).map((s) => ({ area: s.area, role: s.role })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  renameArea: (oldArea, newArea) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.area === oldArea) || !newArea.trim()) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.map((s) => ({
+          area: s.area === oldArea ? newArea.trim() : s.area,
+          role: s.role,
+        })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  renameSlotRole: (label, role) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.label === label)) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.map((s) => (s.label === label ? { area: s.area, role } : { area: s.area, role: s.role })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  removeSlot: (label) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.label === label)) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.filter((s) => s.label !== label).map((s) => ({ area: s.area, role: s.role })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  moveArea: (area, dir) => {
+    let changed = false;
+    set((state) => {
+      // Group contiguous slots into area blocks, then swap neighbouring blocks.
+      const blocks: Array<Array<{ area: string; role: string }>> = [];
+      for (const s of state.slots) {
+        const last = blocks[blocks.length - 1];
+        if (last && last[0].area === s.area) last.push({ area: s.area, role: s.role });
+        else blocks.push([{ area: s.area, role: s.role }]);
+      }
+      const idx = blocks.findIndex((b) => b[0].area === area);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= blocks.length) return {};
+      [blocks[idx], blocks[j]] = [blocks[j], blocks[idx]];
+      changed = true;
+      return applyLayout(state, blocks.flat());
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  moveSlot: (label, dir) => {
+    let changed = false;
+    set((state) => {
+      const idx = state.slots.findIndex((s) => s.label === label);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= state.slots.length) return {};
+      const pairs = state.slots.map((s) => ({ area: s.area, role: s.role }));
+      [pairs[idx], pairs[j]] = [pairs[j], pairs[idx]];
+      changed = true;
+      return applyLayout(state, pairs);
+    });
+    if (changed) scheduleRosterSync();
   },
 
   // --- BLOCKOUTS ---
@@ -826,7 +1044,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         (r) => r.serving_area === area && r.sub_team_name === name,
       );
       if (exists) return {};
-      const slots = ROSTER_SLOTS.filter((s) => s.area === area);
+      const slots = state.slots.filter((s) => s.area === area);
       return {
         subTeams: [
           ...state.subTeams,

@@ -24,9 +24,9 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
-import { ROSTER_SLOTS } from "@/lib/roster-grid";
 import { resolveSubTeamColor } from "@/lib/person-colors";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
+import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
 import {
   assignmentsByCell,
   detectClashes,
@@ -248,14 +248,16 @@ function LiveRosterPage() {
     return m;
   }, [clashes]);
 
-  // Fixed column set from the Live_Roster grid schema, so empty slots stay visible
-  // and can be filled. When a team filter is active, narrow to that team's areas.
+  // Column set from the live slot layout (store state, synced with the sheet),
+  // so empty slots stay visible and can be filled. When a team filter is
+  // active, narrow to that team's areas.
+  const slots = useRoster((s) => s.slots);
   const columns = useMemo(() => {
-    const all = ROSTER_SLOTS.map((s) => ({ area: s.area, label: s.label }));
+    const all = slots.map((s) => ({ area: s.area, label: s.label }));
     if (selectedTeam === "all") return all;
     const areas = new Set(filteredAssignments.map((a) => a.area));
     return all.filter((c) => areas.has(c.area));
-  }, [filteredAssignments, selectedTeam]);
+  }, [slots, filteredAssignments, selectedTeam]);
 
   const months = useMemo(() => {
     const s = new Set<string>();
@@ -604,6 +606,9 @@ function LiveRosterPage() {
             <Share2 className="h-4 w-4 mr-1.5" />
             Share Link
           </Button>
+
+          {/* Manage columns / serving teams */}
+          {!isShareView && <ManageColumnsDialog />}
 
           {/* Add Sunday */}
           {!isShareView && (
@@ -1671,6 +1676,7 @@ function PartnerAlignDialog({
   const blockouts = useRoster((s) => s.blockouts);
   const assignSlot = useRoster((s) => s.assignSlot);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+  const slotsForPartner = useRoster((s) => s.slots);
 
   const suggestions = useMemo(() => {
     if (!target) return [];
@@ -1683,13 +1689,13 @@ function PartnerAlignDialog({
           .map((b) => b.date)
       );
       return suggestSlotsForPartner(p, target.date, {
-        slots: ROSTER_SLOTS,
+        slots: slotsForPartner,
         assignments,
         volunteers,
         blockoutDates: dates,
       });
     });
-  }, [target, assignments, volunteers, blockouts]);
+  }, [target, assignments, volunteers, blockouts, slotsForPartner]);
 
   return (
     <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>

@@ -21,7 +21,9 @@ import {
   type DocSection,
   type DocSectionType,
 } from "@/lib/doc-template";
-import { ROSTER_SLOTS } from "@/lib/roster-grid";
+import { areasOf } from "@/lib/roster-grid";
+
+
 
 export const Route = createFileRoute("/docs")({
   head: () => ({
@@ -51,14 +53,15 @@ function DocsTemplatePage() {
   const setDocTemplate = useRoster((s) => s.setDocTemplate);
   const resetDocTemplate = useRoster((s) => s.resetDocTemplate);
   const loading = useRoster((s) => s.loading);
+  const layoutSlots = useRoster((s) => s.slots);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const roleKeys = useMemo(
     () =>
       Array.from(
-        new Set(ROSTER_SLOTS.map((s) => (s.role ? `${s.area} — ${s.role}` : s.area))),
+        new Set(layoutSlots.map((s) => (s.role ? `${s.area} — ${s.role}` : s.area))),
       ).sort((a, b) => a.localeCompare(b)),
-    [],
+    [layoutSlots],
   );
 
   const update = (sections: DocSection[]) => setDocTemplate(sections);

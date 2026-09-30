@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { CalendarPlus, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
-import { ROSTER_AREAS, ROSTER_SLOTS } from "@/lib/roster-grid";
+import { areasOf } from "@/lib/roster-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
 import { resolveSubTeamColor, PASTEL_SWATCHES } from "@/lib/person-colors";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -52,6 +53,7 @@ function TeamsPage() {
     subTeams,
     volunteers,
     dates,
+    slots,
     addSubTeam,
     removeSubTeam,
     renameSubTeam,
@@ -65,9 +67,10 @@ function TeamsPage() {
   const [newFor, setNewFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
+  const allAreas = useMemo(() => areasOf(slots), [slots]);
   const areas = useMemo(
-    () => (selectedArea === "all" ? ROSTER_AREAS : [selectedArea]),
-    [selectedArea],
+    () => (selectedArea === "all" ? allAreas : [selectedArea]),
+    [selectedArea, allAreas],
   );
 
   const byArea = useMemo(() => {
@@ -92,29 +95,32 @@ function TeamsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Team Builder</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {totalSubTeams} sub-teams across {ROSTER_AREAS.length} serving areas — saved to
+            {totalSubTeams} sub-teams across {allAreas.length} serving areas — saved to
             the <span className="font-medium">Sub_Teams</span> tab in Google Sheets.
           </p>
         </div>
 
-        <Select value={selectedArea} onValueChange={setSelectedArea}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter area" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All serving areas</SelectItem>
-            {ROSTER_AREAS.map((a) => (
-              <SelectItem key={a} value={a}>
-                {a}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <ManageColumnsDialog />
+          <Select value={selectedArea} onValueChange={setSelectedArea}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter area" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All serving areas</SelectItem>
+              {allAreas.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {areas.map((area) => {
-          const slots = ROSTER_SLOTS.filter((s) => s.area === area);
+          const areaSlots = slots.filter((s) => s.area === area);
           const names = byArea.get(area) ?? [];
           return (
             <section key={area} className="rounded-xl border bg-card p-4 shadow-sm space-y-4">
@@ -122,7 +128,7 @@ function TeamsPage() {
                 <div>
                   <div className="font-semibold">{area}</div>
                   <div className="text-xs text-muted-foreground">
-                    {slots.length} slot{slots.length === 1 ? "" : "s"} ·{" "}
+                    {areaSlots.length} slot{areaSlots.length === 1 ? "" : "s"} ·{" "}
                     {names.length} sub-team{names.length === 1 ? "" : "s"}
                   </div>
                 </div>
@@ -149,7 +155,7 @@ function TeamsPage() {
                   key={`${area}::${name}`}
                   area={area}
                   name={name}
-                  slots={slots}
+                  slots={areaSlots}
                   rows={subTeams.filter(
                     (r) => r.serving_area === area && r.sub_team_name === name,
                   )}
