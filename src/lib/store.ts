@@ -59,6 +59,8 @@ interface RosterState {
   docTemplate: DocSection[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
+  /** Current column layout of the Live_Roster grid (areas × roles), synced two-way. */
+  slots: SlotDef[];
 
 
   ready: boolean;
