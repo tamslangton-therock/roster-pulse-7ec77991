@@ -50,14 +50,15 @@ function PrintRosterPage() {
   const search = Route.useSearch();
   const { assignments, dates, loading, error } = useRoster();
   const docTemplate = useRoster((s) => s.docTemplate);
+  const layoutSlots = useRoster((s) => s.slots);
 
   const [isExporting, setIsExporting] = useState(false);
 
   const areas = useMemo(() => {
-    const set = new Set<string>(ROSTER_SLOTS.map((s) => s.area));
+    const set = new Set<string>(layoutSlots.map((s) => s.area));
     for (const a of assignments) if (a.area) set.add(a.area);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [assignments]);
+  }, [assignments, layoutSlots]);
 
   const area = String(search.area || "") || areas[0] || "";
 

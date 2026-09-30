@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
 import { resolveSubTeamColor, PASTEL_SWATCHES } from "@/lib/person-colors";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
