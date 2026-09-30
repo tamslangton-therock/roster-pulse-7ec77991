@@ -24,7 +24,7 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import { useRoster, findVolunteer, type AssignmentStatus } from "@/lib/store";
-import { ROSTER_SLOTS } from "@/lib/roster-grid";
+import { colLetter } from "@/lib/roster-grid";
 import { resolveSubTeamColor } from "@/lib/person-colors";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
