@@ -501,7 +501,6 @@ export const useRoster = create<RosterState>()((set, get) => ({
         allowedClashes,
         subTeams,
         lifeGroups,
-        tasks,
         docRows,
       ] =
         await Promise.all([
@@ -512,7 +511,6 @@ export const useRoster = create<RosterState>()((set, get) => ({
           fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
           fetchSubTeams().catch(() => [] as SubTeamRow[]),
           fetchLifeGroups().catch(() => [] as LifeGroupRow[]),
-          fetchTasks().catch(() => [] as TaskRow[]),
           fetchDocTemplate().catch(() => []),
         ]);
 
@@ -572,7 +570,6 @@ export const useRoster = create<RosterState>()((set, get) => ({
         allowedClashes,
         subTeams,
         lifeGroups,
-        tasks,
         docTemplate: docSections,
         statuses,
         rosterMeta,
@@ -918,52 +915,6 @@ export const useRoster = create<RosterState>()((set, get) => ({
   },
 
   // --- LIFE GROUPS ---
-  addTask: (task) => {
-    const id = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    set((state) => ({
-      tasks: [
-        ...state.tasks,
-        {
-          TaskID: id,
-          Title: task.Title,
-          Notes: task.Notes ?? "",
-          Category: task.Category ?? "",
-          AssignedTo: task.AssignedTo ?? "",
-          Status: task.Status ?? "todo",
-          DueDate: task.DueDate ?? "",
-          RemindAt: task.RemindAt ?? "",
-          CreatedAt: new Date().toISOString(),
-          CompletedAt: "",
-        },
-      ],
-    }));
-    scheduleTaskSync();
-    return id;
-  },
-  updateTask: (id, updates) => {
-    set((state) => ({
-      tasks: state.tasks.map((t) =>
-        t.TaskID === id
-          ? {
-              ...t,
-              ...updates,
-              CompletedAt:
-                updates.Status === "done"
-                  ? t.CompletedAt || new Date().toISOString()
-                  : updates.Status
-                    ? ""
-                    : t.CompletedAt,
-            }
-          : t,
-      ),
-    }));
-    scheduleTaskSync();
-  },
-  removeTask: (id) => {
-    set((state) => ({ tasks: state.tasks.filter((t) => t.TaskID !== id) }));
-    scheduleTaskSync();
-  },
-
   addLifeGroup: (name) => {
     const id = `lg-${Math.random().toString(36).slice(2, 10)}`;
     set((state) => ({
