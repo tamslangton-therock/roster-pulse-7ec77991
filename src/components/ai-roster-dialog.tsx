@@ -628,7 +628,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                   id="ai-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Prioritise the car park on 5 Oct, skip tea team this month"
+                  placeholder="e.g. Only 1 in Car Park on the 5th, extra kids helpers on the 26th, skip tea team that week"
                   className="mt-1.5"
                 />
               </div>
