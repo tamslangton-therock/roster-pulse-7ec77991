@@ -1086,6 +1086,7 @@ function StatusCellBadge({
   isDoubleBookedOnDate,
   isBlackoutOnDate,
   isShareView,
+  canEdit = false,
   subTeam,
   missingPartners = [],
   onSelectPartner,
@@ -1104,6 +1105,7 @@ function StatusCellBadge({
   isDoubleBookedOnDate: boolean;
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
+  canEdit?: boolean;
   subTeam?: { name: string; color: { bg: string; border: string; text: string } };
   missingPartners?: string[];
   onSelectPartner?: () => void;
@@ -1171,12 +1173,13 @@ function StatusCellBadge({
     >
       <button
         type="button"
-        disabled={isShareView}
+        disabled={isShareView || (!canEdit && !isClash && !isBlackoutOnDate)}
         onClick={() => {
           if (isShareView) return;
           if ((isClash && !overridden) || isBlackoutOnDate) {
             onSelectClash();
           } else {
+            if (!canEdit) return;
             onSelectSwap();
           }
         }}
@@ -1218,8 +1221,8 @@ function StatusCellBadge({
         </span>
       </button>
 
-      {/* Action buttons on badge */}
-      {!isShareView && (
+      {/* Action buttons on badge — editing only */}
+      {!isShareView && canEdit && (
         <div className="flex items-center gap-0.5 print:hidden">
           {missingPartners.length > 0 && (
             <button
@@ -1490,6 +1493,7 @@ function SwapDialog({
 
 function ClashDialog({
   detail,
+  canOverride = false,
   onClose,
 }: {
   detail: {
@@ -1498,6 +1502,7 @@ function ClashDialog({
     items: Assignment[];
     isBlackout?: boolean;
   } | null;
+  canOverride?: boolean;
   onClose: () => void;
 }) {
   const { assignments, setOverride, removeAssignment } = useRoster();
@@ -1554,6 +1559,7 @@ function ClashDialog({
                   <Button
                     variant="ghost"
                     size="sm"
+                    disabled={!canOverride}
                     onClick={() => removeAssignment(a.id)}
                   >
                     Remove
@@ -1561,15 +1567,17 @@ function ClashDialog({
                 </div>
               ))}
             </div>
-            <label className="flex items-center gap-2 pt-2 text-sm">
-              <Checkbox
-                checked={allOverride}
-                onCheckedChange={(v) => {
-                  live.forEach((a) => setOverride(a.id, !!v));
-                }}
-              />
-              Allow as exception (approved assignment)
-            </label>
+            {canOverride && (
+              <label className="flex items-center gap-2 pt-2 text-sm">
+                <Checkbox
+                  checked={allOverride}
+                  onCheckedChange={(v) => {
+                    live.forEach((a) => setOverride(a.id, !!v));
+                  }}
+                />
+                Allow as exception (approved assignment)
+              </label>
+            )}
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close
