@@ -29,7 +29,13 @@ import {
   sectionsToRows,
   type DocSection,
 } from "./doc-template";
-import { ROSTER_SLOTS, defaultSundayWindow } from "./roster-grid";
+import {
+  ROSTER_SLOTS,
+  defaultSundayWindow,
+  buildSlots,
+  areasOf,
+  type SlotDef,
+} from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
 import { toast } from "sonner";
 
