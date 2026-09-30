@@ -16,12 +16,15 @@ import {
   writeLifeGroups,
   fetchDocTemplate,
   writeDocTemplate,
+  fetchUserAccess,
+  writeUserAccess,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
   type AllowedClashRow,
   type SubTeamRow,
   type LifeGroupRow,
+  type UserAccessTabValues,
 } from "./sheets.functions";
 import {
   defaultDocTemplate,
@@ -56,6 +59,8 @@ interface RosterState {
   subTeams: SubTeamRow[];
   lifeGroups: LifeGroupRow[];
   docTemplate: DocSection[];
+  /** Team-leader logins + permissions — two-way with the User_Access tab. */
+  userAccess: UserAccessTabValues[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
   /** Current column layout of the Live_Roster grid (areas × roles), synced two-way. */
@@ -134,6 +139,9 @@ interface RosterState {
   // Sunday Docs template — two-way with the Doc_Template tab
   setDocTemplate: (sections: DocSection[]) => void;
   resetDocTemplate: () => void;
+
+  // User Access — two-way with the User_Access tab (admin only)
+  setUserAccess: (users: UserAccessTabValues[]) => void;
 }
 
 
