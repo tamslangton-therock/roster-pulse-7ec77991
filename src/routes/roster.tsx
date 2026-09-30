@@ -1677,6 +1677,7 @@ function PartnerAlignDialog({
   const blockouts = useRoster((s) => s.blockouts);
   const assignSlot = useRoster((s) => s.assignSlot);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+  const slotsForPartner = useRoster((s) => s.slots);
 
   const suggestions = useMemo(() => {
     if (!target) return [];
