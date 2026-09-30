@@ -634,23 +634,25 @@ function LiveRosterPage() {
             </Button>
           )}
 
-          {/* Team print / PDF */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate({
-                to: "/print",
-                search: {
-                  area: selectedTeam !== "all" ? selectedTeam : "",
-                  months: filterMonth !== "all" ? filterMonth : "",
-                },
-              })
-            }
-          >
-            <Printer className="h-4 w-4 mr-1.5" />
-            Print / PDF
-          </Button>
+          {/* Team print / PDF — master only (page is gated) */}
+          {isMaster && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigate({
+                  to: "/print",
+                  search: {
+                    area: selectedTeam !== "all" ? selectedTeam : "",
+                    months: filterMonth !== "all" ? filterMonth : "",
+                  },
+                })
+              }
+            >
+              <Printer className="h-4 w-4 mr-1.5" />
+              Print / PDF
+            </Button>
+          )}
         </div>
       </div>
 
