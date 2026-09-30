@@ -1178,6 +1178,12 @@ export const useRoster = create<RosterState>()((set, get) => ({
     scheduleDocTemplateSync();
   },
 
+  // --- USER ACCESS ---
+  setUserAccess: (users) => {
+    set({ userAccess: users });
+    scheduleUserAccessSync();
+  },
+
   // --- LIFE GROUPS ---
   addLifeGroup: (name) => {
     const id = `lg-${Math.random().toString(36).slice(2, 10)}`;
