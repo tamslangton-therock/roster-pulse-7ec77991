@@ -262,6 +262,7 @@ function SubTeamCard({
   onApply,
   colorId,
   onSetColor,
+  readOnly = false,
 
 }: {
   area: string;
@@ -276,6 +277,7 @@ function SubTeamCard({
   onApply: (date: string) => void;
   colorId?: string;
   onSetColor: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const color = resolveSubTeamColor(area, name, colorId);
   const [editing, setEditing] = useState(false);
@@ -340,42 +342,56 @@ function SubTeamCard({
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  title="Choose sub-team colour"
-                  className="h-4 w-4 rounded-full shrink-0 border border-black/10 hover:ring-2 hover:ring-offset-1 hover:ring-muted-foreground/30"
-                  style={{ backgroundColor: color.border }}
-                />
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-3" align="start">
-                <div className="text-xs font-medium mb-2">Sub-team colour</div>
-                <div className="grid grid-cols-6 gap-2">
-                  {PASTEL_SWATCHES.map((sw) => (
-                    <button
-                      key={sw.id}
-                      type="button"
-                      title={sw.label}
-                      onClick={() => onSetColor(sw.id)}
-                      className={`h-6 w-6 rounded-full border transition ${
-                        colorId === sw.id
-                          ? "ring-2 ring-offset-1 ring-foreground/50"
-                          : "hover:scale-110"
-                      }`}
-                      style={{ backgroundColor: sw.bg, borderColor: sw.border }}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="mt-3 text-xs text-muted-foreground underline"
-                  onClick={() => onSetColor("")}
-                >
-                  Reset to automatic
-                </button>
-              </PopoverContent>
-            </Popover>
+        {readOnly ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                tabIndex={-1}
+                title="Sub-team colour (edit is not enabled for your login)"
+                className="h-4 w-4 rounded-full shrink-0 border border-black/10 cursor-default"
+                style={{ backgroundColor: color.border }}
+              />
+            </PopoverTrigger>
+          </Popover>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                title="Choose sub-team colour"
+                className="h-4 w-4 rounded-full shrink-0 border border-black/10 hover:ring-2 hover:ring-offset-1 hover:ring-muted-foreground/30"
+                style={{ backgroundColor: color.border }}
+              />
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="start">
+              <div className="text-xs font-medium mb-2">Sub-team colour</div>
+              <div className="grid grid-cols-6 gap-2">
+                {PASTEL_SWATCHES.map((sw) => (
+                  <button
+                    key={sw.id}
+                    type="button"
+                    title={sw.label}
+                    onClick={() => onSetColor(sw.id)}
+                    className={`h-6 w-6 rounded-full border transition ${
+                      colorId === sw.id
+                        ? "ring-2 ring-offset-1 ring-foreground/50"
+                        : "hover:scale-110"
+                    }`}
+                    style={{ backgroundColor: sw.bg, borderColor: sw.border }}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                className="mt-3 text-xs text-muted-foreground underline"
+                onClick={() => onSetColor("")}
+              >
+                Reset to automatic
+              </button>
+            </PopoverContent>
+          </Popover>
+        )}
             <span
               className="rounded-md px-2 py-0.5 text-sm font-medium"
               style={{ backgroundColor: color.bg, color: color.text }}
@@ -385,7 +401,7 @@ function SubTeamCard({
           </div>
         )}
 
-        {!editing && (
+        {!editing && !readOnly && (
           <div className="flex items-center gap-1">
             <Button
               size="icon"
