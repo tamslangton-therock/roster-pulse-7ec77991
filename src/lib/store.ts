@@ -34,6 +34,7 @@ import {
   defaultSundayWindow,
   buildSlots,
   areasOf,
+  colLetter,
   type SlotDef,
 } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
