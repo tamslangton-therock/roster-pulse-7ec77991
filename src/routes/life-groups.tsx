@@ -451,3 +451,11 @@ function LeaderPicker({
     </Popover>
   );
 }
+
+function MasterOnlyLifeGroups() {
+  const isMaster = useAuth((s) => s.master);
+  if (!isMaster) {
+    return <AccessNotice title="Life Groups is admin-only" />;
+  }
+  return <LifeGroupsPage />;
+}

@@ -801,3 +801,11 @@ function PrintRosterPage() {
     </div>
   );
 }
+
+function MasterOnlyPrint() {
+  const isMaster = useAuth((s) => s.master);
+  if (!isMaster) {
+    return <AccessNotice title="Team Print is admin-only" />;
+  }
+  return <PrintRosterPage />;
+}

@@ -321,3 +321,11 @@ function SectionItems({
     </div>
   );
 }
+
+function MasterOnlyDocs() {
+  const isMaster = useAuth((s) => s.master);
+  if (!isMaster) {
+    return <AccessNotice title="Doc Templates are admin-only" />;
+  }
+  return <DocsTemplatePage />;
+}
