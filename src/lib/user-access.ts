@@ -2,6 +2,7 @@
 // every page that needs to check what the signed-in team leader may do.
 // A signed-in "master" (admin access code) bypasses every check.
 import type { SlotDef } from "./roster-grid";
+import type { UserAccessTabValues } from "./sheets-config";
 
 export type IndividualsAccess = "none" | "view" | "edit";
 
@@ -28,6 +29,27 @@ export interface SessionUser {
   canViewHealth: boolean;
   teamEditAreas: string[];
   individualsAccess: IndividualsAccess;
+}
+
+export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
+  const split = (s: string | undefined) =>
+    (s ?? "")
+      .split(/[|;]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  return {
+    username: t.username ?? "",
+    password: t.password ?? "",
+    displayName: t.display_name ?? "",
+    rosterViewAreas: split(t.roster_view_areas),
+    rosterEditAreas: split(t.roster_edit_areas),
+    canViewHealth: (t.can_view_health ?? "").toUpperCase() === "TRUE",
+    teamEditAreas: split(t.team_edit_areas),
+    individualsAccess:
+      t.individuals_access === "edit" || t.individuals_access === "view"
+        ? t.individuals_access
+        : "none",
+  };
 }
 
 export function toSessionUser(r: UserAccessRecord): SessionUser {
