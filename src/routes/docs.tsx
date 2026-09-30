@@ -13,15 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useRoster } from "@/lib/store";
-import {
-  SECTION_COLUMNS,
-  SECTION_TYPE_LABELS,
-  defaultDocTemplate,
-  uid,
-  type DocSection,
-  type DocSectionType,
-} from "@/lib/doc-template";
-import { ROSTER_SLOTS } from "@/lib/roster-grid";
+import { areasOf } from "@/lib/roster-grid";
+
 
 export const Route = createFileRoute("/docs")({
   head: () => ({
