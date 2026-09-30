@@ -245,15 +245,21 @@ export interface LiveRosterRow {
 }
 
 export const fetchLiveRoster = createServerFn({ method: "GET" }).handler(
-  async (): Promise<LiveRosterRow[]> => {
-    const range = `${LIVE_ROSTER_TAB}!A1:${DETAIL_COL}2000`;
+  async (): Promise<{ slots: SlotDef[]; rows: LiveRosterRow[] }> => {
+    // Read generously wide so columns added by the user in the sheet are seen.
+    const range = `${LIVE_ROSTER_TAB}!A1:BZ2000`;
     let data: { values?: string[][] };
     try {
       data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${range}`);
     } catch {
-      return [];
+      return { slots: [], rows: [] };
     }
     const rows = data.values ?? [];
+    const areaRow = rows[0] ?? [];
+    const roleRow = rows[1] ?? [];
+    const slots = slotsFromHeaders(areaRow, roleRow);
+    if (!slots) return { slots: [], rows: [] };
+
     const out: LiveRosterRow[] = [];
     for (let r = FIRST_DATA_ROW - 1; r < rows.length; r++) {
       const row = rows[r] ?? [];
@@ -261,7 +267,7 @@ export const fetchLiveRoster = createServerFn({ method: "GET" }).handler(
       const iso = normalizeDate(rawDate);
       if (!iso) continue;
       const cells: Record<string, string> = {};
-      ROSTER_SLOTS.forEach((slot, i) => {
+      slots.forEach((slot, i) => {
         const v = String(row[i + 1] ?? "").trim();
         if (v) cells[slot.label] = v;
       });
@@ -269,30 +275,32 @@ export const fetchLiveRoster = createServerFn({ method: "GET" }).handler(
         date: iso,
         label: rawDate.trim(),
         cells,
-        notes: String(row[ROSTER_SLOTS.length + 2] ?? "").trim(),
-        detail: String(row[ROSTER_SLOTS.length + 3] ?? "").trim(),
+        notes: String(row[slots.length + 2] ?? "").trim(),
+        detail: String(row[slots.length + 3] ?? "").trim(),
       });
     }
-    return out;
+    return { slots, rows: out };
   },
 );
 
 export const writeLiveRoster = createServerFn({ method: "POST" })
-  .inputValidator((data: { rows: LiveRosterRow[] }) => data)
+  .inputValidator((data: { slots: SlotDef[]; rows: LiveRosterRow[] }) => data)
   .handler(async ({ data }) => {
-    const { rows } = data;
+    const { rows, slots } = data;
     await ensureLiveRosterTab();
+    // Clear well past the current layout so removed columns leave no residue.
+    const wideEnd = colLetter(slots.length + 30);
     await gwFetch(
-      `/spreadsheets/${SPREADSHEET_ID}/values/${LIVE_ROSTER_TAB}!A1:${DETAIL_COL}2000:clear`,
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIVE_ROSTER_TAB}!A1:${wideEnd}2000:clear`,
       { method: "POST", body: "{}" },
     );
-    const values: string[][] = [...headerRows()];
+    const values: string[][] = [...headerRows(slots)];
     rows.forEach((row, i) => {
       const sheetRow = FIRST_DATA_ROW + i;
       values.push([
         `'${row.label || row.date}`,
-        ...ROSTER_SLOTS.map((s) => row.cells[s.label] ?? ""),
-        clashFormula(sheetRow),
+        ...slots.map((s) => row.cells[s.label] ?? ""),
+        clashFormula(sheetRow, slots.length, ALLOWED_CLASHES_TAB),
         row.notes ?? "",
         row.detail ?? "",
       ]);
