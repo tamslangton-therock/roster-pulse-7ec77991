@@ -837,6 +837,7 @@ function LiveRosterPage() {
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
+                                    canEdit={canEditSlot(a.label)}
                                     subTeam={subTeamMap.get(
                                       `${a.label}||${a.person_name.trim().toLowerCase()}`
                                     )}
@@ -1005,7 +1006,7 @@ function LiveRosterPage() {
             target={partnerTarget}
             onClose={() => setPartnerTarget(null)}
           />
-          <ClashDialog detail={clashDetail} onClose={() => setClashDetail(null)} />
+          <ClashDialog detail={clashDetail} canOverride={isMaster} onClose={() => setClashDetail(null)} />
           <BlackoutManagementDialog
             volunteer={selectedVolunteerForBlackouts}
             blackouts={
