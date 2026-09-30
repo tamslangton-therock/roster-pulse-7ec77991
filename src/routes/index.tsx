@@ -88,6 +88,21 @@ function HomeMenu() {
   const volunteers = useRoster((s) => s.volunteers);
   const dates = useRoster((s) => s.dates);
   const lifeGroups = useRoster((s) => s.lifeGroups);
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+
+  const allowedTiles = tiles.filter((tile) => {
+    switch (tile.to) {
+      case "/volunteers":
+        return canViewIndividuals(isMaster, authUser);
+      case "/health":
+        return canViewHealth(isMaster, authUser);
+      case "/teams":
+        return isMaster || (authUser?.teamEditAreas ?? []).length > 0;
+      default:
+        return isMaster;
+    }
+  });
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:py-14">
