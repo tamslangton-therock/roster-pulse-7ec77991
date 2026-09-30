@@ -107,6 +107,8 @@ function UserAccessPage() {
         can_view_health: false,
         team_edit_areas: [],
         individuals_access: "none",
+        can_view_roster: true,
+        can_view_life_groups: false,
       },
     ]);
     setAddOpen(false);
@@ -214,6 +216,26 @@ function UserAccessPage() {
                   id={`health-${u.username}`}
                   checked={u.can_view_health}
                   onCheckedChange={(v) => updateUser(u.username, { can_view_health: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+                <Label className="text-sm" htmlFor={`roster-${u.username}`}>
+                  View Live Roster
+                </Label>
+                <Switch
+                  id={`roster-${u.username}`}
+                  checked={u.can_view_roster !== false}
+                  onCheckedChange={(v) => updateUser(u.username, { can_view_roster: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+                <Label className="text-sm" htmlFor={`lg-${u.username}`}>
+                  Life Groups access
+                </Label>
+                <Switch
+                  id={`lg-${u.username}`}
+                  checked={u.can_view_life_groups === true}
+                  onCheckedChange={(v) => updateUser(u.username, { can_view_life_groups: v })}
                 />
               </div>
               <div className="flex items-center justify-between rounded-lg border px-3 py-2">

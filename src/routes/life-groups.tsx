@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { teamColor } from "@/lib/person-colors";
 import { useAuth } from "@/lib/auth";
+import { canViewLifeGroups } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/life-groups")({
@@ -55,7 +56,7 @@ export const Route = createFileRoute("/life-groups")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: MasterOnlyLifeGroups,
+  component: LifeGroupsAccessGate,
 });
 
 const DAYS = [
@@ -452,10 +453,11 @@ function LeaderPicker({
   );
 }
 
-function MasterOnlyLifeGroups() {
+function LifeGroupsAccessGate() {
   const isMaster = useAuth((s) => s.master);
-  if (!isMaster) {
-    return <AccessNotice title="Life Groups is admin-only" />;
+  const user = useAuth((s) => s.user);
+  if (!canViewLifeGroups(isMaster, user)) {
+    return <AccessNotice title="Life Groups is not switched on for your login" />;
   }
   return <LifeGroupsPage />;
 }

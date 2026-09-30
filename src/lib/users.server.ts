@@ -38,7 +38,11 @@ const toList = (s: string) =>
     .split(/\s*[|,;]\s*/)
     .map((x) => x.trim())
     .filter(Boolean);
-const toBool = (s: string) => /^(true|1|yes|y)$/i.test(String(s ?? "").trim());
+const toBool = (s: string, fallback = false) => {
+  const v = String(s ?? "").trim();
+  if (!v) return fallback;
+  return /^(true|1|yes|y)$/i.test(v);
+};
 
 /**
  * Reads every user row from the User_Access tab. Returns [] when the tab
@@ -47,7 +51,7 @@ const toBool = (s: string) => /^(true|1|yes|y)$/i.test(String(s ?? "").trim());
 export async function readUserAccessRows(): Promise<UserAccessTabValues[]> {
   let data: { values?: string[][] };
   try {
-    data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:H2000`);
+    data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:J2000`);
   } catch {
     return [];
   }
@@ -55,19 +59,25 @@ export async function readUserAccessRows(): Promise<UserAccessTabValues[]> {
   if (rows.length < 2) return [];
   const header = rows[0].map((h) => String(h).trim().toLowerCase());
   const idx = (name: string) => header.indexOf(name.toLowerCase());
+  const cell = (r: string[], name: string) => {
+    const i = idx(name);
+    return i < 0 ? "" : String(r[i] ?? "");
+  };
   const out: UserAccessTabValues[] = [];
   for (const r of rows.slice(1)) {
-    const username = String(r[idx("username")] ?? "").trim();
+    const username = cell(r, "username").trim();
     if (!username) continue;
     out.push({
       username,
-      password: String(r[idx("password")] ?? "").trim(),
-      display_name: String(r[idx("display_name")] ?? "").trim(),
-      roster_view_areas: toList(String(r[idx("roster_view_areas")] ?? "")),
-      roster_edit_areas: toList(String(r[idx("roster_edit_areas")] ?? "")),
-      can_view_health: toBool(String(r[idx("can_view_health")] ?? "")),
-      team_edit_areas: toList(String(r[idx("team_edit_areas")] ?? "")),
-      individuals_access: String(r[idx("individuals_access")] ?? "").trim(),
+      password: cell(r, "password").trim(),
+      display_name: cell(r, "display_name").trim(),
+      roster_view_areas: toList(cell(r, "roster_view_areas")),
+      roster_edit_areas: toList(cell(r, "roster_edit_areas")),
+      can_view_health: toBool(cell(r, "can_view_health")),
+      team_edit_areas: toList(cell(r, "team_edit_areas")),
+      individuals_access: cell(r, "individuals_access").trim(),
+      can_view_roster: toBool(cell(r, "can_view_roster"), true),
+      can_view_life_groups: toBool(cell(r, "can_view_life_groups")),
     });
   }
   return out;

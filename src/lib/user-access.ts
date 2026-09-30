@@ -18,6 +18,8 @@ export interface UserAccessRecord {
   /** Serving areas this user may edit in Team Builder. Empty = no editing. */
   teamEditAreas: string[];
   individualsAccess: IndividualsAccess;
+  canViewRoster: boolean;
+  canViewLifeGroups: boolean;
 }
 
 /** What the login flow stores in the session — never includes the password. */
@@ -29,6 +31,8 @@ export interface SessionUser {
   canViewHealth: boolean;
   teamEditAreas: string[];
   individualsAccess: IndividualsAccess;
+  canViewRoster: boolean;
+  canViewLifeGroups: boolean;
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
@@ -44,6 +48,8 @@ export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
       t.individuals_access === "edit" || t.individuals_access === "view"
         ? t.individuals_access
         : "none",
+    canViewRoster: t.can_view_roster !== false,
+    canViewLifeGroups: t.can_view_life_groups === true,
   };
 }
 
@@ -56,6 +62,8 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
     canViewHealth: r.canViewHealth,
     teamEditAreas: r.teamEditAreas,
     individualsAccess: r.individualsAccess,
+    canViewRoster: r.canViewRoster,
+    canViewLifeGroups: r.canViewLifeGroups,
   };
 }
 
@@ -96,6 +104,16 @@ export function canEditTeamsArea(isMaster: boolean, user: SessionUser | null, ar
   if (isMaster) return true;
   if (!user) return false;
   return inScope(user.teamEditAreas, area);
+}
+
+/** Whether the Live Roster page is open to this login at all. */
+export function canViewRosterPage(isMaster: boolean, user: SessionUser | null): boolean {
+  return isMaster || (!!user && user.canViewRoster);
+}
+
+/** Whether the Life Groups page is open to this login at all. */
+export function canViewLifeGroups(isMaster: boolean, user: SessionUser | null): boolean {
+  return isMaster || (!!user && user.canViewLifeGroups);
 }
 
 export function canViewHealth(isMaster: boolean, user: SessionUser | null): boolean {
