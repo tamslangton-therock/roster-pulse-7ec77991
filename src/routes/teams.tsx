@@ -127,7 +127,7 @@ function TeamsPage() {
                 <div>
                   <div className="font-semibold">{area}</div>
                   <div className="text-xs text-muted-foreground">
-                    {slots.length} slot{slots.length === 1 ? "" : "s"} ·{" "}
+                    {areaSlots.length} slot{areaSlots.length === 1 ? "" : "s"} ·{" "}
                     {names.length} sub-team{names.length === 1 ? "" : "s"}
                   </div>
                 </div>
@@ -388,7 +388,7 @@ function SubTeamCard({
       </div>
 
       <div className="space-y-2">
-        {slots.map((s) => (
+        {areaSlots.map((s) => (
           <div key={s.label} className="flex items-center gap-2">
             <div className="w-36 shrink-0 text-xs text-muted-foreground truncate" title={s.label}>
               {s.role || s.label}
