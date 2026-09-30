@@ -600,6 +600,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         statuses,
         rosterMeta,
         dates,
+        slots,
         ready: true,
         loading: false,
       });
