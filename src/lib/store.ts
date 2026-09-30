@@ -509,6 +509,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
 
   dates: [],
   rosterMeta: {},
+  slots: ROSTER_SLOTS,
 
   hydrate: async () => {
     if (get().ready || get().loading) return;
@@ -516,7 +517,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
     try {
       const [
         data,
-        gridRows,
+        liveGrid,
         blockouts,
         statusRows,
         allowedClashes,
@@ -526,7 +527,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
       ] =
         await Promise.all([
           fetchAllTabs(),
-          fetchLiveRoster(),
+          fetchLiveRoster().catch(() => ({ slots: [], rows: [] as LiveRosterRow[] })),
           fetchBlockouts().catch(() => [] as BlockoutRow[]),
           fetchStatuses().catch(() => [] as StatusRow[]),
           fetchAllowedClashes().catch(() => [] as AllowedClashRow[]),
@@ -551,7 +552,11 @@ export const useRoster = create<RosterState>()((set, get) => ({
         id: t.id || `team-${Math.random().toString(36).slice(2, 10)}`,
       }));
 
-      const slotByLabel = new Map(ROSTER_SLOTS.map((s) => [s.label, s]));
+      // The Live_Roster header rows are the source of truth for the column
+      // layout, so teams added/renamed directly in Google Sheets flow in here.
+      const gridRows = liveGrid.rows;
+      const slots: SlotDef[] = liveGrid.slots?.length ? liveGrid.slots : ROSTER_SLOTS;
+      const slotByLabel = new Map(slots.map((s) => [s.label, s]));
       const assignments: Assignment[] = [];
       const rosterMeta: RosterState["rosterMeta"] = {};
       for (const row of gridRows) {
