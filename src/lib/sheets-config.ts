@@ -126,3 +126,29 @@ export const DOC_TEMPLATE_SCHEMA = [
   "col_b",
   "col_c",
 ] as const;
+
+// Team-leader logins and their permissions. One row per user; area scopes are
+// pipe-separated serving-area names (empty roster_view_areas = all areas).
+export const USER_ACCESS_TAB = "User_Access";
+export const USER_ACCESS_SCHEMA = [
+  "username",
+  "password",
+  "display_name",
+  "roster_view_areas",
+  "roster_edit_areas",
+  "can_view_health",
+  "team_edit_areas",
+  "individuals_access",
+] as const;
+
+/** Row shape as stored in the sheet (raw strings). */
+export interface UserAccessTabValues {
+  username: string;
+  password: string;
+  display_name: string;
+  roster_view_areas: string[];
+  roster_edit_areas: string[];
+  can_view_health: boolean;
+  team_edit_areas: string[];
+  individuals_access: string;
+}
