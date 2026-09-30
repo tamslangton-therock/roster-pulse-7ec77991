@@ -197,7 +197,7 @@ function PrintRosterPage() {
 
   const docRoleRows = useMemo(() => {
     const byRole = new Map<string, string[]>();
-    for (const slot of ROSTER_SLOTS) {
+    for (const slot of layoutSlots) {
       if (!activeDocAreas.includes(slot.area)) continue;
       const person = assignments.find(
         (a) => a.date === activeDocDate && a.label === slot.label,
@@ -211,7 +211,7 @@ function PrintRosterPage() {
       role,
       names: names.join(", "),
     }));
-  }, [assignments, activeDocAreas, activeDocDate]);
+  }, [assignments, activeDocAreas, activeDocDate, layoutSlots]);
 
   const hostNames = useMemo(
     () =>
