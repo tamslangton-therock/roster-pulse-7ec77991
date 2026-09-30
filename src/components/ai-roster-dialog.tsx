@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRoster } from "@/lib/store";
 import {
   suggestRoster,
@@ -477,8 +476,8 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
           AI Roster
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl h-[88vh] max-h-[88vh] flex flex-col overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="shrink-0">
           <DialogTitle>AI Auto-Roster</DialogTitle>
           <DialogDescription>
             Pick service dates and staffing scope, then review the AI's
@@ -488,7 +487,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
         </DialogHeader>
 
         {!result && (
-          <ScrollArea className="max-h-[55vh] pr-3">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-1">
             <div className="space-y-5 py-1">
               {/* Dates */}
               <div>
@@ -535,14 +534,26 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
 
               {/* Areas + staffing targets */}
               <div>
-                <Label className="text-sm font-medium">Staffing needs</Label>
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Staffing needs — all {areas.length} serving areas
+                  </Label>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:underline"
+                    onClick={() => setTargetOverrides({})}
+                  >
+                    Reset sizes
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Leave all unticked to include every serving area. The number
-                  is how many people that area normally needs on a Sunday
-                  (learned from recent Sundays) — extra slots stay as backup
-                  and won't be force-filled.
+                  Every area is listed below. Leave all unticked to include them
+                  all, or tick only the ones you want drafted. The number is how
+                  many people that area normally needs on a Sunday (learned from
+                  recent Sundays) — extra slots stay as backup and won't be
+                  force-filled.
                 </p>
-                <div className="space-y-1.5">
+                <div className="grid gap-1.5 sm:grid-cols-2">
                   {areas.map((a) => {
                     const slotCount = slots.filter((s) => s.area === a).length;
                     const target =
@@ -551,7 +562,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                     return (
                       <div
                         key={a}
-                        className="flex items-center gap-2 rounded-md border px-2.5 py-1.5"
+                        className="flex items-center gap-2 rounded-md border px-2 py-1.5"
                       >
                         <Checkbox
                           checked={selectedAreas.has(a)}
@@ -564,15 +575,17 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                             })
                           }
                         />
-                        <span className="flex-1 text-sm">{a}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm" title={a}>
+                          {a}
+                        </span>
                         <span className="text-[11px] text-muted-foreground">
-                          {capped} of {slotCount} slot{slotCount === 1 ? "" : "s"}
+                          {capped}/{slotCount}
                         </span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 shrink-0"
                           onClick={() =>
                             setTargetOverrides((prev) => ({
                               ...prev,
@@ -589,7 +602,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 shrink-0"
                           onClick={() =>
                             setTargetOverrides((prev) => ({
                               ...prev,
@@ -608,13 +621,13 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
               {/* Optional notes */}
               <div>
                 <Label className="text-sm font-medium" htmlFor="ai-notes">
-                  Notes for the AI (optional)
+                  Notes for the AI (optional) — covers every area
                 </Label>
                 <Input
                   id="ai-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Prioritise the car park on 5 Oct, skip tea team this month"
+                  placeholder="e.g. Only 1 in Car Park on the 5th, extra kids helpers on the 26th, skip tea team that week"
                   className="mt-1.5"
                 />
               </div>
@@ -650,11 +663,11 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                 </RadioGroup>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {result && (
-          <ScrollArea className="max-h-[55vh] pr-3">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-1">
             <div className="space-y-4 py-1">
               {result.summary && (
                 <p className="text-sm text-muted-foreground">{result.summary}</p>
@@ -750,7 +763,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {error && (
