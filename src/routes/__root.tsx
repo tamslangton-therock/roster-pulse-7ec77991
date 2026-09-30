@@ -15,10 +15,10 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { HydrateStore } from "@/components/hydrate-store";
 import { SaveBar } from "@/components/save-bar";
 import { Toaster } from "@/components/ui/sonner";
+import { useAuth } from "@/lib/auth";
 
-// CHANGE YOUR ACCESS CODE HERE
+// CHANGE YOUR ADMIN ACCESS CODE HERE
 const MASTER_PASSCODE = "1234";
-const SESSION_AUTH_KEY = "roster-pulse-authenticated";
 
 function NotFoundComponent() {
   return (
@@ -80,35 +80,54 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-function PasscodeGate({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [passcode, setPasscode] = useState("");
-  const [error, setError] = useState(false);
+function LoginGate({ children }: { children: ReactNode }) {
+  const master = useAuth((s) => s.master);
+  const user = useAuth((s) => s.user);
+  const hydrateAuth = useAuth((s) => s.hydrate);
+  const loginMasterFn = useAuth((s) => s.loginMaster);
+  const loginUserFn = useAuth((s) => s.loginUser);
+  const lock = useAuth((s) => s.lock);
+
+  const [mode, setMode] = useState<"leader" | "admin">("leader");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (window.sessionStorage.getItem(SESSION_AUTH_KEY) === "true") {
-      setIsAuthenticated(true);
-    }
-  }, []);
+    hydrateAuth();
+  }, [hydrateAuth]);
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const authenticated = master || !!user;
+
+  const handleLeaderLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === MASTER_PASSCODE) {
-      window.sessionStorage.setItem(SESSION_AUTH_KEY, "true");
-      setIsAuthenticated(true);
-      setError(false);
+    setBusy(true);
+    setError("");
+    const res = await loginUserFn(username, password);
+    setBusy(false);
+    if (!res.ok) setError(res.error ?? "Sign-in failed. Try again.");
+  };
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginMasterFn(code, MASTER_PASSCODE)) {
+      setError("");
     } else {
-      setError(true);
+      setError("Incorrect access code.");
     }
   };
 
   const handleLock = () => {
-    window.sessionStorage.removeItem(SESSION_AUTH_KEY);
-    setIsAuthenticated(false);
-    setPasscode("");
+    lock();
+    setUsername("");
+    setPassword("");
+    setCode("");
+    setError("");
   };
 
-  if (!isAuthenticated) {
+  if (!authenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 px-4">
         <div className="w-full max-w-sm p-8 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 text-center">
@@ -116,40 +135,92 @@ function PasscodeGate({ children }: { children: ReactNode }) {
             🔒
           </div>
           <h2 className="text-2xl font-bold mb-1 tracking-tight text-white">Roster Pulse</h2>
-          <p className="text-xs text-slate-400 mb-6">Enter master access code to view roster</p>
+          <p className="text-xs text-slate-400 mb-6">
+            {mode === "leader"
+              ? "Team leader sign-in"
+              : "Enter the admin access code"}
+          </p>
 
-          <form onSubmit={handleUnlock} className="space-y-4">
-            <div>
+          <div className="flex rounded-lg bg-slate-900 p-1 mb-6 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => { setMode("leader"); setError(""); }}
+              className={`flex-1 py-2 rounded-md transition-colors ${
+                mode === "leader" ? "bg-primary text-primary-foreground" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Team leader
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("admin"); setError(""); }}
+              className={`flex-1 py-2 rounded-md transition-colors ${
+                mode === "admin" ? "bg-primary text-primary-foreground" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Admin
+            </button>
+          </div>
+
+          {mode === "leader" ? (
+            <form onSubmit={handleLeaderLogin} className="space-y-4">
               <input
-                type="password"
-                placeholder="Enter passcode"
-                value={passcode}
-                onChange={(e) => {
-                  setPasscode(e.target.value);
-                  setError(false);
-                }}
-                className={`w-full px-4 py-3 bg-slate-900 border rounded-lg text-center text-lg tracking-widest text-white focus:outline-none focus:ring-2 ${
-                  error
-                    ? "border-red-500 focus:ring-red-500"
-                    : "border-slate-700 focus:ring-primary focus:border-transparent"
+                type="text"
+                placeholder="Your name"
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setError(""); }}
+                autoComplete="username"
+                className={`w-full px-4 py-3 bg-slate-900 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 ${
+                  error ? "border-red-500 focus:ring-red-500" : "border-slate-700 focus:ring-primary focus:border-transparent"
                 }`}
                 autoFocus
               />
-              {error && (
-                <p className="text-red-400 text-xs mt-2">Incorrect passcode. Try again.</p>
-              )}
-            </div>
-            <button
-              type="submit"
-              className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors duration-200 text-sm shadow-md"
-            >
-              Unlock Access
-            </button>
-          </form>
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                autoComplete="current-password"
+                className={`w-full px-4 py-3 bg-slate-900 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 ${
+                  error ? "border-red-500 focus:ring-red-500" : "border-slate-700 focus:ring-primary focus:border-transparent"
+                }`}
+              />
+              {error && <p className="text-red-400 text-xs">{error}</p>}
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors duration-200 text-sm shadow-md disabled:opacity-60"
+              >
+                {busy ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <input
+                type="password"
+                placeholder="Enter passcode"
+                value={code}
+                onChange={(e) => { setCode(e.target.value); setError(""); }}
+                className={`w-full px-4 py-3 bg-slate-900 border rounded-lg text-center text-lg tracking-widest text-white focus:outline-none focus:ring-2 ${
+                  error ? "border-red-500 focus:ring-red-500" : "border-slate-700 focus:ring-primary focus:border-transparent"
+                }`}
+                autoFocus
+              />
+              {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+              <button
+                type="submit"
+                className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-colors duration-200 text-sm shadow-md"
+              >
+                Unlock Access
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );
   }
+
+  const whoami = master ? "Admin" : user?.displayName || user?.username || "";
 
   return (
     <SidebarProvider>
@@ -161,12 +232,19 @@ function PasscodeGate({ children }: { children: ReactNode }) {
               <SidebarTrigger />
               <div className="text-sm font-medium tracking-tight">Roster Pulse</div>
             </div>
-            <button
-              onClick={handleLock}
-              className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-background hover:bg-accent text-muted-foreground transition-colors flex items-center gap-1.5"
-            >
-              🔒 Lock App
-            </button>
+            <div className="flex items-center gap-2">
+              {whoami && (
+                <span className="text-xs text-muted-foreground">
+                  Signed in: <span className="font-medium text-foreground">{whoami}</span>
+                </span>
+              )}
+              <button
+                onClick={handleLock}
+                className="text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-background hover:bg-accent text-muted-foreground transition-colors flex items-center gap-1.5"
+              >
+                🔒 Lock App
+              </button>
+            </div>
           </header>
           <main className="flex-1 min-w-0">
             {children}
@@ -228,10 +306,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <HydrateStore>
-        <PasscodeGate>
+        <LoginGate>
           <Outlet />
           <SaveBar />
-        </PasscodeGate>
+        </LoginGate>
         <Toaster position="top-right" />
       </HydrateStore>
     </QueryClientProvider>
