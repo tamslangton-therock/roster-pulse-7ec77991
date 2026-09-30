@@ -32,8 +32,6 @@ import {
 import {
   ROSTER_SLOTS,
   defaultSundayWindow,
-  buildSlots,
-  areasOf,
   colLetter,
   type SlotDef,
 } from "./roster-grid";
