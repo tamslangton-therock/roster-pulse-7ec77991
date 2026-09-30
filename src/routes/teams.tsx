@@ -119,7 +119,7 @@ function TeamsPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {areas.map((area) => {
-          const slots = slots.filter((s) => s.area === area);
+          const areaSlots = slots.filter((s) => s.area === area);
           const names = byArea.get(area) ?? [];
           return (
             <section key={area} className="rounded-xl border bg-card p-4 shadow-sm space-y-4">
