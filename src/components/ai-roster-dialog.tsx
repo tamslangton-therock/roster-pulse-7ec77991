@@ -764,7 +764,7 @@ export function AiRosterDialog({ disabled }: AiRosterDialogProps) {
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {error && (
