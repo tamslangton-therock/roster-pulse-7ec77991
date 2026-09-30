@@ -249,14 +249,16 @@ function LiveRosterPage() {
     return m;
   }, [clashes]);
 
-  // Fixed column set from the Live_Roster grid schema, so empty slots stay visible
-  // and can be filled. When a team filter is active, narrow to that team's areas.
+  // Column set from the live slot layout (store state, synced with the sheet),
+  // so empty slots stay visible and can be filled. When a team filter is
+  // active, narrow to that team's areas.
+  const slots = useRoster((s) => s.slots);
   const columns = useMemo(() => {
-    const all = ROSTER_SLOTS.map((s) => ({ area: s.area, label: s.label }));
+    const all = slots.map((s) => ({ area: s.area, label: s.label }));
     if (selectedTeam === "all") return all;
     const areas = new Set(filteredAssignments.map((a) => a.area));
     return all.filter((c) => areas.has(c.area));
-  }, [filteredAssignments, selectedTeam]);
+  }, [slots, filteredAssignments, selectedTeam]);
 
   const months = useMemo(() => {
     const s = new Set<string>();
