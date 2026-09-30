@@ -4,7 +4,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { readUserAccessRows } from "./users.server";
-import { toSessionUser, type SessionUser } from "./user-access";
+import { toSessionUser, recordFromTabValues, type SessionUser } from "./user-access";
 
 export const loginTeamUser = createServerFn({ method: "POST" })
   .inputValidator((data: { username: string; password: string }) =>
@@ -30,5 +30,5 @@ export const loginTeamUser = createServerFn({ method: "POST" })
     if (!match || match.password !== data.password) {
       return { ok: false, error: "Name or password is incorrect." };
     }
-    return { ok: true, user: toSessionUser({ ...match }) };
+    return { ok: true, user: toSessionUser(recordFromTabValues(match)) };
   });
