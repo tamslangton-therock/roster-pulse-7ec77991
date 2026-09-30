@@ -68,7 +68,12 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { canEditSlotLabel, canViewArea } from "@/lib/user-access";
+import {
+  canEditSlotLabel,
+  canViewArea,
+  canViewRosterPage,
+} from "@/lib/user-access";
+import { AccessNotice } from "@/components/access-notice";
 
 // Zod schema for URL search parameters
 const rosterSearchSchema = z.object({
@@ -89,8 +94,19 @@ export const Route = createFileRoute("/roster")({
       },
     ],
   }),
-  component: LiveRosterPage,
+  component: RosterAccessGate,
 });
+
+function RosterAccessGate() {
+  const isMaster = useAuth((s) => s.master);
+  const user = useAuth((s) => s.user);
+  if (!canViewRosterPage(isMaster, user)) {
+    return (
+      <AccessNotice title="Live Roster is not switched on for your login" />
+    );
+  }
+  return <LiveRosterPage />;
+}
 
 export type { AssignmentStatus } from "@/lib/store";
 

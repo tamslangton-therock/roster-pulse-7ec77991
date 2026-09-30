@@ -15,6 +15,8 @@ import {
   canEditTeamsArea,
   canViewHealth,
   canViewIndividuals,
+  canViewLifeGroups,
+  canViewRosterPage,
 } from "@/lib/user-access";
 
 export const Route = createFileRoute("/")({
@@ -94,13 +96,15 @@ function HomeMenu() {
   const allowedTiles = tiles.filter((tile) => {
     switch (tile.to) {
       case "/roster":
-        return true;
+        return canViewRosterPage(isMaster, authUser);
       case "/volunteers":
         return canViewIndividuals(isMaster, authUser);
       case "/health":
         return canViewHealth(isMaster, authUser);
       case "/teams":
         return isMaster || (authUser?.teamEditAreas ?? []).length > 0;
+      case "/life-groups":
+        return canViewLifeGroups(isMaster, authUser);
       default:
         return isMaster;
     }

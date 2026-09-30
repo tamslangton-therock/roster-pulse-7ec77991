@@ -16,6 +16,8 @@ import {
   canEditTeamsArea,
   canViewHealth,
   canViewIndividuals,
+  canViewLifeGroups,
+  canViewRosterPage,
 } from "@/lib/user-access";
 
 interface NavItem {
@@ -28,9 +30,12 @@ interface NavItem {
 
 const items: NavItem[] = [
   { title: "Home", url: "/", icon: LayoutDashboard, allowed: () => true },
-  // Everyone signed in can view the full live roster; per-area edit limits are
-  // enforced inside the roster page itself.
-  { title: "Live Roster", url: "/roster", icon: CalendarDays, allowed: () => true },
+  {
+    title: "Live Roster",
+    url: "/roster",
+    icon: CalendarDays,
+    allowed: (m) => canViewRosterPage(m, useAuth.getState().user),
+  },
   {
     title: "Individuals",
     url: "/volunteers",
@@ -51,7 +56,12 @@ const items: NavItem[] = [
   },
   { title: "Team Print", url: "/print", icon: Printer, allowed: (m) => m },
   { title: "Doc Templates", url: "/docs", icon: FileText, allowed: (m) => m },
-  { title: "Life Groups", url: "/life-groups", icon: Home, allowed: (m) => m },
+  {
+    title: "Life Groups",
+    url: "/life-groups",
+    icon: Home,
+    allowed: (m) => canViewLifeGroups(m, useAuth.getState().user),
+  },
   { title: "User Access", url: "/users", icon: Shield, allowed: (m) => m },
 ];
 
