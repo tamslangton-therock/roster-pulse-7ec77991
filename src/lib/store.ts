@@ -24,8 +24,8 @@ import {
   type AllowedClashRow,
   type SubTeamRow,
   type LifeGroupRow,
-  type UserAccessTabValues,
 } from "./sheets.functions";
+import type { UserAccessTabValues } from "./sheets-config";
 import {
   defaultDocTemplate,
   rowsToSections,
