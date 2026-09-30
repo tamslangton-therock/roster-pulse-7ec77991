@@ -1689,13 +1689,13 @@ function PartnerAlignDialog({
           .map((b) => b.date)
       );
       return suggestSlotsForPartner(p, target.date, {
-        slots: ROSTER_SLOTS,
+        slots: slotsForPartner,
         assignments,
         volunteers,
         blockoutDates: dates,
       });
     });
-  }, [target, assignments, volunteers, blockouts]);
+  }, [target, assignments, volunteers, blockouts, slotsForPartner]);
 
   return (
     <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
