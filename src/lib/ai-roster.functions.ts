@@ -63,6 +63,7 @@ const inputSchema = z.object({
       lastServed: z.string(),
     }),
   ),
+  priorities: z.string().optional(),
 });
 
 
@@ -192,6 +193,7 @@ export const suggestRoster = createServerFn({ method: "POST" })
         data.mode === "fill_empty"
           ? "Keep existingAssignments; only fill slots with no person, up to each area's staffing target."
           : "Draft a full roster; you may reassign any slot. Treat existingAssignments as the recent pattern to learn from — replicate sub-teams and affinity groups that worked.",
+      ...(data.priorities ? { priorities: data.priorities } : {}),
     };
 
     const response = await runIdFetch.fetch(
