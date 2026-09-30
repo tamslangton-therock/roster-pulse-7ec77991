@@ -884,6 +884,127 @@ export const useRoster = create<RosterState>()((set, get) => ({
     scheduleRosterSync();
   },
 
+  // --- LIVE ROSTER COLUMN LAYOUT ---
+  addSlotToArea: (area, role) => {
+    let changed = false;
+    set((state) => {
+      const areaSlots = state.slots.filter((s) => s.area === area);
+      const useRole = role !== undefined ? role : areaSlots[areaSlots.length - 1]?.role ?? "";
+      const pairs = state.slots.map((s) => ({ area: s.area, role: s.role }));
+      let lastIdx = -1;
+      pairs.forEach((p, i) => {
+        if (p.area === area) lastIdx = i;
+      });
+      pairs.splice(lastIdx + 1, 0, { area, role: useRole });
+      changed = true;
+      return applyLayout(state, pairs);
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  addServingArea: (area, roles) => {
+    let changed = false;
+    set((state) => {
+      if (state.slots.some((s) => s.area.toLowerCase() === area.toLowerCase())) return {};
+      const pairs = state.slots.map((s) => ({ area: s.area, role: s.role }));
+      for (const r of roles) {
+        for (let i = 0; i < Math.max(1, r.count); i++) pairs.push({ area, role: r.role });
+      }
+      changed = true;
+      return applyLayout(state, pairs);
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  removeArea: (area) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.area === area)) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.filter((s) => s.area !== area).map((s) => ({ area: s.area, role: s.role })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  renameArea: (oldArea, newArea) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.area === oldArea) || !newArea.trim()) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.map((s) => ({
+          area: s.area === oldArea ? newArea.trim() : s.area,
+          role: s.role,
+        })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  renameSlotRole: (label, role) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.label === label)) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.map((s) => (s.label === label ? { area: s.area, role } : { area: s.area, role: s.role })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  removeSlot: (label) => {
+    let changed = false;
+    set((state) => {
+      if (!state.slots.some((s) => s.label === label)) return {};
+      changed = true;
+      return applyLayout(
+        state,
+        state.slots.filter((s) => s.label !== label).map((s) => ({ area: s.area, role: s.role })),
+      );
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  moveArea: (area, dir) => {
+    let changed = false;
+    set((state) => {
+      // Group contiguous slots into area blocks, then swap neighbouring blocks.
+      const blocks: Array<Array<{ area: string; role: string }>> = [];
+      for (const s of state.slots) {
+        const last = blocks[blocks.length - 1];
+        if (last && last[0].area === s.area) last.push({ area: s.area, role: s.role });
+        else blocks.push([{ area: s.area, role: s.role }]);
+      }
+      const idx = blocks.findIndex((b) => b[0].area === area);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= blocks.length) return {};
+      [blocks[idx], blocks[j]] = [blocks[j], blocks[idx]];
+      changed = true;
+      return applyLayout(state, blocks.flat());
+    });
+    if (changed) scheduleRosterSync();
+  },
+
+  moveSlot: (label, dir) => {
+    let changed = false;
+    set((state) => {
+      const idx = state.slots.findIndex((s) => s.label === label);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= state.slots.length) return {};
+      const pairs = state.slots.map((s) => ({ area: s.area, role: s.role }));
+      [pairs[idx], pairs[j]] = [pairs[j], pairs[idx]];
+      changed = true;
+      return applyLayout(state, pairs);
+    });
+    if (changed) scheduleRosterSync();
+  },
+
   // --- BLOCKOUTS ---
   toggleBlockout: (personName, date, reason) => {
     set((state) => {
