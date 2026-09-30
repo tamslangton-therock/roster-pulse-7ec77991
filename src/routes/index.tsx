@@ -5,7 +5,6 @@ import {
   FileText,
   Home,
   LayoutGrid,
-  ListTodo,
   Printer,
   Sparkles,
   Users,
@@ -19,13 +18,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Home menu for Roster Pulse: jump into the live Sunday roster, individuals, team health, life groups, tasks and print docs.",
+          "Home menu for Roster Pulse: jump into the live Sunday roster, individuals, team health, life groups and print docs.",
       },
       { property: "og:title", content: "Roster Pulse — Church Roster Home" },
       {
         property: "og:description",
         content:
-          "One place to manage Sunday rosters, volunteers, life groups and team tasks.",
+          "One place to manage Sunday rosters, volunteers and life groups.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -77,20 +76,12 @@ const tiles = [
     icon: Home,
     blurb: "Groups, leaders, meeting details and member rosters.",
   },
-  {
-    title: "Tasks",
-    to: "/tasks",
-    icon: ListTodo,
-    blurb: "To-dos and thoughts with reminders, owners and categories.",
-  },
 ] as const;
 
 function HomeMenu() {
   const volunteers = useRoster((s) => s.volunteers);
   const dates = useRoster((s) => s.dates);
   const lifeGroups = useRoster((s) => s.lifeGroups);
-  const tasks = useRoster((s) => s.tasks);
-  const openTasks = tasks.filter((t) => t.Status !== "done").length;
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:py-14">
@@ -113,7 +104,6 @@ function HomeMenu() {
           <span className="rounded-full border bg-card px-3 py-1">
             {lifeGroups.length} life groups
           </span>
-          <span className="rounded-full border bg-card px-3 py-1">{openTasks} open tasks</span>
         </div>
       </header>
 
