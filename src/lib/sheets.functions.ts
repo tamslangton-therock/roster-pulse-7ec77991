@@ -17,6 +17,9 @@ import {
   SUB_TEAMS_SCHEMA,
   LIFE_GROUPS_TAB,
   LIFE_GROUPS_SCHEMA,
+  USER_ACCESS_TAB,
+  USER_ACCESS_SCHEMA,
+  type UserAccessTabValues,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
 
@@ -898,12 +901,6 @@ export const writeDocTemplate = createServerFn({ method: "POST" })
   });
 
 // ---------- User_Access ----------
-
-import {
-  USER_ACCESS_TAB,
-  USER_ACCESS_SCHEMA,
-  type UserAccessTabValues,
-} from "./sheets-config";
 
 async function ensureUserAccessTab() {
   try {
