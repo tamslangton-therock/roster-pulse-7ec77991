@@ -5,6 +5,8 @@ import { z } from "zod";
 import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
 import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { AccessNotice } from "@/components/access-notice";
 
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
 import { Button } from "@/components/ui/button";
@@ -41,7 +43,7 @@ export const Route = createFileRoute("/print")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: PrintRosterPage,
+  component: MasterOnlyPrint,
 });
 
 function PrintRosterPage() {
