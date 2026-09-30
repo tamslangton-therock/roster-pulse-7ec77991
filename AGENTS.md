@@ -11,3 +11,5 @@
 
 ## Roster layout is dynamic
 Serving-area columns on Live_Roster are data, not constants: `src/lib/roster-grid.ts` builds slots from the sheet's header rows (Row 1 = area, Row 2 = role) and clash formulas use the live slot count. Any new page that needs columns must read `slots` from `src/lib/store.ts` (`useRoster()`), never `ROSTER_SLOTS`.
+
+- AI auto-roster: `src/lib/ai-roster.functions.ts` calls the Lovable AI Gateway `/v1/responses` (`openai/gpt-6-astra`, streamed SSE, strict json_schema) — client sends the volunteer/slot snapshot; the server fn owns the key and prompt. Review-then-apply lives in `src/components/ai-roster-dialog.tsx`.
