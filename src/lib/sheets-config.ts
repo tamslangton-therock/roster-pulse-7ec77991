@@ -126,18 +126,3 @@ export const DOC_TEMPLATE_SCHEMA = [
   "col_b",
   "col_c",
 ] as const;
-
-// Tasks / to-dos — kanban board with reminders, assignees and categories.
-export const TASKS_TAB = "Tasks";
-export const TASKS_SCHEMA = [
-  "TaskID",
-  "Title",
-  "Notes",
-  "Category",
-  "AssignedTo",
-  "Status",
-  "DueDate",
-  "RemindAt",
-  "CreatedAt",
-  "CompletedAt",
-] as const;

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText, LayoutDashboard, ListTodo }  from "lucide-react";
+import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText }  from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,6 @@ const items = [
   { title: "Team Print", url: "/print", icon: Printer },
   { title: "Doc Templates", url: "/docs", icon: FileText },
   { title: "Life Groups", url: "/life-groups", icon: Home },
-  { title: "Tasks", url: "/tasks", icon: ListTodo },
 ];
 
 
