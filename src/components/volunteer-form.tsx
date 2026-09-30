@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { X, Plus } from "lucide-react";
 import type { Volunteer } from "@/lib/types";
-import { ROSTER_AREAS } from "@/lib/roster-grid";
+import { useRoster } from "@/lib/store";
+import { areasOf } from "@/lib/roster-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
