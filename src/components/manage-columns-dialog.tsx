@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRosterStore } from "@/lib/store";
+import { useRoster } from "@/lib/store";
 import { areasOf } from "@/lib/roster-grid";
 import { Settings2, Plus, Trash2, ChevronUp, ChevronDown, Layers } from "lucide-react";
 
@@ -27,7 +27,7 @@ import { Settings2, Plus, Trash2, ChevronUp, ChevronDown, Layers } from "lucide-
  * with the Live_Roster tab in Google Sheets.
  */
 export function ManageColumnsDialog({ children }: { children?: React.ReactNode }) {
-  const store = useRosterStore();
+  const store = useRoster();
   const { slots, addSlotToArea, addServingArea, removeArea, renameArea, renameSlotRole, removeSlot, moveArea, moveSlot } = store;
   const [open, setOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
