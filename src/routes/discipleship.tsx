@@ -40,7 +40,12 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useRoster } from "@/lib/store";
 import { useLiveUser } from "@/lib/use-live-user";
-import { canViewDiscipleship, canEditDiscipleship } from "@/lib/user-access";
+import {
+  canViewDiscipleship,
+  canEditDiscipleship,
+  discipleshipInterestScope,
+  cardInInterestScope,
+} from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 import {
   fetchDiscipleship,
