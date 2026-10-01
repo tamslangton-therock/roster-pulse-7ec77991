@@ -267,6 +267,14 @@ function DiscipleshipPage() {
         <p className="text-sm text-destructive py-16 text-center">
           Couldn’t load from the sheet. Refresh to try again.
         </p>
+      ) : scopedRows.length === 0 && allowedInterests.length > 0 ? (
+        <div className="rounded-xl border bg-card p-10 text-center max-w-lg mx-auto mt-10">
+          <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
+          <h2 className="mt-3 text-lg font-semibold">Nothing in your interest scope</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            You're set up to see {allowedInterests.join(", ")} only. Cards with other interests stay hidden here.
+          </p>
+        </div>
       ) : rows.length === 0 ? (
         <div className="rounded-xl border bg-card p-10 text-center max-w-lg mx-auto mt-10">
           <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
