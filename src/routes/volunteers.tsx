@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { useAuth } from "@/lib/auth";
-import { canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
+import { areaInScope, canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 
 
@@ -178,7 +178,7 @@ function VolunteersPage() {
             <SelectContent>
               <SelectItem value="all">All areas</SelectItem>
               {allAreas
-                .filter((a) => scopeAreas.length === 0 || scopeAreas.some((s) => s.toLowerCase() === a.toLowerCase()))
+                .filter((a) => scopeAreas.length === 0 || areaInScope(scopeAreas, a))
                 .map((a) => (
                 <SelectItem key={a} value={a}>
                   {a}

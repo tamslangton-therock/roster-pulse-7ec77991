@@ -79,8 +79,27 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
 
 const norm = (s: string) => (s ?? "").trim().toLowerCase();
 
+/** Loose key: "Kids — Yellow 8AM" → "yellow", "Yellow Group" → "yellow". */
+const areaKey = (s: string) =>
+  ` ${norm(s)
+    .replace(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b/g, " ")
+    .replace(/\b(kids|group)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()} `;
+
+/** Whether a person's serving area (e.g. "Kids — Yellow 8AM") falls under a scope area (e.g. "Yellow Group"). */
+export function areaMatches(scopeArea: string, servingArea: string): boolean {
+  if (norm(scopeArea) === norm(servingArea)) return true;
+  const s = areaKey(scopeArea);
+  return s.trim() !== "" && areaKey(servingArea).includes(s);
+}
+
+export function areaInScope(areas: string[], area: string): boolean {
+  return areas.some((a) => areaMatches(a, area));
+}
+
 function inScope(areas: string[], area: string): boolean {
-  return areas.some((a) => norm(a) === norm(area));
+  return areaInScope(areas, area);
 }
 
 // ---- Permission checks. `isMaster` true → always allowed. ----
