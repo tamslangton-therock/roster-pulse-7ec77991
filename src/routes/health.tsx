@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useLiveUser } from "@/lib/use-live-user";
 import { useEffect, useMemo, useState } from "react";
 import { useRoster } from "@/lib/store";
 import type { FatigueStatus } from "@/lib/types";
@@ -121,7 +122,7 @@ function NumberField({
 
 function HealthPage() {
   const isMaster = useAuth((s) => s.master);
-  const authUser = useAuth((s) => s.user);
+  const authUser = useLiveUser();
   const { volunteers, assignments } = useRoster();
   if (!canViewHealth(isMaster, authUser)) {
     return <AccessNotice title="Team Health is not switched on for your login" />;

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useLiveUser } from "@/lib/use-live-user";
 import { useMemo, useState } from "react";
 import { Edit2, Plus, Trash2, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
@@ -82,7 +83,7 @@ function VolunteersPage() {
   );
 
   const isMaster = useAuth((s) => s.master);
-  const authUser = useAuth((s) => s.user);
+  const authUser = useLiveUser();
   const scopeAreas = individualsViewAreas(isMaster, authUser);
 
   const filtered = useMemo(() => {
