@@ -85,23 +85,6 @@ const STAGES = [
   { id: "plugged_in", label: "Plugged In", icon: Handshake, hint: "In a Life Group or serving — done" },
 ] as const;
 
-const INTERESTS = [
-  "Life Groups",
-  "New Partners Dinner",
-  "Alpha",
-  "Baptism",
-  "More about God",
-  "Serving",
-] as const;
-
-const INTEREST_ICONS: Record<string, string> = {
-  "Life Groups": "👥",
-  "New Partners Dinner": "🍽️",
-  Alpha: "❓",
-  Baptism: "🌊",
-  "More about God": "✝️",
-  Serving: "🤝",
-};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
