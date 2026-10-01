@@ -888,7 +888,7 @@ function InterestPools({
             </button>
           );
         })}
-        {canEdit && (
+        {canEdit && allowedInterests.length === 0 && (
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setManageOpen(true)}>
             <Settings2 className="h-3.5 w-3.5" /> Manage interests
           </Button>
