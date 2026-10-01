@@ -248,6 +248,7 @@ function DiscipleshipPage() {
         <InterestPools
           rows={scopedRows}
           canEdit={canEdit}
+          allowedInterests={allowedInterests}
           onOpen={setDetailId}
           onMarkAllDone={(interest, ids) =>
             save(
