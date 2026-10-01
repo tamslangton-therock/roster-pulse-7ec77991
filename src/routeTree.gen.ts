@@ -17,6 +17,7 @@ import { Route as PrintRouteImport } from './routes/print'
 import { Route as LifeGroupsRouteImport } from './routes/life-groups'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as DocsRouteImport } from './routes/docs'
+import { Route as DiscipleshipRouteImport } from './routes/discipleship'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VolunteersRoute = VolunteersRouteImport.update({
@@ -59,6 +60,11 @@ const DocsRoute = DocsRouteImport.update({
   path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DiscipleshipRoute = DiscipleshipRouteImport.update({
+  id: '/discipleship',
+  path: '/discipleship',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -67,6 +73,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/discipleship': typeof DiscipleshipRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/discipleship': typeof DiscipleshipRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/discipleship': typeof DiscipleshipRoute
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/discipleship'
     | '/docs'
     | '/health'
     | '/life-groups'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/discipleship'
     | '/docs'
     | '/health'
     | '/life-groups'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/discipleship'
     | '/docs'
     | '/health'
     | '/life-groups'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DiscipleshipRoute: typeof DiscipleshipRoute
   DocsRoute: typeof DocsRoute
   HealthRoute: typeof HealthRoute
   LifeGroupsRoute: typeof LifeGroupsRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/discipleship': {
+      id: '/discipleship'
+      path: '/discipleship'
+      fullPath: '/discipleship'
+      preLoaderRoute: typeof DiscipleshipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DiscipleshipRoute: DiscipleshipRoute,
   DocsRoute: DocsRoute,
   HealthRoute: HealthRoute,
   LifeGroupsRoute: LifeGroupsRoute,
