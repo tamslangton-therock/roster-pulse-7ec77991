@@ -45,6 +45,8 @@ import {
   writeDiscipleship,
   type DiscipleshipRow,
 } from "@/lib/sheets.functions";
+import { findIndividual, personKey } from "@/lib/person-link";
+import type { Volunteer } from "@/lib/types";
 
 export const Route = createFileRoute("/discipleship")({
   head: () => ({
@@ -358,6 +360,7 @@ function DiscipleshipPage() {
             toast.success(`${row.person_name} added to the pipeline.`);
           }}
           leaderNames={leaderNames}
+          existingRows={rows}
         />
       )}
 
@@ -378,11 +381,13 @@ function AddCardDialog({
   open,
   onOpenChange,
   onAdd,
+  existingRows,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onAdd: (row: DiscipleshipRow) => void;
   leaderNames: string[];
+  existingRows: DiscipleshipRow[];
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -392,10 +397,18 @@ function AddCardDialog({
   const [interests, setInterests] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
+  const volunteers = useRoster((s) => s.volunteers);
+  const match = findIndividual(volunteers, name);
+  const cardMatch = existingRows.find((r) => personKey(r.person_name) === personKey(name));
+
   const submit = () => {
-    const trimmed = name.trim();
+    const trimmed = match?.full_name ?? name.trim().replace(/\s+/g, " ");
     if (!trimmed) {
       toast.error("A name is needed.");
+      return;
+    }
+    if (cardMatch) {
+      toast.error(`${cardMatch.person_name} already has a connect card — open that one instead.`);
       return;
     }
     onAdd({
@@ -503,7 +516,38 @@ function DetailDialog({
 }) {
   const lifeGroups = useRoster((s) => s.lifeGroups);
   const addLifeGroupMember = useRoster((s) => s.addLifeGroupMember);
+  const volunteers = useRoster((s) => s.volunteers);
+  const addVolunteer = useRoster((s) => s.addVolunteer);
+  const updateVolunteer = useRoster((s) => s.updateVolunteer);
+  const linked = findIndividual(volunteers, row.person_name);
   const stage = stageOf(row);
+
+  /** Ensures this card has exactly one Individual profile; returns the canonical name. */
+  const promote = (announce: boolean): string => {
+    const existing = findIndividual(useRoster.getState().volunteers, row.person_name);
+    if (existing) {
+      const fill: Partial<Volunteer> = {};
+      if (!existing.phone && row.phone) fill.phone = row.phone;
+      if (!existing.email && row.email) fill.email = row.email;
+      if (Object.keys(fill).length) updateVolunteer(existing.id, fill);
+      if (existing.full_name !== row.person_name) onUpdate({ person_name: existing.full_name });
+      if (announce) toast.success(`Linked to existing profile ${existing.full_name}.`);
+      return existing.full_name;
+    }
+    const name = row.person_name.trim().replace(/\s+/g, " ");
+    addVolunteer({
+      full_name: name,
+      phone: row.phone,
+      email: row.email,
+      is_volunteer: false,
+      serving_areas: [],
+      notes: [row.source && `Connected ${row.date_connected} via ${row.source}`, row.notes]
+        .filter(Boolean)
+        .join(" — "),
+    });
+    toast.success(`${name} is now an Individual — ready for a Life Group or serving.`);
+    return name;
+  };
   const waNumber = row.phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
   const waText = encodeURIComponent(
     `Hi ${row.person_name.split(" ")[0]}! Just checking in — great to have you with us.`,
@@ -561,6 +605,25 @@ function DetailDialog({
             </p>
           )}
 
+          <div className="rounded-md border bg-muted/40 p-3 flex flex-wrap items-center gap-2 text-sm">
+            {linked ? (
+              <>
+                <UserCheck className="h-4 w-4 text-primary" />
+                <span>
+                  Linked to Individual profile <strong>{linked.full_name}</strong>
+                  {linked.serving_areas.length ? ` · serves in ${linked.serving_areas.join(", ")}` : ""}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground flex-1">Not yet an Individual.</span>
+                <Button size="sm" onClick={() => promote(true)}>
+                  <UserCheck className="h-4 w-4" /> Make an Individual
+                </Button>
+              </>
+            )}
+          </div>
+
           <div className="grid gap-1.5">
             <Label className="text-sm font-medium">Stage</Label>
             <Select
@@ -568,6 +631,7 @@ function DetailDialog({
               onValueChange={(v) => {
                 const patch: Partial<DiscipleshipRow> = { stage: v };
                 if (v === "plugged_in" && !row.plugged_in_date) patch.plugged_in_date = today();
+                if (v === "handover" || v === "plugged_in") promote(false);
                 onUpdate(patch);
               }}
             >
@@ -588,11 +652,12 @@ function DetailDialog({
                 onValueChange={(id) => {
                   const g = lifeGroups.find((x) => x.GroupID === id);
                   if (!g) return;
-                  if (!g.MembersList.some((m) => m.toLowerCase() === row.person_name.toLowerCase())) {
-                    addLifeGroupMember(g.GroupID, row.person_name);
+                  const name = promote(false);
+                  if (!g.MembersList.some((m) => personKey(m) === personKey(name))) {
+                    addLifeGroupMember(g.GroupID, name);
                   }
                   onUpdate({ assigned_to: g.Leaders ? `${g.GroupName} (${g.Leaders})` : g.GroupName });
-                  toast.success(`${row.person_name} added to ${g.GroupName}.`);
+                  toast.success(`${name} added to ${g.GroupName}.`);
                 }}
               >
                 <SelectTrigger className="w-full">
