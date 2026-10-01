@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useInterestList } from "@/lib/interest-list";
 
 export const Route = createFileRoute("/users")({
   head: () => ({
