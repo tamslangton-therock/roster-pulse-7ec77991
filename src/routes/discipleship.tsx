@@ -212,6 +212,23 @@ function DiscipleshipPage() {
         </div>
       </div>
 
+      {!isLoading && !isError && rows.length > 0 && (
+        <InterestPools
+          rows={rows}
+          canEdit={canEdit}
+          onOpen={setDetailId}
+          onMarkAllDone={(interest, ids) =>
+            save(
+              rows.map((r) =>
+                ids.includes(r.id) && !r.interest_done.includes(interest)
+                  ? { ...r, interest_done: [...r.interest_done, interest] }
+                  : r,
+              ),
+            )
+          }
+        />
+      )}
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-16 text-center">Loading pipeline…</p>
       ) : isError ? (
@@ -627,5 +644,137 @@ function DetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InterestPools({
+  rows,
+  canEdit,
+  onOpen,
+  onMarkAllDone,
+}: {
+  rows: DiscipleshipRow[];
+  canEdit: boolean;
+  onOpen: (id: string) => void;
+  onMarkAllDone: (interest: string, ids: string[]) => void;
+}) {
+  const [pool, setPool] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
+
+  const allInterests = useMemo(() => {
+    const extra = rows.flatMap((r) => r.interests).filter((i) => !(INTERESTS as readonly string[]).includes(i));
+    return [...INTERESTS, ...Array.from(new Set(extra))];
+  }, [rows]);
+
+  const waitingCount = (i: string) =>
+    rows.filter((r) => r.interests.includes(i) && !r.interest_done.includes(i)).length;
+
+  const members = pool
+    ? rows.filter(
+        (r) => r.interests.includes(pool) && (showDone || !r.interest_done.includes(pool)),
+      )
+    : [];
+  const waiting = members.filter((r) => pool && !r.interest_done.includes(pool));
+
+  const copyNumbers = async () => {
+    const nums = members.map((r) => r.phone).filter(Boolean);
+    if (nums.length === 0) {
+      toast.error("Nobody in this list has a phone number yet.");
+      return;
+    }
+    await navigator.clipboard.writeText(nums.join("\n"));
+    toast.success(`Copied ${nums.length} number${nums.length === 1 ? "" : "s"} — paste them into a new WhatsApp group.`);
+  };
+
+  const copyList = async () => {
+    const text = members.map((r) => `${r.person_name}${r.phone ? ` — ${r.phone}` : ""}`).join("\n");
+    await navigator.clipboard.writeText(text);
+    toast.success("Copied names and numbers.");
+  };
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium mr-1">Interest lists:</span>
+        {allInterests.map((i) => {
+          const n = waitingCount(i);
+          const active = pool === i;
+          return (
+            <button
+              key={i}
+              onClick={() => setPool(active ? null : i)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent/60"
+              }`}
+            >
+              {INTEREST_ICONS[i] ?? "•"} {i}
+              <span className={`rounded-full px-1.5 text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>
+                {n}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {pool && (
+        <div className="space-y-3 border-t pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-semibold">
+              {INTEREST_ICONS[pool] ?? "•"} {pool} — {waiting.length} still waiting
+            </h2>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
+              <Checkbox checked={showDone} onCheckedChange={(v) => setShowDone(v === true)} />
+              Include people already seen to
+            </label>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={copyNumbers} disabled={members.length === 0}>
+                <MessageCircle className="h-4 w-4" /> Copy numbers for WhatsApp
+              </Button>
+              <Button size="sm" variant="outline" onClick={copyList} disabled={members.length === 0}>
+                Copy names + numbers
+              </Button>
+              {canEdit && waiting.length > 0 && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    onMarkAllDone(pool, waiting.map((r) => r.id));
+                    toast.success(`Marked ${waiting.length} as seen to for ${pool}.`);
+                  }}
+                >
+                  <Check className="h-4 w-4" /> Mark all seen to
+                </Button>
+              )}
+            </div>
+          </div>
+          {members.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Nobody is waiting on {pool} right now.</p>
+          ) : (
+            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+              {members.map((r) => {
+                const done = r.interest_done.includes(pool);
+                const stage = STAGES.find((s) => s.id === stageOf(r));
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => canEdit && onOpen(r.id)}
+                    className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm hover:bg-accent/50"
+                  >
+                    <div className="min-w-0">
+                      <p className={`truncate font-medium ${done ? "line-through text-muted-foreground" : ""}`}>
+                        {r.person_name}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {r.phone || "no phone"} · since {r.date_connected || "?"}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="shrink-0 text-[10px]">{stage?.label}</Badge>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
