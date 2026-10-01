@@ -815,11 +815,13 @@ function InterestPools({
   canEdit,
   onOpen,
   onMarkAllDone,
+  allowedInterests,
 }: {
   rows: DiscipleshipRow[];
   canEdit: boolean;
   onOpen: (id: string) => void;
   onMarkAllDone: (interest: string, ids: string[]) => void;
+  allowedInterests: string[];
 }) {
   const [pool, setPool] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
@@ -830,8 +832,11 @@ function InterestPools({
   const allInterests = useMemo(() => {
     const known = new Set(configured.map((i) => i.name));
     const extra = rows.flatMap((r) => r.interests).filter((i) => !known.has(i));
-    return [...configured.map((i) => i.name), ...Array.from(new Set(extra))];
-  }, [rows, configured]);
+    const all = [...configured.map((i) => i.name), ...Array.from(new Set(extra))];
+    return allowedInterests.length === 0
+      ? all
+      : all.filter((i) => allowedInterests.includes(i));
+  }, [rows, configured, allowedInterests]);
   const emojiOf = (i: string) => interestEmoji(configured.find((c) => c.name === i)?.emoji, i);
 
   const waitingCount = (i: string) =>
