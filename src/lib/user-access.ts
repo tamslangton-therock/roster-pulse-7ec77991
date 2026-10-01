@@ -25,6 +25,8 @@ export interface UserAccessRecord {
   /** Serving areas visible on the Family tab. Empty = all areas. */
   individualsViewAreas: string[];
   discipleshipAccess: IndividualsAccess;
+  /** Interests whose Discipleship cards this login may see. Empty = all. */
+  discipleshipInterests: string[];
 }
 
 /** What the login flow stores in the session — never includes the password. */
@@ -41,6 +43,8 @@ export interface SessionUser {
   healthViewAreas: string[];
   individualsViewAreas: string[];
   discipleshipAccess: IndividualsAccess;
+  /** Interests whose Discipleship cards this login may see. Empty = all. */
+  discipleshipInterests: string[];
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
@@ -64,6 +68,7 @@ export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
       t.discipleship_access === "edit" || t.discipleship_access === "view"
         ? t.discipleship_access
         : "none",
+    discipleshipInterests: t.discipleship_interests ?? [],
   };
 }
 
@@ -81,6 +86,7 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
     healthViewAreas: r.healthViewAreas,
     individualsViewAreas: r.individualsViewAreas,
     discipleshipAccess: r.discipleshipAccess,
+    discipleshipInterests: r.discipleshipInterests,
   };
 }
 
@@ -189,4 +195,21 @@ export function canViewDiscipleship(isMaster: boolean, user: SessionUser | null)
 
 export function canEditDiscipleship(isMaster: boolean, user: SessionUser | null): boolean {
   return isMaster || (!!user && user.discipleshipAccess === "edit");
+}
+
+/** Interests this login may see in Discipleship. Empty = all interests. */
+export function discipleshipInterestScope(isMaster: boolean, user: SessionUser | null): string[] {
+  if (isMaster || !user) return [];
+  return user.discipleshipInterests ?? [];
+}
+
+/** Whether a connect card's interests intersect the login's interest scope. */
+export function cardInInterestScope(
+  isMaster: boolean,
+  user: SessionUser | null,
+  cardInterests: string[] | undefined,
+): boolean {
+  const scope = discipleshipInterestScope(isMaster, user);
+  if (scope.length === 0) return true;
+  return (cardInterests ?? []).some((i) => scope.includes(i));
 }

@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useInterestList } from "@/lib/interest-list";
 
 export const Route = createFileRoute("/users")({
   head: () => ({
@@ -65,6 +66,7 @@ function UserAccessPage() {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplay, setNewDisplay] = useState("");
+  const { interests: interestList } = useInterestList();
 
   const areas = useMemo(() => {
     const set = new Set<string>();
@@ -124,6 +126,7 @@ function UserAccessPage() {
         health_view_areas: [],
         individuals_view_areas: [],
         discipleship_access: "none",
+        discipleship_interests: [],
       },
     ]);
     setAddOpen(false);
@@ -163,6 +166,13 @@ function UserAccessPage() {
           No custom logins yet. Create one for each team leader — they sign in with their name and
           the password you set, and only get the access you switch on below.
         </div>
+      )}
+
+      {interestList.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Interest scopes below use the interests configured on the Discipleship page:{" "}
+          {interestList.map((i) => `${i.emoji || ""} ${i.name}`).join(" · ")}
+        </p>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -323,6 +333,54 @@ function UserAccessPage() {
                     <SelectItem value="edit">View &amp; edit</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Discipleship interest scope */}
+            <div className="rounded-lg border px-3 py-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label className="text-sm">Discipleship interest scope</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Leave empty to show every interest. Pick only the interests whose connect cards
+                    they may see — people with other interests stay hidden.
+                  </p>
+                </div>
+                {(u.discipleship_interests ?? []).length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs shrink-0"
+                    onClick={() => updateUser(u.username, { discipleship_interests: [] })}
+                  >
+                    All interests
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {interestList.map((i) => {
+                  const on = (u.discipleship_interests ?? []).includes(i.name);
+                  return (
+                    <button
+                      key={i.name}
+                      type="button"
+                      onClick={() =>
+                        updateUser(u.username, {
+                          discipleship_interests: on
+                            ? (u.discipleship_interests ?? []).filter((x) => x !== i.name)
+                            : [...(u.discipleship_interests ?? []), i.name],
+                        })
+                      }
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                        on
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "text-muted-foreground hover:bg-accent/60"
+                      }`}
+                    >
+                      {i.emoji || "•"} {i.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </section>

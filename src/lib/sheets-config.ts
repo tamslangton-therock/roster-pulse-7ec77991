@@ -144,6 +144,7 @@ export const USER_ACCESS_SCHEMA = [
   "health_view_areas",
   "individuals_view_areas",
   "discipleship_access",
+  "discipleship_interests",
 ] as const;
 
 /** Row shape as stored in the sheet (raw strings). */
@@ -165,6 +166,8 @@ export interface UserAccessTabValues {
   individuals_view_areas: string[];
   /** "none" | "view" | "edit" — access to the Discipleship pipeline. */
   discipleship_access?: string;
+  /** Interests whose Discipleship cards this login may see. Empty = all. */
+  discipleship_interests?: string[];
 }
 
 // Master Team Health rules & category labels (edited on the User Access page,

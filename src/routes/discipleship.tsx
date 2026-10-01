@@ -40,7 +40,12 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useRoster } from "@/lib/store";
 import { useLiveUser } from "@/lib/use-live-user";
-import { canViewDiscipleship, canEditDiscipleship } from "@/lib/user-access";
+import {
+  canViewDiscipleship,
+  canEditDiscipleship,
+  discipleshipInterestScope,
+  cardInInterestScope,
+} from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 import {
   fetchDiscipleship,
@@ -179,9 +184,17 @@ function DiscipleshipPage() {
     [people],
   );
 
+  // Interest scope: leaders with a restricted scope only see cards whose
+  // interests intersect their allowed set. Shared cards show in full.
+  const allowedInterests = discipleshipInterestScope(isMaster, liveUser);
+  const scopedRows = useMemo(() => {
+    if (allowedInterests.length === 0) return rows;
+    return rows.filter((r) => cardInInterestScope(isMaster, liveUser, r.interests));
+  }, [rows, allowedInterests, isMaster, liveUser]);
+
   const counts = STAGES.map((s) => ({
     id: s.id,
-    count: rows.filter((r) => stageOf(r) === s.id).length,
+    count: scopedRows.filter((r) => stageOf(r) === s.id).length,
   }));
 
   return (
@@ -227,14 +240,15 @@ function DiscipleshipPage() {
         </div>
       )}
 
-      {view === "insights" && !isLoading && !isError && rows.length > 0 ? (
-        <Insights rows={rows} />
+      {view === "insights" && !isLoading && !isError && scopedRows.length > 0 ? (
+        <Insights rows={scopedRows} />
       ) : (
       <>
-      {!isLoading && !isError && rows.length > 0 && (
+      {!isLoading && !isError && scopedRows.length > 0 && (
         <InterestPools
-          rows={rows}
+          rows={scopedRows}
           canEdit={canEdit}
+          allowedInterests={allowedInterests}
           onOpen={setDetailId}
           onMarkAllDone={(interest, ids) =>
             save(
@@ -254,6 +268,14 @@ function DiscipleshipPage() {
         <p className="text-sm text-destructive py-16 text-center">
           Couldn’t load from the sheet. Refresh to try again.
         </p>
+      ) : scopedRows.length === 0 && allowedInterests.length > 0 ? (
+        <div className="rounded-xl border bg-card p-10 text-center max-w-lg mx-auto mt-10">
+          <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
+          <h2 className="mt-3 text-lg font-semibold">Nothing in your interest scope</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            You're set up to see {allowedInterests.join(", ")} only. Cards with other interests stay hidden here.
+          </p>
+        </div>
       ) : rows.length === 0 ? (
         <div className="rounded-xl border bg-card p-10 text-center max-w-lg mx-auto mt-10">
           <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
@@ -270,7 +292,7 @@ function DiscipleshipPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {STAGES.map((stage) => {
-            const items = filtered.filter((r) => stageOf(r) === stage.id);
+            const items = filtered.filter((r) => stageOf(r) === stage.id && scopedRows.includes(r));
             const count = counts.find((c) => c.id === stage.id)?.count ?? 0;
             return (
               <div key={stage.id} className="rounded-xl border bg-card flex flex-col">
@@ -794,11 +816,13 @@ function InterestPools({
   canEdit,
   onOpen,
   onMarkAllDone,
+  allowedInterests,
 }: {
   rows: DiscipleshipRow[];
   canEdit: boolean;
   onOpen: (id: string) => void;
   onMarkAllDone: (interest: string, ids: string[]) => void;
+  allowedInterests: string[];
 }) {
   const [pool, setPool] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
@@ -809,8 +833,11 @@ function InterestPools({
   const allInterests = useMemo(() => {
     const known = new Set(configured.map((i) => i.name));
     const extra = rows.flatMap((r) => r.interests).filter((i) => !known.has(i));
-    return [...configured.map((i) => i.name), ...Array.from(new Set(extra))];
-  }, [rows, configured]);
+    const all = [...configured.map((i) => i.name), ...Array.from(new Set(extra))];
+    return allowedInterests.length === 0
+      ? all
+      : all.filter((i) => allowedInterests.includes(i));
+  }, [rows, configured, allowedInterests]);
   const emojiOf = (i: string) => interestEmoji(configured.find((c) => c.name === i)?.emoji, i);
 
   const waitingCount = (i: string) =>
@@ -861,7 +888,7 @@ function InterestPools({
             </button>
           );
         })}
-        {canEdit && (
+        {canEdit && allowedInterests.length === 0 && (
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setManageOpen(true)}>
             <Settings2 className="h-3.5 w-3.5" /> Manage interests
           </Button>
