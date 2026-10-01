@@ -517,6 +517,8 @@ function DetailDialog({
   onRemove: () => void;
   leaderNames: string[];
 }) {
+  const { interests: interestList } = useInterestList();
+  const [newInterest, setNewInterest] = useState("");
   const lifeGroups = useRoster((s) => s.lifeGroups);
   const addLifeGroupMember = useRoster((s) => s.addLifeGroupMember);
   const volunteers = useRoster((s) => s.volunteers);
