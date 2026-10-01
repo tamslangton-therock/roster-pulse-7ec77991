@@ -212,6 +212,23 @@ function DiscipleshipPage() {
         </div>
       </div>
 
+      {!isLoading && !isError && rows.length > 0 && (
+        <InterestPools
+          rows={rows}
+          canEdit={canEdit}
+          onOpen={setDetailId}
+          onMarkAllDone={(interest, ids) =>
+            save(
+              rows.map((r) =>
+                ids.includes(r.id) && !r.interest_done.includes(interest)
+                  ? { ...r, interest_done: [...r.interest_done, interest] }
+                  : r,
+              ),
+            )
+          }
+        />
+      )}
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-16 text-center">Loading pipeline…</p>
       ) : isError ? (
