@@ -3,7 +3,10 @@ import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  // Every refetch is a Google Sheets read (quota ~60/min) — don't refetch on tab focus.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 30_000 } },
+  });
 
   const router = createRouter({
     routeTree,

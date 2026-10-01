@@ -59,7 +59,50 @@ function gatewayHeaders() {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// ---------- Read cache ----------
+// Google Sheets allows ~60 reads per minute. A full app load needs ~25 reads, so
+// two or three quick reloads used to exhaust the quota, every read then waited
+// ~60s on 429 back-off, the page looked frozen, and reloading made it worse.
+// Identical GETs are now shared while in flight and reused for a short window;
+// header/existence probes (row 1, A1) are reused much longer. Any write clears
+// the data cache so the next read is fresh.
+const DATA_TTL_MS = 20_000;
+const PROBE_TTL_MS = 10 * 60_000;
+const readCache = new Map<string, { at: number; probe: boolean; value: Promise<any> }>();
+
+const isProbePath = (path: string) => /![A-Z]*1(:[A-Z]*1)?(\?|$)/.test(path);
+const tabOfPath = (path: string) => {
+  const m = path.match(/\/values\/([^!?]+)/);
+  return m ? decodeURIComponent(m[1]).replace(/^'|'$/g, "") : null;
+};
+
+function invalidateAfterWrite(path: string) {
+  const tab = tabOfPath(path);
+  for (const [key, entry] of readCache) {
+    if (!entry.probe) readCache.delete(key);
+    else if (!tab || tabOfPath(key) === tab) readCache.delete(key);
+  }
+}
+
 async function gwFetch(path: string, init: RequestInit = {}): Promise<any> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET") {
+    const result = await gwFetchRaw(path, init);
+    invalidateAfterWrite(path);
+    return result;
+  }
+  const now = Date.now();
+  const hit = readCache.get(path);
+  if (hit && now - hit.at < (hit.probe ? PROBE_TTL_MS : DATA_TTL_MS)) return hit.value;
+  const value = gwFetchRaw(path, init);
+  readCache.set(path, { at: now, probe: isProbePath(path), value });
+  value.catch(() => {
+    if (readCache.get(path)?.value === value) readCache.delete(path);
+  });
+  return value;
+}
+
+async function gwFetchRaw(path: string, init: RequestInit = {}): Promise<any> {
   const maxAttempts = 5;
   let lastText = "";
   let lastStatus = 0;
