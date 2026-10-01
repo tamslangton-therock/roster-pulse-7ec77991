@@ -1064,6 +1064,7 @@ function Bar({ label, value, max, suffix }: { label: string; value: number; max:
 }
 
 function Insights({ rows }: { rows: DiscipleshipRow[] }) {
+  const { interests: configuredInterests } = useInterestList();
   const plugged = rows.filter((r) => stageOf(r) === "plugged_in");
   const toPlug = plugged.map((r) => daysBetween(r.date_connected, r.plugged_in_date)).filter((n): n is number => n !== null);
   const toContact = rows.map((r) => (r.contacted ? daysBetween(r.date_connected, r.contacted_date) : null)).filter((n): n is number => n !== null);
@@ -1119,7 +1120,7 @@ function Insights({ rows }: { rows: DiscipleshipRow[] }) {
           <h2 className="text-sm font-semibold">What people ask for</h2>
           <p className="text-xs text-muted-foreground">How many asked, and what share of them are plugged in.</p>
           {byInterest.map(([k, v]) => (
-            <Bar key={k} label={`${interestEmoji(configured.find((c) => c.name === k)?.emoji, k)} ${k}`} value={v.total} max={maxInterest}
+            <Bar key={k} label={`${interestEmoji(configuredInterests.find((c) => c.name === k)?.emoji, k)} ${k}`} value={v.total} max={maxInterest}
               suffix={`${v.total} · ${Math.round((v.plugged / v.total) * 100)}% in${avg(v.days) !== null ? ` · ${avg(v.days)}d` : ""}`} />
           ))}
         </div>
