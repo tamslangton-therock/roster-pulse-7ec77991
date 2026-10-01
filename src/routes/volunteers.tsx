@@ -378,6 +378,11 @@ function VolunteersPage() {
         </DialogContent>
       </Dialog>
 
+      <InterestPathwayDialog
+        volunteer={pathwaysFor}
+        open={Boolean(pathwaysFor)}
+        onOpenChange={(v) => !v && setPathwaysFor(null)}
+      />
     </div>
   );
 }
