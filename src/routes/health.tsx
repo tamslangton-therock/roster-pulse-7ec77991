@@ -133,9 +133,6 @@ function HealthPage() {
   const healthLabels = useRoster((s) => s.healthLabels);
   const setHealthSettings = useRoster((s) => s.setHealthSettings);
   const resetHealthSettings = useRoster((s) => s.resetHealthSettings);
-  if (!canViewHealth(isMaster, authUser)) {
-    return <AccessNotice title="Team Health is not switched on for your login" />;
-  }
   const [statusFilter, setStatusFilter] = useState<FatigueStatus | "all">("all");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -198,6 +195,10 @@ function HealthPage() {
 
   const modeMeta = MODE_OPTIONS.find((m) => m.value === settings.mode)!;
   const countModes = settings.mode !== "consecutive" && settings.mode !== "preference";
+
+  if (!canViewHealth(isMaster, authUser)) {
+    return <AccessNotice title="Team Health is not switched on for your login" />;
+  }
 
   return (
     <div className="p-6 space-y-6">
