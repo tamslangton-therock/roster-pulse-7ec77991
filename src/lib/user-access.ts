@@ -43,6 +43,8 @@ export interface SessionUser {
   healthViewAreas: string[];
   individualsViewAreas: string[];
   discipleshipAccess: IndividualsAccess;
+  /** Interests whose Discipleship cards this login may see. Empty = all. */
+  discipleshipInterests: string[];
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
@@ -66,6 +68,7 @@ export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
       t.discipleship_access === "edit" || t.discipleship_access === "view"
         ? t.discipleship_access
         : "none",
+    discipleshipInterests: t.discipleship_interests ?? [],
   };
 }
 
@@ -83,6 +86,7 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
     healthViewAreas: r.healthViewAreas,
     individualsViewAreas: r.individualsViewAreas,
     discipleshipAccess: r.discipleshipAccess,
+    discipleshipInterests: r.discipleshipInterests,
   };
 }
 
