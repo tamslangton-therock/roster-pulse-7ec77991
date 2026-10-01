@@ -826,13 +826,18 @@ function InterestPools({
                 active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent/60"
               }`}
             >
-              {INTEREST_ICONS[i] ?? "•"} {i}
+              {emojiOf(i)} {i}
               <span className={`rounded-full px-1.5 text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>
                 {n}
               </span>
             </button>
           );
         })}
+        {canEdit && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setManageOpen(true)}>
+            <Settings2 className="h-3.5 w-3.5" /> Manage interests
+          </Button>
+        )}
       </div>
 
       {pool && (
