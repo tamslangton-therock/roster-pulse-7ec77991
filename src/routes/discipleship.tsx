@@ -927,7 +927,109 @@ function InterestPools({
           )}
         </div>
       )}
+
+      <ManageInterestsDialog open={manageOpen} onOpenChange={setManageOpen} onSave={saveInterests} />
     </div>
+  );
+}
+
+function ManageInterestsDialog({
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSave: (interests: { name: string; emoji: string }[]) => Promise<void>;
+}) {
+  const { interests, isLoading } = useInterestList();
+  const [draft, setDraft] = useState<{ name: string; emoji: string }[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  const items = draft ?? interests;
+
+  const commit = async () => {
+    const cleaned = items
+      .map((i) => ({ name: i.name.trim(), emoji: i.emoji.trim() }))
+      .filter((i) => i.name);
+    if (cleaned.length === 0) {
+      toast.error("Keep at least one interest.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(cleaned);
+      toast.success("Interest list saved — it now shows for every leader.");
+      setDraft(null);
+      onOpenChange(false);
+    } catch {
+      toast.error("Couldn't save the interest list — try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setDraft(null); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manage interests</DialogTitle>
+          <DialogDescription>
+            Add, rename or remove the interest lists everyone sees — e.g. Baptism, Alpha, a marriage course.
+          </DialogDescription>
+        </DialogHeader>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+        ) : (
+          <div className="grid gap-2 max-h-[50vh] overflow-y-auto pr-1">
+            {items.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  value={item.emoji}
+                  onChange={(e) =>
+                    setDraft(items.map((x, i) => (i === idx ? { ...x, emoji: e.target.value } : x)))
+                  }
+                  className="w-14 text-center"
+                  placeholder="🙂"
+                />
+                <Input
+                  value={item.name}
+                  onChange={(e) =>
+                    setDraft(items.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))
+                  }
+                  placeholder="Interest name"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive shrink-0"
+                  onClick={() => setDraft(items.filter((_, i) => i !== idx))}
+                  title={`Remove ${item.name}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1 self-start"
+              onClick={() => setDraft([...items, { name: "", emoji: "" }])}
+            >
+              <Plus className="h-4 w-4" /> Add interest
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Removing an interest only removes it from the lists — existing cards keep their history.
+            </p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={commit} disabled={saving || isLoading}>
+            {saving ? "Saving…" : "Save interest list"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
