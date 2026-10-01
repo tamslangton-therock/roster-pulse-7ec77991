@@ -165,6 +165,13 @@ function UserAccessPage() {
         </div>
       )}
 
+      {interestList.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Interest scopes below use the interests configured on the Discipleship page:{" "}
+          {interestList.map((i) => `${i.emoji || ""} ${i.name}`).join(" · ")}
+        </p>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {users.map((u) => (
           <section key={u.username} className="rounded-xl border bg-card p-4 shadow-sm space-y-4">
