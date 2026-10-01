@@ -448,6 +448,11 @@ function AddCardDialog({
           <div className="grid gap-1.5">
             <Label>Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" autoFocus />
+            {match && (
+              <p className="text-xs text-amber-600">
+                This person is already an Individual — the card will link to their existing profile.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
