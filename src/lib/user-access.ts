@@ -196,3 +196,20 @@ export function canViewDiscipleship(isMaster: boolean, user: SessionUser | null)
 export function canEditDiscipleship(isMaster: boolean, user: SessionUser | null): boolean {
   return isMaster || (!!user && user.discipleshipAccess === "edit");
 }
+
+/** Interests this login may see in Discipleship. Empty = all interests. */
+export function discipleshipInterestScope(isMaster: boolean, user: SessionUser | null): string[] {
+  if (isMaster || !user) return [];
+  return user.discipleshipInterests ?? [];
+}
+
+/** Whether a connect card's interests intersect the login's interest scope. */
+export function cardInInterestScope(
+  isMaster: boolean,
+  user: SessionUser | null,
+  cardInterests: string[] | undefined,
+): boolean {
+  const scope = discipleshipInterestScope(isMaster, user);
+  if (scope.length === 0) return true;
+  return (cardInterests ?? []).some((i) => scope.includes(i));
+}
