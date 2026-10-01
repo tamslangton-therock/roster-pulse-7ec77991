@@ -244,7 +244,7 @@ function UserAccessPage() {
               onSetAll={() => updateUser(u.username, { health_view_areas: [] })}
             />
 
-            {/* Individuals view scope */}
+            {/* Family view scope */}
             <AreaScope
               title="Family — can view these areas"
               hint="Leave empty to show everyone on the Family tab. Tick only the areas whose people they may see."

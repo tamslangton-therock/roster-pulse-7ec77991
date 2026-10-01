@@ -395,7 +395,7 @@ export function VolunteerForm({
         <div>
           <p className="text-sm font-medium">Active volunteer</p>
           <p className="text-xs text-muted-foreground">
-            Off = directory-only individual (e.g. life group member who doesn't serve).
+            Off = directory-only (e.g. life group member who doesn't serve).
           </p>
         </div>
         <Switch

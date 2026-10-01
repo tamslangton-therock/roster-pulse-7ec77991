@@ -193,7 +193,7 @@ function VolunteersPage() {
 
           {canEditPeople && (
             <Button onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add individual
+              <Plus className="h-4 w-4 mr-1" /> Add family member
             </Button>
           )}
         </div>

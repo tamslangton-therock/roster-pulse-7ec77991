@@ -447,7 +447,7 @@ function AddCardDialog({
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" autoFocus />
             {match && (
               <p className="text-xs text-amber-600">
-                This person is already an Individual — the card will link to their existing profile.
+                This person is already a Family member — the card will link to their existing profile.
               </p>
             )}
           </div>
@@ -551,7 +551,7 @@ function DetailDialog({
         .filter(Boolean)
         .join(" — "),
     });
-    toast.success(`${name} is now an Individual — ready for a Life Group or serving.`);
+    toast.success(`${name} is already a Family member — ready for a Life Group or serving.`);
     return name;
   };
   const waNumber = row.phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
@@ -616,15 +616,15 @@ function DetailDialog({
               <>
                 <UserCheck className="h-4 w-4 text-primary" />
                 <span>
-                  Linked to Individual profile <strong>{linked.full_name}</strong>
+                  Linked to Family profile <strong>{linked.full_name}</strong>
                   {linked.serving_areas.length ? ` · serves in ${linked.serving_areas.join(", ")}` : ""}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-muted-foreground flex-1">Not yet an Individual.</span>
+                <span className="text-muted-foreground flex-1">Not yet a Family member.</span>
                 <Button size="sm" onClick={() => promote(true)}>
-                  <UserCheck className="h-4 w-4" /> Make an Individual
+                  <UserCheck className="h-4 w-4" /> Already a Family member
                 </Button>
               </>
             )}
