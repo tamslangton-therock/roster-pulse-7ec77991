@@ -142,6 +142,7 @@ export const USER_ACCESS_SCHEMA = [
   "can_view_roster",
   "can_view_life_groups",
   "health_view_areas",
+  "individuals_view_areas",
 ] as const;
 
 /** Row shape as stored in the sheet (raw strings). */
@@ -159,4 +160,6 @@ export interface UserAccessTabValues {
   can_view_life_groups: boolean;
   /** Serving areas shown on Team Health. Empty = all areas. */
   health_view_areas: string[];
+  /** Serving areas visible on the Individuals tab. Empty = all areas. */
+  individuals_view_areas: string[];
 }

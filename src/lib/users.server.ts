@@ -51,7 +51,7 @@ const toBool = (s: string, fallback = false) => {
 export async function readUserAccessRows(): Promise<UserAccessTabValues[]> {
   let data: { values?: string[][] };
   try {
-    data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:K2000`);
+    data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:L2000`);
   } catch {
     return [];
   }
@@ -79,6 +79,7 @@ export async function readUserAccessRows(): Promise<UserAccessTabValues[]> {
       can_view_roster: toBool(cell(r, "can_view_roster"), true),
       can_view_life_groups: toBool(cell(r, "can_view_life_groups")),
       health_view_areas: toList(cell(r, "health_view_areas")),
+      individuals_view_areas: toList(cell(r, "individuals_view_areas")),
     });
   }
   return out;
