@@ -124,6 +124,9 @@ function DiscipleshipPage() {
   const [view, setView] = useState<"pipeline" | "insights">("pipeline");
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  const { interests: configuredInterests } = useInterestList();
+  const emojiFor = (i: string) =>
+    interestEmoji(configuredInterests.find((c) => c.name === i)?.emoji, i);
   const people = useRoster((s) => s.volunteers);
   const { data: rows = [], isLoading, isError } = useQuery({
     queryKey: ["discipleship"],
