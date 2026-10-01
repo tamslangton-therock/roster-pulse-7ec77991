@@ -70,6 +70,7 @@ function VolunteersPage() {
   // Edit volunteer state
   const [editingVolunteer, setEditingVolunteer] = useState<Volunteer | null>(null);
   const [editDraft, setEditDraft] = useState<VolunteerDraft>(emptyDraft);
+  const [pathwaysFor, setPathwaysFor] = useState<Volunteer | null>(null);
 
   const allAreas = useMemo(() => {
     const set = new Set<string>();
