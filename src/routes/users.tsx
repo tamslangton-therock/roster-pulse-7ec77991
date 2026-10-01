@@ -110,6 +110,7 @@ function UserAccessPage() {
         can_view_roster: true,
         can_view_life_groups: false,
         health_view_areas: [],
+        individuals_view_areas: [],
       },
     ]);
     setAddOpen(false);
@@ -219,6 +220,21 @@ function UserAccessPage() {
                 updateUser(u.username, { health_view_areas: toggleArea(u.health_view_areas, area) })
               }
               onSetAll={() => updateUser(u.username, { health_view_areas: [] })}
+            />
+
+            {/* Individuals view scope */}
+            <AreaScope
+              title="Individuals — can view these areas"
+              hint="Leave empty to show everyone on the Individuals tab. Tick only the areas whose people they may see."
+              allChecked={u.individuals_view_areas.length === 0}
+              areas={areas}
+              selected={u.individuals_view_areas}
+              onToggle={(area) =>
+                updateUser(u.username, {
+                  individuals_view_areas: toggleArea(u.individuals_view_areas, area),
+                })
+              }
+              onSetAll={() => updateUser(u.username, { individuals_view_areas: [] })}
             />
 
             <div className="grid gap-3 sm:grid-cols-2">
