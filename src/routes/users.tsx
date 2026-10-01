@@ -246,8 +246,8 @@ function UserAccessPage() {
 
             {/* Individuals view scope */}
             <AreaScope
-              title="Individuals — can view these areas"
-              hint="Leave empty to show everyone on the Individuals tab. Tick only the areas whose people they may see."
+              title="Family — can view these areas"
+              hint="Leave empty to show everyone on the Family tab. Tick only the areas whose people they may see."
               allChecked={u.individuals_view_areas.length === 0}
               areas={areas}
               selected={u.individuals_view_areas}
@@ -306,7 +306,7 @@ function UserAccessPage() {
               </div>
               <div className="flex items-center justify-between rounded-lg border px-3 py-2">
                 <Label className="text-sm" htmlFor={`ind-${u.username}`}>
-                  Individuals access
+                  Family access
                 </Label>
                 <Select
                   value={u.individuals_access || "none"}

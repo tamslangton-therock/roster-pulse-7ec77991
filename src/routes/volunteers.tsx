@@ -130,14 +130,14 @@ function VolunteersPage() {
 
   const canEditPeople = canEditIndividuals(isMaster, authUser);
   if (!canViewIndividuals(isMaster, authUser)) {
-    return <AccessNotice title="Individuals is not switched on for your login" />;
+    return <AccessNotice title="Family is not switched on for your login" />;
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Individuals</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Family</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {filtered.length} shown · {volunteers.length} in directory ·{" "}
             {volunteerCount} active volunteers
@@ -147,7 +147,7 @@ function VolunteersPage() {
           </p>
           <div className="mt-3 inline-flex rounded-md border bg-muted/40 p-0.5">
             {([
-              { key: "all", label: "All individuals" },
+              { key: "all", label: "All family" },
               { key: "volunteers", label: "Active volunteers" },
             ] as const).map((opt) => (
               <button

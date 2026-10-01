@@ -26,7 +26,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Home menu for Roster Pulse: jump into the live Sunday roster, individuals, team health, life groups and print docs.",
+          "Home menu for Roster Pulse: jump into the live Sunday roster, family, team health, life groups and print docs.",
       },
       { property: "og:title", content: "Roster Pulse — Church Roster Home" },
       {
@@ -49,10 +49,10 @@ const tiles = [
     blurb: "Build and edit the Sunday schedule, spot clashes and swap people.",
   },
   {
-    title: "Individuals",
+    title: "Family",
     to: "/volunteers",
     icon: Users,
-    blurb: "Directory of everyone, preferences, pastoral notes and pauses.",
+    blurb: "Directory of every family member, preferences, pastoral notes and pauses.",
   },
   {
     title: "Team Health",
@@ -125,7 +125,7 @@ function HomeMenu() {
         </p>
         <div className="mt-5 flex flex-wrap gap-2 text-xs text-muted-foreground">
           <span className="rounded-full border bg-card px-3 py-1">
-            {volunteers.length} individuals
+            {volunteers.length} family members
           </span>
           <span className="rounded-full border bg-card px-3 py-1">{dates.length} Sundays</span>
           <span className="rounded-full border bg-card px-3 py-1">

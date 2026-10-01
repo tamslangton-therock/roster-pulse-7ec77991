@@ -38,7 +38,7 @@ const items: NavItem[] = [
     allowed: (m) => canViewRosterPage(m, useAuth.getState().user),
   },
   {
-    title: "Individuals",
+    title: "Family",
     url: "/volunteers",
     icon: Users,
     allowed: (m) => canViewIndividuals(m, useAuth.getState().user),
