@@ -128,6 +128,7 @@ function DiscipleshipPage() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [view, setView] = useState<"pipeline" | "insights">("pipeline");
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const people = useRoster((s) => s.volunteers);
@@ -212,6 +213,26 @@ function DiscipleshipPage() {
         </div>
       </div>
 
+      {!isLoading && !isError && rows.length > 0 && (
+        <div className="inline-flex rounded-lg border bg-card p-0.5">
+          {(["pipeline", "insights"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-md px-3 py-1 text-sm capitalize ${
+                view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view === "insights" && !isLoading && !isError && rows.length > 0 ? (
+        <Insights rows={rows} />
+      ) : (
+      <>
       {!isLoading && !isError && rows.length > 0 && (
         <InterestPools
           rows={rows}
@@ -324,6 +345,8 @@ function DiscipleshipPage() {
             );
           })}
         </div>
+      )}
+      </>
       )}
 
       {canEdit && (
@@ -555,13 +578,37 @@ function DetailDialog({
             </Select>
           </div>
 
-          {stage === "handover" && (
+          {(stage === "handover" || stage === "plugged_in") && (
             <div className="grid gap-1.5">
-              <Label className="text-sm font-medium">Handed over to</Label>
+              <Label className="text-sm font-medium">Add to a Life Group</Label>
+              <Select
+                value=""
+                onValueChange={(id) => {
+                  const g = lifeGroups.find((x) => x.GroupID === id);
+                  if (!g) return;
+                  if (!g.MembersList.some((m) => m.toLowerCase() === row.person_name.toLowerCase())) {
+                    addLifeGroupMember(g.GroupID, row.person_name);
+                  }
+                  onUpdate({ assigned_to: g.Leaders ? `${g.GroupName} (${g.Leaders})` : g.GroupName });
+                  toast.success(`${row.person_name} added to ${g.GroupName}.`);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={lifeGroups.length ? "Choose a Life Group…" : "No Life Groups yet"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {lifeGroups.map((g) => (
+                    <SelectItem key={g.GroupID} value={g.GroupID}>
+                      {g.GroupName}{g.Leaders ? ` — ${g.Leaders}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Label className="text-sm font-medium mt-1">Handed over to</Label>
               <Input
                 value={row.assigned_to}
                 onChange={(e) => onUpdate({ assigned_to: e.target.value })}
-                placeholder="Leader's name…"
+                placeholder="Leader's name or group…"
               />
             </div>
           )}
