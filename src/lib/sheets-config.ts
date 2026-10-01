@@ -141,6 +141,7 @@ export const USER_ACCESS_SCHEMA = [
   "individuals_access",
   "can_view_roster",
   "can_view_life_groups",
+  "health_view_areas",
 ] as const;
 
 /** Row shape as stored in the sheet (raw strings). */
@@ -156,4 +157,6 @@ export interface UserAccessTabValues {
   /** Blank in the sheet means yes — existing logins keep roster access. */
   can_view_roster: boolean;
   can_view_life_groups: boolean;
+  /** Serving areas shown on Team Health. Empty = all areas. */
+  health_view_areas: string[];
 }
