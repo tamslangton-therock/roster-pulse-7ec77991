@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { useAuth } from "@/lib/auth";
-import { canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
+import { areaInScope, canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 
 
