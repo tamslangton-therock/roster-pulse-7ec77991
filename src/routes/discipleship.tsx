@@ -518,7 +518,6 @@ function DetailDialog({
   leaderNames: string[];
 }) {
   const { interests: interestList } = useInterestList();
-  const [newInterest, setNewInterest] = useState("");
   const lifeGroups = useRoster((s) => s.lifeGroups);
   const addLifeGroupMember = useRoster((s) => s.addLifeGroupMember);
   const volunteers = useRoster((s) => s.volunteers);
@@ -724,7 +723,6 @@ function DetailDialog({
                   onValueChange={(v) => {
                     if (v && !row.interests.includes(v))
                       onUpdate({ interests: [...row.interests, v] });
-                    setNewInterest("");
                   }}
                 >
                   <SelectTrigger className="h-8 flex-1 text-xs">
