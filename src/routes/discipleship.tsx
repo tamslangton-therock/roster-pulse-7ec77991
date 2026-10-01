@@ -710,7 +710,7 @@ function DetailDialog({
                       }
                     />
                     <span className={done ? "line-through text-muted-foreground" : ""}>
-                      {INTEREST_ICONS[i] ?? "•"} {i}
+                      {interestEmoji(interestList.find((c) => c.name === i)?.emoji, i)} {i}
                     </span>
                     {i === "Baptism" && !done && (
                       <Badge variant="secondary" className="ml-auto">Baptism list</Badge>
@@ -718,6 +718,29 @@ function DetailDialog({
                   </label>
                 );
               })}
+              <div className="flex items-center gap-2 pt-1">
+                <Select
+                  value=""
+                  onValueChange={(v) => {
+                    if (v && !row.interests.includes(v))
+                      onUpdate({ interests: [...row.interests, v] });
+                    setNewInterest("");
+                  }}
+                >
+                  <SelectTrigger className="h-8 flex-1 text-xs">
+                    <SelectValue placeholder="Add a request…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {interestList
+                      .filter((d) => !row.interests.includes(d.name))
+                      .map((d) => (
+                        <SelectItem key={d.name} value={d.name}>
+                          {interestEmoji(d.emoji, d.name)} {d.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
