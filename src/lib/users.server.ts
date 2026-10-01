@@ -51,7 +51,7 @@ const toBool = (s: string, fallback = false) => {
 export async function readUserAccessRows(): Promise<UserAccessTabValues[]> {
   let data: { values?: string[][] };
   try {
-    data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:L2000`);
+    data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:N2000`);
   } catch {
     return [];
   }
