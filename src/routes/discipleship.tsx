@@ -184,9 +184,17 @@ function DiscipleshipPage() {
     [people],
   );
 
+  // Interest scope: leaders with a restricted scope only see cards whose
+  // interests intersect their allowed set. Shared cards show in full.
+  const allowedInterests = discipleshipInterestScope(isMaster, liveUser);
+  const scopedRows = useMemo(() => {
+    if (allowedInterests.length === 0) return rows;
+    return rows.filter((r) => cardInInterestScope(isMaster, liveUser, r.interests));
+  }, [rows, allowedInterests, isMaster, liveUser]);
+
   const counts = STAGES.map((s) => ({
     id: s.id,
-    count: rows.filter((r) => stageOf(r) === s.id).length,
+    count: scopedRows.filter((r) => stageOf(r) === s.id).length,
   }));
 
   return (
