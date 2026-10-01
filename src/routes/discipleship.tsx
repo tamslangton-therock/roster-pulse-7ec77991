@@ -46,7 +46,15 @@ import {
   type DiscipleshipRow,
 } from "@/lib/sheets.functions";
 import { findIndividual, personKey } from "@/lib/person-link";
+import {
+  useInterestList,
+  useSaveInterestList,
+  interestEmoji,
+  DEFAULT_INTERESTS,
+} from "@/lib/interest-list";
 import type { Volunteer } from "@/lib/types";
+
+export const DEFAULT_INTEREST_NAMES = DEFAULT_INTERESTS.map((i) => i.name);
 
 export const Route = createFileRoute("/discipleship")({
   head: () => ({
