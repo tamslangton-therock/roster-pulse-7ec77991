@@ -11,6 +11,8 @@ import {
   Handshake,
   Sparkles,
   Search,
+  Settings2,
+  Trash2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
