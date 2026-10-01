@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Activity, AlertTriangle, Pause, TrendingDown, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { canViewHealth } from "@/lib/user-access";
+import { canViewHealth, healthViewAreas } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/health")({
@@ -142,15 +142,24 @@ function HealthPage() {
       return next;
     });
 
+  // Serving-area scope for this login (empty = all areas; admin sees everything)
+  const scope = useMemo(
+    () => healthViewAreas(isMaster, authUser).map((a) => a.toLowerCase()),
+    [isMaster, authUser],
+  );
+  const inScope = (v: (typeof volunteers)[number]) =>
+    scope.length === 0 || v.serving_areas.some((a) => scope.includes(a.toLowerCase()));
+
   const areas = useMemo(() => {
     const set = new Set<string>();
-    volunteers.forEach((v) => v.serving_areas.forEach((a) => a && set.add(a)));
+    volunteers.filter(inScope).forEach((v) => v.serving_areas.forEach((a) => a && set.add(a)));
     return Array.from(set).sort();
-  }, [volunteers]);
+  }, [volunteers, scope]);
 
   const rows = useMemo(
     () =>
       volunteers
+        .filter(inScope)
         .filter((v) => settings.includePaused || !v.is_paused)
         .filter(
           (v) =>
@@ -158,7 +167,7 @@ function HealthPage() {
             v.serving_areas.some((a) => a.toLowerCase() === settings.area.toLowerCase()),
         )
         .map((v) => computeHealthRow(v, assignments, settings)),
-    [volunteers, assignments, settings],
+    [volunteers, assignments, settings, scope],
   );
 
   const filtered = useMemo(() => {

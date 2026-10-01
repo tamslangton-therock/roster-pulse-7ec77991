@@ -20,6 +20,8 @@ export interface UserAccessRecord {
   individualsAccess: IndividualsAccess;
   canViewRoster: boolean;
   canViewLifeGroups: boolean;
+  /** Serving areas shown on Team Health. Empty = all areas. */
+  healthViewAreas: string[];
 }
 
 /** What the login flow stores in the session — never includes the password. */
@@ -33,6 +35,7 @@ export interface SessionUser {
   individualsAccess: IndividualsAccess;
   canViewRoster: boolean;
   canViewLifeGroups: boolean;
+  healthViewAreas: string[];
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
@@ -50,6 +53,7 @@ export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
         : "none",
     canViewRoster: t.can_view_roster !== false,
     canViewLifeGroups: t.can_view_life_groups === true,
+    healthViewAreas: t.health_view_areas ?? [],
   };
 }
 
@@ -64,6 +68,7 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
     individualsAccess: r.individualsAccess,
     canViewRoster: r.canViewRoster,
     canViewLifeGroups: r.canViewLifeGroups,
+    healthViewAreas: r.healthViewAreas,
   };
 }
 
@@ -118,6 +123,12 @@ export function canViewLifeGroups(isMaster: boolean, user: SessionUser | null): 
 
 export function canViewHealth(isMaster: boolean, user: SessionUser | null): boolean {
   return isMaster || !!user?.canViewHealth;
+}
+
+/** Serving areas this login may see on Team Health. Empty = all areas. */
+export function healthViewAreas(isMaster: boolean, user: SessionUser | null): string[] {
+  if (isMaster || !user) return [];
+  return user.healthViewAreas;
 }
 
 export function canViewIndividuals(isMaster: boolean, user: SessionUser | null): boolean {
