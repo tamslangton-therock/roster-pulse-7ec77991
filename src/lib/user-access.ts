@@ -22,7 +22,7 @@ export interface UserAccessRecord {
   canViewLifeGroups: boolean;
   /** Serving areas shown on Team Health. Empty = all areas. */
   healthViewAreas: string[];
-  /** Serving areas visible on the Individuals tab. Empty = all areas. */
+  /** Serving areas visible on the Family tab. Empty = all areas. */
   individualsViewAreas: string[];
   discipleshipAccess: IndividualsAccess;
 }
@@ -162,13 +162,13 @@ export function healthViewAreas(isMaster: boolean, user: SessionUser | null): st
   return user.healthViewAreas;
 }
 
-/** Serving areas this login may see on the Individuals tab. Empty = all areas. */
+/** Serving areas this login may see on the Family tab. Empty = all areas. */
 export function individualsViewAreas(isMaster: boolean, user: SessionUser | null): string[] {
   if (isMaster || !user) return [];
   return user.individualsViewAreas ?? [];
 }
 
-/** Whether a person (by serving areas) falls inside the login's Individuals scope. */
+/** Whether a person (by serving areas) falls inside the login's Family scope. */
 export function inIndividualsScope(isMaster: boolean, user: SessionUser | null, servingAreas: string[] | undefined): boolean {
   const scope = individualsViewAreas(isMaster, user);
   if (scope.length === 0) return true;

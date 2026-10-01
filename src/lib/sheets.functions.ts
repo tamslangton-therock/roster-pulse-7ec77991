@@ -24,6 +24,8 @@ import {
   type UserAccessTabValues,
   DISCIPLESHIP_TAB,
   DISCIPLESHIP_SCHEMA,
+  INTERESTS_TAB,
+  INTERESTS_SCHEMA,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
 
@@ -1220,4 +1222,52 @@ export const writeDiscipleship = createServerFn({ method: "POST" })
       body: JSON.stringify({ values }),
     });
     return { ok: true, count: data.rows.length };
+  });
+
+export interface InterestDef {
+  name: string;
+  emoji: string;
+}
+
+async function ensureInterestsTab(): Promise<boolean> {
+  try {
+    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${INTERESTS_TAB}!1:1`);
+    return ((data.values?.[0] ?? []) as string[]).length > 0;
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [{ addSheet: { properties: { title: INTERESTS_TAB, gridProperties: { frozenRowCount: 1 } } } }],
+      }),
+    });
+    return false;
+  }
+}
+
+/** Returns null when the tab has never been set up (client falls back to defaults). */
+export const fetchInterestList = createServerFn({ method: "GET" }).handler(
+  async (): Promise<InterestDef[] | null> => {
+    const exists = await ensureInterestsTab();
+    if (!exists) return null;
+    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${INTERESTS_TAB}!A1:B500`);
+    const out: InterestDef[] = [];
+    for (const r of ((data.values ?? []) as string[][]).slice(1)) {
+      const name = String(r[0] ?? "").trim();
+      if (name) out.push({ name, emoji: String(r[1] ?? "").trim() });
+    }
+    return out;
+  },
+);
+
+export const writeInterestList = createServerFn({ method: "POST" })
+  .inputValidator((data: { interests: InterestDef[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureInterestsTab();
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${INTERESTS_TAB}!A1:B500:clear`, { method: "POST", body: "{}" });
+    const values = [INTERESTS_SCHEMA.slice(), ...data.interests.map((i) => [i.name, i.emoji ?? ""])];
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${INTERESTS_TAB}!A1?valueInputOption=RAW`, {
+      method: "PUT",
+      body: JSON.stringify({ values }),
+    });
+    return { ok: true };
   });

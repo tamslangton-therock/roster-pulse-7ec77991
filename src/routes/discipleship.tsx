@@ -11,6 +11,8 @@ import {
   Handshake,
   Sparkles,
   Search,
+  Settings2,
+  Trash2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -46,7 +48,15 @@ import {
   type DiscipleshipRow,
 } from "@/lib/sheets.functions";
 import { findIndividual, personKey } from "@/lib/person-link";
+import {
+  useInterestList,
+  useSaveInterestList,
+  interestEmoji,
+  DEFAULT_INTERESTS,
+} from "@/lib/interest-list";
 import type { Volunteer } from "@/lib/types";
+
+export const DEFAULT_INTEREST_NAMES = DEFAULT_INTERESTS.map((i) => i.name);
 
 export const Route = createFileRoute("/discipleship")({
   head: () => ({
@@ -77,23 +87,6 @@ const STAGES = [
   { id: "plugged_in", label: "Plugged In", icon: Handshake, hint: "In a Life Group or serving — done" },
 ] as const;
 
-const INTERESTS = [
-  "Life Groups",
-  "New Partners Dinner",
-  "Alpha",
-  "Baptism",
-  "More about God",
-  "Serving",
-] as const;
-
-const INTEREST_ICONS: Record<string, string> = {
-  "Life Groups": "👥",
-  "New Partners Dinner": "🍽️",
-  Alpha: "❓",
-  Baptism: "🌊",
-  "More about God": "✝️",
-  Serving: "🤝",
-};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -133,6 +126,9 @@ function DiscipleshipPage() {
   const [view, setView] = useState<"pipeline" | "insights">("pipeline");
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  const { interests: configuredInterests } = useInterestList();
+  const emojiFor = (i: string) =>
+    interestEmoji(configuredInterests.find((c) => c.name === i)?.emoji, i);
   const people = useRoster((s) => s.volunteers);
   const { data: rows = [], isLoading, isError } = useQuery({
     queryKey: ["discipleship"],
@@ -324,7 +320,7 @@ function DiscipleshipPage() {
                                       : "text-muted-foreground"
                                   }`}
                                 >
-                                  {INTEREST_ICONS[i] ?? "•"} {i}
+                                  {emojiFor(i)} {i}
                                   {done ? " ✓" : ""}
                                 </span>
                               );
@@ -397,6 +393,7 @@ function AddCardDialog({
   const [interests, setInterests] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
+  const { interests: interestList } = useInterestList();
   const volunteers = useRoster((s) => s.volunteers);
   const match = findIndividual(volunteers, name);
   const cardMatch = existingRows.find((r) => personKey(r.person_name) === personKey(name));
@@ -450,7 +447,7 @@ function AddCardDialog({
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" autoFocus />
             {match && (
               <p className="text-xs text-amber-600">
-                This person is already an Individual — the card will link to their existing profile.
+                This person is already a Family member — the card will link to their existing profile.
               </p>
             )}
           </div>
@@ -477,7 +474,9 @@ function AddCardDialog({
           <div className="grid gap-1.5">
             <Label>Interested in</Label>
             <div className="grid grid-cols-2 gap-1.5">
-              {INTERESTS.map((i) => (
+              {interestList.map((def) => {
+                const i = def.name;
+                return (
                 <label
                   key={i}
                   className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm cursor-pointer hover:bg-accent/50"
@@ -488,9 +487,10 @@ function AddCardDialog({
                       setInterests((prev) => (v ? [...prev, i] : prev.filter((x) => x !== i)))
                     }
                   />
-                  <span>{INTEREST_ICONS[i]} {i}</span>
+                  <span>{interestEmoji(def.emoji, i)} {i}</span>
                 </label>
-              ))}
+                );
+              })}
             </div>
           </div>
           <div className="grid gap-1.5">
@@ -519,6 +519,7 @@ function DetailDialog({
   onRemove: () => void;
   leaderNames: string[];
 }) {
+  const { interests: interestList } = useInterestList();
   const lifeGroups = useRoster((s) => s.lifeGroups);
   const addLifeGroupMember = useRoster((s) => s.addLifeGroupMember);
   const volunteers = useRoster((s) => s.volunteers);
@@ -550,7 +551,7 @@ function DetailDialog({
         .filter(Boolean)
         .join(" — "),
     });
-    toast.success(`${name} is now an Individual — ready for a Life Group or serving.`);
+    toast.success(`${name} is already a Family member — ready for a Life Group or serving.`);
     return name;
   };
   const waNumber = row.phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
@@ -615,15 +616,15 @@ function DetailDialog({
               <>
                 <UserCheck className="h-4 w-4 text-primary" />
                 <span>
-                  Linked to Individual profile <strong>{linked.full_name}</strong>
+                  Linked to Family profile <strong>{linked.full_name}</strong>
                   {linked.serving_areas.length ? ` · serves in ${linked.serving_areas.join(", ")}` : ""}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-muted-foreground flex-1">Not yet an Individual.</span>
+                <span className="text-muted-foreground flex-1">Not yet a Family member.</span>
                 <Button size="sm" onClick={() => promote(true)}>
-                  <UserCheck className="h-4 w-4" /> Make an Individual
+                  <UserCheck className="h-4 w-4" /> Already a Family member
                 </Button>
               </>
             )}
@@ -710,7 +711,7 @@ function DetailDialog({
                       }
                     />
                     <span className={done ? "line-through text-muted-foreground" : ""}>
-                      {INTEREST_ICONS[i] ?? "•"} {i}
+                      {interestEmoji(interestList.find((c) => c.name === i)?.emoji, i)} {i}
                     </span>
                     {i === "Baptism" && !done && (
                       <Badge variant="secondary" className="ml-auto">Baptism list</Badge>
@@ -718,6 +719,28 @@ function DetailDialog({
                   </label>
                 );
               })}
+              <div className="flex items-center gap-2 pt-1">
+                <Select
+                  value=""
+                  onValueChange={(v) => {
+                    if (v && !row.interests.includes(v))
+                      onUpdate({ interests: [...row.interests, v] });
+                  }}
+                >
+                  <SelectTrigger className="h-8 flex-1 text-xs">
+                    <SelectValue placeholder="Add a request…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {interestList
+                      .filter((d) => !row.interests.includes(d.name))
+                      .map((d) => (
+                        <SelectItem key={d.name} value={d.name}>
+                          {interestEmoji(d.emoji, d.name)} {d.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -779,11 +802,16 @@ function InterestPools({
 }) {
   const [pool, setPool] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const { interests: configured } = useInterestList();
+  const saveInterests = useSaveInterestList();
 
   const allInterests = useMemo(() => {
-    const extra = rows.flatMap((r) => r.interests).filter((i) => !(INTERESTS as readonly string[]).includes(i));
-    return [...INTERESTS, ...Array.from(new Set(extra))];
-  }, [rows]);
+    const known = new Set(configured.map((i) => i.name));
+    const extra = rows.flatMap((r) => r.interests).filter((i) => !known.has(i));
+    return [...configured.map((i) => i.name), ...Array.from(new Set(extra))];
+  }, [rows, configured]);
+  const emojiOf = (i: string) => interestEmoji(configured.find((c) => c.name === i)?.emoji, i);
 
   const waitingCount = (i: string) =>
     rows.filter((r) => r.interests.includes(i) && !r.interest_done.includes(i)).length;
@@ -826,20 +854,25 @@ function InterestPools({
                 active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent/60"
               }`}
             >
-              {INTEREST_ICONS[i] ?? "•"} {i}
+              {emojiOf(i)} {i}
               <span className={`rounded-full px-1.5 text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>
                 {n}
               </span>
             </button>
           );
         })}
+        {canEdit && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setManageOpen(true)}>
+            <Settings2 className="h-3.5 w-3.5" /> Manage interests
+          </Button>
+        )}
       </div>
 
       {pool && (
         <div className="space-y-3 border-t pt-3">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-semibold">
-              {INTEREST_ICONS[pool] ?? "•"} {pool} — {waiting.length} still waiting
+              {emojiOf(pool)} {pool} — {waiting.length} still waiting
             </h2>
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
               <Checkbox checked={showDone} onCheckedChange={(v) => setShowDone(v === true)} />
@@ -894,7 +927,109 @@ function InterestPools({
           )}
         </div>
       )}
+
+      <ManageInterestsDialog open={manageOpen} onOpenChange={setManageOpen} onSave={saveInterests} />
     </div>
+  );
+}
+
+function ManageInterestsDialog({
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSave: (interests: { name: string; emoji: string }[]) => Promise<void>;
+}) {
+  const { interests, isLoading } = useInterestList();
+  const [draft, setDraft] = useState<{ name: string; emoji: string }[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  const items = draft ?? interests;
+
+  const commit = async () => {
+    const cleaned = items
+      .map((i) => ({ name: i.name.trim(), emoji: i.emoji.trim() }))
+      .filter((i) => i.name);
+    if (cleaned.length === 0) {
+      toast.error("Keep at least one interest.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(cleaned);
+      toast.success("Interest list saved — it now shows for every leader.");
+      setDraft(null);
+      onOpenChange(false);
+    } catch {
+      toast.error("Couldn't save the interest list — try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setDraft(null); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manage interests</DialogTitle>
+          <DialogDescription>
+            Add, rename or remove the interest lists everyone sees — e.g. Baptism, Alpha, a marriage course.
+          </DialogDescription>
+        </DialogHeader>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+        ) : (
+          <div className="grid gap-2 max-h-[50vh] overflow-y-auto pr-1">
+            {items.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  value={item.emoji}
+                  onChange={(e) =>
+                    setDraft(items.map((x, i) => (i === idx ? { ...x, emoji: e.target.value } : x)))
+                  }
+                  className="w-14 text-center"
+                  placeholder="🙂"
+                />
+                <Input
+                  value={item.name}
+                  onChange={(e) =>
+                    setDraft(items.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))
+                  }
+                  placeholder="Interest name"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive shrink-0"
+                  onClick={() => setDraft(items.filter((_, i) => i !== idx))}
+                  title={`Remove ${item.name}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1 self-start"
+              onClick={() => setDraft([...items, { name: "", emoji: "" }])}
+            >
+              <Plus className="h-4 w-4" /> Add interest
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Removing an interest only removes it from the lists — existing cards keep their history.
+            </p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={commit} disabled={saving || isLoading}>
+            {saving ? "Saving…" : "Save interest list"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -929,6 +1064,7 @@ function Bar({ label, value, max, suffix }: { label: string; value: number; max:
 }
 
 function Insights({ rows }: { rows: DiscipleshipRow[] }) {
+  const { interests: configuredInterests } = useInterestList();
   const plugged = rows.filter((r) => stageOf(r) === "plugged_in");
   const toPlug = plugged.map((r) => daysBetween(r.date_connected, r.plugged_in_date)).filter((n): n is number => n !== null);
   const toContact = rows.map((r) => (r.contacted ? daysBetween(r.date_connected, r.contacted_date) : null)).filter((n): n is number => n !== null);
@@ -984,7 +1120,7 @@ function Insights({ rows }: { rows: DiscipleshipRow[] }) {
           <h2 className="text-sm font-semibold">What people ask for</h2>
           <p className="text-xs text-muted-foreground">How many asked, and what share of them are plugged in.</p>
           {byInterest.map(([k, v]) => (
-            <Bar key={k} label={`${INTEREST_ICONS[k] ?? ""} ${k}`} value={v.total} max={maxInterest}
+            <Bar key={k} label={`${interestEmoji(configuredInterests.find((c) => c.name === k)?.emoji, k)} ${k}`} value={v.total} max={maxInterest}
               suffix={`${v.total} · ${Math.round((v.plugged / v.total) * 100)}% in${avg(v.days) !== null ? ` · ${avg(v.days)}d` : ""}`} />
           ))}
         </div>

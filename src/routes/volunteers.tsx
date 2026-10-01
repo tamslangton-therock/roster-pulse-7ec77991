@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useLiveUser } from "@/lib/use-live-user";
 import { useMemo, useState } from "react";
-import { Edit2, Plus, Trash2, X } from "lucide-react";
+import { Edit2, Plus, Trash2, X, Target } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -33,21 +33,22 @@ import { useAuth } from "@/lib/auth";
 import { areaInScope, canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 import { findIndividual } from "@/lib/person-link";
+import { InterestPathwayDialog } from "@/components/interest-pathway-dialog";
 
 
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
     meta: [
-      { title: "Individuals — Roster Pulse" },
+      { title: "Family — Roster Pulse" },
       {
         name: "description",
         content:
-          "Master directory of every individual — serving areas, availability, context, challenges and prayer notes.",
+          "Family directory of every person — serving areas, availability, context, challenges and prayer notes.",
       },
-      { property: "og:title", content: "Individuals — Roster Pulse" },
+      { property: "og:title", content: "Family — Roster Pulse" },
       {
         property: "og:description",
-        content: "Add, edit, and filter individual profiles, volunteer flags and serving rules.",
+        content: "Add, edit, and filter family profiles, volunteer flags and serving rules.",
       },
     ],
   }),
@@ -69,6 +70,7 @@ function VolunteersPage() {
   // Edit volunteer state
   const [editingVolunteer, setEditingVolunteer] = useState<Volunteer | null>(null);
   const [editDraft, setEditDraft] = useState<VolunteerDraft>(emptyDraft);
+  const [pathwaysFor, setPathwaysFor] = useState<Volunteer | null>(null);
 
   const allAreas = useMemo(() => {
     const set = new Set<string>();
@@ -128,14 +130,14 @@ function VolunteersPage() {
 
   const canEditPeople = canEditIndividuals(isMaster, authUser);
   if (!canViewIndividuals(isMaster, authUser)) {
-    return <AccessNotice title="Individuals is not switched on for your login" />;
+    return <AccessNotice title="Family is not switched on for your login" />;
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Individuals</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Family</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {filtered.length} shown · {volunteers.length} in directory ·{" "}
             {volunteerCount} active volunteers
@@ -145,7 +147,7 @@ function VolunteersPage() {
           </p>
           <div className="mt-3 inline-flex rounded-md border bg-muted/40 p-0.5">
             {([
-              { key: "all", label: "All individuals" },
+              { key: "all", label: "All family" },
               { key: "volunteers", label: "Active volunteers" },
             ] as const).map((opt) => (
               <button
@@ -191,7 +193,7 @@ function VolunteersPage() {
 
           {canEditPeople && (
             <Button onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add individual
+              <Plus className="h-4 w-4 mr-1" /> Add family member
             </Button>
           )}
         </div>
@@ -254,6 +256,16 @@ function VolunteersPage() {
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="outline"
+                        size="sm"
+                        onClick={() => setPathwaysFor(v)}
+                        className="h-8 gap-1.5 px-2.5"
+                        title="Add to Baptism, Alpha, etc."
+                      >
+                        <Target className="h-3.5 w-3.5" />
+                        <span>Interests</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => startEditing(v)}
                         className="h-8 gap-1.5 px-2.5"
@@ -322,9 +334,9 @@ function VolunteersPage() {
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add Volunteer</DialogTitle>
+            <DialogTitle>Add family member</DialogTitle>
             <DialogDescription>
-              Create a full volunteer profile — it syncs straight to the sheet.
+              Create a full profile — it syncs straight to the sheet.
             </DialogDescription>
           </DialogHeader>
 
@@ -360,12 +372,17 @@ function VolunteersPage() {
                 toast.success("Volunteer added");
               }}
             >
-              Add Volunteer
+              Add family member
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      <InterestPathwayDialog
+        volunteer={pathwaysFor}
+        open={Boolean(pathwaysFor)}
+        onOpenChange={(v) => !v && setPathwaysFor(null)}
+      />
     </div>
   );
 }

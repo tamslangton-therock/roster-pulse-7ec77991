@@ -191,3 +191,7 @@ export const DISCIPLESHIP_SCHEMA = [
   "plugged_in_date",
   "notes",
 ] as const;
+
+// Customisable Discipleship interest lists (Baptism, Alpha, …) — one row each, in display order.
+export const INTERESTS_TAB = "Discipleship_Interests";
+export const INTERESTS_SCHEMA = ["name", "emoji"] as const;
