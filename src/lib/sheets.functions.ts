@@ -1019,6 +1019,7 @@ export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
         health_view_areas: toList(String(r[10] ?? "")),
         individuals_view_areas: toList(String(r[11] ?? "")),
         discipleship_access: String(r[12] ?? "").trim() || "none",
+        discipleship_interests: toList(String(r[13] ?? "")),
       });
     }
     return out;
@@ -1049,6 +1050,7 @@ export const writeUserAccess = createServerFn({ method: "POST" })
         (r.health_view_areas ?? []).join(" | "),
         (r.individuals_view_areas ?? []).join(" | "),
         r.discipleship_access ?? "none",
+        (r.discipleship_interests ?? []).join(" | "),
       ]),
     ];
     await gwFetch(
