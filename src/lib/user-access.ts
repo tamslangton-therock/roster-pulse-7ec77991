@@ -139,7 +139,7 @@ export function healthViewAreas(isMaster: boolean, user: SessionUser | null): st
 /** Serving areas this login may see on the Individuals tab. Empty = all areas. */
 export function individualsViewAreas(isMaster: boolean, user: SessionUser | null): string[] {
   if (isMaster || !user) return [];
-  return user.individualsViewAreas;
+  return user.individualsViewAreas ?? [];
 }
 
 /** Whether a person (by serving areas) falls inside the login's Individuals scope. */
