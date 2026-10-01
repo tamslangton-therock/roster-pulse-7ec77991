@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Activity, AlertTriangle, Pause, TrendingDown, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { canViewHealth, healthViewAreas } from "@/lib/user-access";
+import { areaInScope, canViewHealth, healthViewAreas } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 
 export const Route = createFileRoute("/health")({
