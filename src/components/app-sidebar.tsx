@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText, LayoutDashboard, Shield } from "lucide-react";
+import { CalendarDays, Users, Activity, LayoutGrid, Sparkles, Printer, Home, FileText, HeartHandshake, LayoutDashboard, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +17,7 @@ import {
   canViewHealth,
   canViewIndividuals,
   canViewLifeGroups,
+  canViewDiscipleship,
   canViewRosterPage,
 } from "@/lib/user-access";
 
@@ -61,6 +62,12 @@ const items: NavItem[] = [
     url: "/life-groups",
     icon: Home,
     allowed: (m) => canViewLifeGroups(m, useAuth.getState().user),
+  },
+  {
+    title: "Discipleship",
+    url: "/discipleship",
+    icon: HeartHandshake,
+    allowed: (m) => canViewDiscipleship(m, useAuth.getState().user),
   },
   { title: "User Access", url: "/users", icon: Shield, allowed: (m) => m },
 ];

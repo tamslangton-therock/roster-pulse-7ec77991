@@ -24,6 +24,7 @@ export interface UserAccessRecord {
   healthViewAreas: string[];
   /** Serving areas visible on the Individuals tab. Empty = all areas. */
   individualsViewAreas: string[];
+  discipleshipAccess: IndividualsAccess;
 }
 
 /** What the login flow stores in the session — never includes the password. */
@@ -39,6 +40,7 @@ export interface SessionUser {
   canViewLifeGroups: boolean;
   healthViewAreas: string[];
   individualsViewAreas: string[];
+  discipleshipAccess: IndividualsAccess;
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
@@ -58,6 +60,10 @@ export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
     canViewLifeGroups: t.can_view_life_groups === true,
     healthViewAreas: t.health_view_areas ?? [],
     individualsViewAreas: t.individuals_view_areas ?? [],
+    discipleshipAccess:
+      t.discipleship_access === "edit" || t.discipleship_access === "view"
+        ? t.discipleship_access
+        : "none",
   };
 }
 
@@ -74,6 +80,7 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
     canViewLifeGroups: r.canViewLifeGroups,
     healthViewAreas: r.healthViewAreas,
     individualsViewAreas: r.individualsViewAreas,
+    discipleshipAccess: r.discipleshipAccess,
   };
 }
 
@@ -174,4 +181,12 @@ export function canViewIndividuals(isMaster: boolean, user: SessionUser | null):
 
 export function canEditIndividuals(isMaster: boolean, user: SessionUser | null): boolean {
   return isMaster || (!!user && user.individualsAccess === "edit");
+}
+
+export function canViewDiscipleship(isMaster: boolean, user: SessionUser | null): boolean {
+  return isMaster || (!!user && (user.discipleshipAccess ?? "none") !== "none");
+}
+
+export function canEditDiscipleship(isMaster: boolean, user: SessionUser | null): boolean {
+  return isMaster || (!!user && user.discipleshipAccess === "edit");
 }
