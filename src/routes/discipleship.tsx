@@ -318,7 +318,7 @@ function DiscipleshipPage() {
                                       : "text-muted-foreground"
                                   }`}
                                 >
-                                  {emojiOf(i)} {i}
+                                  {emojiFor(i)} {i}
                                   {done ? " ✓" : ""}
                                 </span>
                               );
