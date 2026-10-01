@@ -25,6 +25,8 @@ export interface UserAccessRecord {
   /** Serving areas visible on the Family tab. Empty = all areas. */
   individualsViewAreas: string[];
   discipleshipAccess: IndividualsAccess;
+  /** Interests whose Discipleship cards this login may see. Empty = all. */
+  discipleshipInterests: string[];
 }
 
 /** What the login flow stores in the session — never includes the password. */
