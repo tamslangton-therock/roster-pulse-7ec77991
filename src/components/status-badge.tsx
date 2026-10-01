@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { FatigueStatus } from "@/lib/types";
-import { statusMeta } from "@/lib/roster-engine";
+import { statusMetaWith } from "@/lib/health-settings";
+import { useRoster } from "@/lib/store";
 
 const toneClasses: Record<string, string> = {
   green: "bg-status-green text-status-green-foreground",
@@ -20,7 +21,8 @@ export function StatusBadge({
   className?: string;
   showEmoji?: boolean;
 }) {
-  const meta = statusMeta(status);
+  const labels = useRoster((s) => s.healthLabels);
+  const meta = statusMetaWith(labels, status);
   return (
     <span
       className={cn(

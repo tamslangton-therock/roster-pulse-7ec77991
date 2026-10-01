@@ -163,3 +163,9 @@ export interface UserAccessTabValues {
   /** Serving areas visible on the Individuals tab. Empty = all areas. */
   individuals_view_areas: string[];
 }
+
+// Master Team Health rules & category labels (edited on the User Access page,
+// applied across every access view). One key/value row per setting.
+export const HEALTH_CONFIG_TAB = "Health_Config";
+export const HEALTH_CONFIG_SCHEMA = ["key", "value"] as const;
+

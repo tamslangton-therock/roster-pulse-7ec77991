@@ -1,14 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useLiveUser } from "@/lib/use-live-user";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRoster } from "@/lib/store";
 import type { FatigueStatus } from "@/lib/types";
+import { statusMetaWith } from "@/lib/health-settings";
 import {
-  DEFAULT_HEALTH_SETTINGS,
   MODE_OPTIONS,
   computeHealthRow,
-  loadHealthSettings,
-  saveHealthSettings,
   type HealthMode,
   type HealthSettings,
 } from "@/lib/health-settings";
@@ -59,15 +57,22 @@ export const Route = createFileRoute("/health")({
   component: HealthPage,
 });
 
-const FATIGUE_OPTIONS: { value: FatigueStatus | "all"; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "healthy", label: "Healthy" },
-  { value: "could_do_more", label: "Could do more" },
-  { value: "no_rest", label: "No rest weeks" },
-  { value: "burnout", label: "Burnout risk / over-served" },
-  { value: "paused", label: "Paused" },
-  { value: "inactive", label: "Inactive" },
+const FATIGUE_KEYS: { value: FatigueStatus | "all" }[] = [
+  { value: "all" },
+  { value: "healthy" },
+  { value: "could_do_more" },
+  { value: "no_rest" },
+  { value: "burnout" },
+  { value: "paused" },
+  { value: "inactive" },
 ];
+
+function fatigueOptions(labels: ReturnType<typeof useRoster.getState>["healthLabels"]) {
+  return FATIGUE_KEYS.map((k) => ({
+    value: k.value,
+    label: k.value === "all" ? "All statuses" : statusMetaWith(labels, k.value as FatigueStatus).label,
+  }));
+}
 
 function KpiCard({
   icon: Icon,
@@ -124,24 +129,19 @@ function HealthPage() {
   const isMaster = useAuth((s) => s.master);
   const authUser = useLiveUser();
   const { volunteers, assignments } = useRoster();
+  const settings = useRoster((s) => s.healthSettings);
+  const healthLabels = useRoster((s) => s.healthLabels);
+  const setHealthSettings = useRoster((s) => s.setHealthSettings);
+  const resetHealthSettings = useRoster((s) => s.resetHealthSettings);
   if (!canViewHealth(isMaster, authUser)) {
     return <AccessNotice title="Team Health is not switched on for your login" />;
   }
   const [statusFilter, setStatusFilter] = useState<FatigueStatus | "all">("all");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<HealthSettings>(DEFAULT_HEALTH_SETTINGS);
-
-  useEffect(() => {
-    setSettings(loadHealthSettings());
-  }, []);
 
   const patch = (p: Partial<HealthSettings>) =>
-    setSettings((s) => {
-      const next = { ...s, ...p };
-      saveHealthSettings(next);
-      return next;
-    });
+    setHealthSettings({ ...settings, ...p }, healthLabels);
 
   // Serving-area scope for this login (empty = all areas; admin sees everything)
   const scope = useMemo(
@@ -217,7 +217,7 @@ function HealthPage() {
         />
         <KpiCard
           icon={AlertTriangle}
-          label="Over-served / burnout"
+          label={healthLabels.burnout.label}
           value={kpis.burnout}
           tone="bg-status-red text-status-red-foreground"
         />
@@ -253,7 +253,7 @@ function HealthPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {FATIGUE_OPTIONS.map((o) => (
+                  {fatigueOptions(healthLabels).map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -445,10 +445,7 @@ function HealthPage() {
             <div className="flex justify-end border-t pt-4">
               <Button
                 variant="outline"
-                onClick={() => {
-                  saveHealthSettings(DEFAULT_HEALTH_SETTINGS);
-                  setSettings(DEFAULT_HEALTH_SETTINGS);
-                }}
+                onClick={() => resetHealthSettings()}
               >
                 Reset to defaults
               </Button>

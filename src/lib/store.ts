@@ -18,6 +18,8 @@ import {
   writeDocTemplate,
   fetchUserAccess,
   writeUserAccess,
+  fetchHealthConfig,
+  writeHealthConfig,
   type LiveRosterRow,
   type BlockoutRow,
   type StatusRow,
@@ -39,6 +41,14 @@ import {
   type SlotDef,
 } from "./roster-grid";
 import type { SheetTab } from "./sheets-config";
+import {
+  DEFAULT_HEALTH_SETTINGS,
+  DEFAULT_HEALTH_LABELS,
+  healthConfigRows,
+  parseHealthConfig,
+  type HealthSettings,
+  type HealthLabels,
+} from "./health-settings";
 import { toast } from "sonner";
 
 
@@ -61,6 +71,10 @@ interface RosterState {
   docTemplate: DocSection[];
   /** Team-leader logins + permissions — two-way with the User_Access tab. */
   userAccess: UserAccessTabValues[];
+  /** Master Team Health rules — two-way with the Health_Config tab. */
+  healthSettings: HealthSettings;
+  /** Master Team Health status labels + emojis — two-way with the Health_Config tab. */
+  healthLabels: HealthLabels;
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
   /** Current column layout of the Live_Roster grid (areas × roles), synced two-way. */
@@ -142,6 +156,8 @@ interface RosterState {
 
   // User Access — two-way with the User_Access tab (admin only)
   setUserAccess: (users: UserAccessTabValues[]) => void;
+  setHealthSettings: (settings: HealthSettings, labels: HealthLabels) => void;
+  resetHealthSettings: () => void;
 }
 
 
@@ -469,6 +485,43 @@ function scheduleUserAccessSync() {
   userAccessTimer = setTimeout(run, 800);
 }
 
+let healthConfigTimer: ReturnType<typeof setTimeout> | null = null;
+let healthConfigInFlight = false;
+
+function scheduleHealthConfigSync() {
+  if (typeof window === "undefined") return;
+  useRoster.setState({ syncStatus: "syncing" });
+  if (healthConfigTimer) clearTimeout(healthConfigTimer);
+  const run = async () => {
+    if (healthConfigTimer) clearTimeout(healthConfigTimer);
+    if (healthConfigInFlight) {
+      scheduleHealthConfigSync();
+      return;
+    }
+    healthConfigInFlight = true;
+    setPending("health_config", null);
+    try {
+      const state = useRoster.getState();
+      await writeHealthConfig({
+        data: { config: healthConfigRows(state.healthSettings, state.healthLabels) },
+      });
+      useRoster.setState({ syncStatus: "idle", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[health-config sync] failed", err);
+      useRoster.setState({ syncStatus: "error", error: msg });
+      setPending("health_config", run);
+      toast.error("Google Sheets sync failed for Health_Config", {
+        description: msg.slice(0, 200),
+      });
+    } finally {
+      healthConfigInFlight = false;
+    }
+  };
+  setPending("health_config", run);
+  healthConfigTimer = setTimeout(run, 800);
+}
+
 function buildRosterRows(state: RosterState): LiveRosterRow[] {
   return state.dates.map((date) => {
     const meta = state.rosterMeta[date] ?? { label: date, notes: "", detail: "" };
@@ -611,6 +664,8 @@ export const useRoster = create<RosterState>()((set, get) => ({
   lifeGroups: [],
   docTemplate: defaultDocTemplate(),
   userAccess: [],
+  healthSettings: DEFAULT_HEALTH_SETTINGS,
+  healthLabels: DEFAULT_HEALTH_LABELS,
   statuses: {},
 
 
@@ -638,6 +693,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         lifeGroups,
         docRows,
         userAccess,
+        healthConfigRowsIn,
       ] =
         await Promise.all([
           fetchAllTabs(),
@@ -649,7 +705,11 @@ export const useRoster = create<RosterState>()((set, get) => ({
           fetchLifeGroups().catch(() => [] as LifeGroupRow[]),
           fetchDocTemplate().catch(() => []),
           fetchUserAccess().catch(() => [] as UserAccessTabValues[]),
+          fetchHealthConfig().catch(() => ({}) as Record<string, string>),
         ]);
+
+      // Master Team Health rules & labels — sheet values win over defaults.
+      const parsedHealth = parseHealthConfig(healthConfigRowsIn);
 
       const docSections = docRows.length ? rowsToSections(docRows) : defaultDocTemplate();
 
@@ -713,6 +773,8 @@ export const useRoster = create<RosterState>()((set, get) => ({
         lifeGroups,
         docTemplate: docSections,
         userAccess,
+        healthSettings: parsedHealth.settings,
+        healthLabels: parsedHealth.labels,
         statuses,
         rosterMeta,
         dates,
@@ -1182,6 +1244,16 @@ export const useRoster = create<RosterState>()((set, get) => ({
   setUserAccess: (users) => {
     set({ userAccess: users });
     scheduleUserAccessSync();
+  },
+
+  // --- HEALTH CONFIG (master Team Health rules & labels) ---
+  setHealthSettings: (settings, labels) => {
+    set({ healthSettings: settings, healthLabels: labels });
+    scheduleHealthConfigSync();
+  },
+  resetHealthSettings: () => {
+    set({ healthSettings: DEFAULT_HEALTH_SETTINGS, healthLabels: DEFAULT_HEALTH_LABELS });
+    scheduleHealthConfigSync();
   },
 
   // --- LIFE GROUPS ---
