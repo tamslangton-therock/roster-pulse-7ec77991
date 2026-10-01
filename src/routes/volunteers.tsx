@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { useAuth } from "@/lib/auth";
-import { canEditIndividuals, canViewIndividuals } from "@/lib/user-access";
+import { canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 
 
@@ -81,6 +81,10 @@ function VolunteersPage() {
     [volunteers]
   );
 
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+  const scopeAreas = individualsViewAreas(isMaster, authUser);
+
   const filtered = useMemo(() => {
     return volunteers.filter((v: Volunteer) => {
       const matchesSearch = (v.full_name || "")
@@ -89,13 +93,18 @@ function VolunteersPage() {
       const matchesArea =
         selectedArea === "all" || (v.serving_areas && v.serving_areas.includes(selectedArea));
       const matchesScope = scope === "all" || v.is_volunteer !== false;
-      return matchesSearch && matchesArea && matchesScope;
+      const inScope = inIndividualsScope(isMaster, authUser, v.serving_areas);
+      return matchesSearch && matchesArea && matchesScope && inScope;
     });
-  }, [volunteers, search, selectedArea, scope]);
+  }, [volunteers, search, selectedArea, scope, isMaster, authUser]);
 
   const volunteerCount = useMemo(
-    () => volunteers.filter((v: Volunteer) => v.is_volunteer !== false).length,
-    [volunteers]
+    () =>
+      volunteers.filter(
+        (v: Volunteer) =>
+          v.is_volunteer !== false && inIndividualsScope(isMaster, authUser, v.serving_areas)
+      ).length,
+    [volunteers, isMaster, authUser]
   );
 
   const startEditing = (volunteer: Volunteer) => {
