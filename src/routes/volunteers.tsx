@@ -257,6 +257,16 @@ function VolunteersPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setPathwaysFor(v)}
+                        className="h-8 gap-1.5 px-2.5"
+                        title="Add to Baptism, Alpha, etc."
+                      >
+                        <Target className="h-3.5 w-3.5" />
+                        <span>Interests</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => startEditing(v)}
                         className="h-8 gap-1.5 px-2.5"
                       >
