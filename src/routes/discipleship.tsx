@@ -291,7 +291,7 @@ function DiscipleshipPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {STAGES.map((stage) => {
-            const items = filtered.filter((r) => stageOf(r) === stage.id);
+            const items = filtered.filter((r) => stageOf(r) === stage.id && scopedRows.includes(r));
             const count = counts.find((c) => c.id === stage.id)?.count ?? 0;
             return (
               <div key={stage.id} className="rounded-xl border bg-card flex flex-col">
