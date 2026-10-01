@@ -3,16 +3,18 @@ import {
   Activity,
   CalendarDays,
   FileText,
+  HeartHandshake,
   Home,
   LayoutGrid,
   Printer,
+  Shield,
   Sparkles,
   Users,
 } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import {
-  canEditTeamsArea,
+  canViewDiscipleship,
   canViewHealth,
   canViewIndividuals,
   canViewLifeGroups,
@@ -84,6 +86,18 @@ const tiles = [
     icon: Home,
     blurb: "Groups, leaders, meeting details and member rosters.",
   },
+  {
+    title: "Discipleship",
+    to: "/discipleship",
+    icon: HeartHandshake,
+    blurb: "Connect cards, follow-up stages and interest pathways like Baptism and Alpha.",
+  },
+  {
+    title: "User Access",
+    to: "/users",
+    icon: Shield,
+    blurb: "Leader logins, page access, area scopes and Team Health settings.",
+  },
 ] as const;
 
 function HomeMenu() {
@@ -105,6 +119,8 @@ function HomeMenu() {
         return isMaster || (authUser?.teamEditAreas ?? []).length > 0;
       case "/life-groups":
         return canViewLifeGroups(isMaster, authUser);
+      case "/discipleship":
+        return canViewDiscipleship(isMaster, authUser);
       default:
         return isMaster;
     }
