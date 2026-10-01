@@ -109,6 +109,7 @@ function UserAccessPage() {
         individuals_access: "none",
         can_view_roster: true,
         can_view_life_groups: false,
+        health_view_areas: [],
       },
     ]);
     setAddOpen(false);
@@ -205,6 +206,19 @@ function UserAccessPage() {
               onToggle={(area) =>
                 updateUser(u.username, { team_edit_areas: toggleArea(u.team_edit_areas, area) })
               }
+            />
+
+            {/* Team Health view scope */}
+            <AreaScope
+              title="Team Health — can view these areas"
+              hint="Leave empty to show all areas on Team Health. Tick only the areas they may see."
+              allChecked={u.health_view_areas.length === 0}
+              areas={areas}
+              selected={u.health_view_areas}
+              onToggle={(area) =>
+                updateUser(u.username, { health_view_areas: toggleArea(u.health_view_areas, area) })
+              }
+              onSetAll={() => updateUser(u.username, { health_view_areas: [] })}
             />
 
             <div className="grid gap-3 sm:grid-cols-2">
