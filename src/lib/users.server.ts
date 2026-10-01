@@ -80,6 +80,8 @@ export async function readUserAccessRows(): Promise<UserAccessTabValues[]> {
       can_view_life_groups: toBool(cell(r, "can_view_life_groups")),
       health_view_areas: toList(cell(r, "health_view_areas")),
       individuals_view_areas: toList(cell(r, "individuals_view_areas")),
+      discipleship_access: cell(r, "discipleship_access").trim() || "none",
+      discipleship_interests: toList(cell(r, "discipleship_interests")),
     });
   }
   return out;
