@@ -501,6 +501,8 @@ function DetailDialog({
   onRemove: () => void;
   leaderNames: string[];
 }) {
+  const lifeGroups = useRoster((s) => s.lifeGroups);
+  const addLifeGroupMember = useRoster((s) => s.addLifeGroupMember);
   const stage = stageOf(row);
   const waNumber = row.phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
   const waText = encodeURIComponent(
@@ -822,6 +824,117 @@ function InterestPools({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function daysBetween(a: string, b: string): number | null {
+  const da = new Date(a), db = new Date(b);
+  if (!a || !b || isNaN(da.getTime()) || isNaN(db.getTime())) return null;
+  return Math.max(0, Math.round((db.getTime() - da.getTime()) / 86_400_000));
+}
+
+const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-xl border bg-card p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function Bar({ label, value, max, suffix }: { label: string; value: number; max: number; suffix: string }) {
+  return (
+    <div className="grid grid-cols-[9rem_1fr_6rem] items-center gap-2 text-sm">
+      <span className="truncate">{label}</span>
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${max ? (value / max) * 100 : 0}%` }} />
+      </div>
+      <span className="text-xs text-muted-foreground text-right">{suffix}</span>
+    </div>
+  );
+}
+
+function Insights({ rows }: { rows: DiscipleshipRow[] }) {
+  const plugged = rows.filter((r) => stageOf(r) === "plugged_in");
+  const toPlug = plugged.map((r) => daysBetween(r.date_connected, r.plugged_in_date)).filter((n): n is number => n !== null);
+  const toContact = rows.map((r) => (r.contacted ? daysBetween(r.date_connected, r.contacted_date) : null)).filter((n): n is number => n !== null);
+  const waitingContact = rows.filter((r) => stageOf(r) === "needs_contact").length;
+  const rate = rows.length ? Math.round((plugged.length / rows.length) * 100) : 0;
+
+  const groupStats = (keyOf: (r: DiscipleshipRow) => string[]) => {
+    const map = new Map<string, { total: number; plugged: number; days: number[] }>();
+    for (const r of rows) {
+      for (const k of keyOf(r)) {
+        const e = map.get(k) ?? { total: 0, plugged: 0, days: [] };
+        e.total++;
+        if (stageOf(r) === "plugged_in") {
+          e.plugged++;
+          const d = daysBetween(r.date_connected, r.plugged_in_date);
+          if (d !== null) e.days.push(d);
+        }
+        map.set(k, e);
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
+  };
+
+  const byInterest = groupStats((r) => (r.interests.length ? r.interests : ["No interest ticked"]));
+  const bySource = groupStats((r) => [r.source || "Unknown"]);
+  const contactBuckets = [
+    { label: "Contacted within 2 days", test: (d: number) => d <= 2 },
+    { label: "Contacted in 3–7 days", test: (d: number) => d > 2 && d <= 7 },
+    { label: "Contacted after a week", test: (d: number) => d > 7 },
+  ].map((b) => {
+    const group = rows.filter((r) => {
+      const d = r.contacted ? daysBetween(r.date_connected, r.contacted_date) : null;
+      return d !== null && b.test(d);
+    });
+    const p = group.filter((r) => stageOf(r) === "plugged_in").length;
+    return { label: b.label, total: group.length, rate: group.length ? Math.round((p / group.length) * 100) : 0 };
+  });
+
+  const maxInterest = Math.max(1, ...byInterest.map(([, v]) => v.total));
+  const maxSource = Math.max(1, ...bySource.map(([, v]) => v.total));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="People in the journey" value={String(rows.length)} hint={`${waitingContact} still need a first message`} />
+        <Stat label="Plugged in" value={`${plugged.length} (${rate}%)`} />
+        <Stat label="Avg. days to plugged in" value={avg(toPlug)?.toString() ?? "—"} hint={toPlug.length ? `from ${toPlug.length} people` : "no one plugged in yet"} />
+        <Stat label="Avg. days to first contact" value={avg(toContact)?.toString() ?? "—"} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border bg-card p-4 space-y-2.5">
+          <h2 className="text-sm font-semibold">What people ask for</h2>
+          <p className="text-xs text-muted-foreground">How many asked, and what share of them are plugged in.</p>
+          {byInterest.map(([k, v]) => (
+            <Bar key={k} label={`${INTEREST_ICONS[k] ?? ""} ${k}`} value={v.total} max={maxInterest}
+              suffix={`${v.total} · ${Math.round((v.plugged / v.total) * 100)}% in${avg(v.days) !== null ? ` · ${avg(v.days)}d` : ""}`} />
+          ))}
+        </div>
+        <div className="rounded-xl border bg-card p-4 space-y-2.5">
+          <h2 className="text-sm font-semibold">Where people come from</h2>
+          <p className="text-xs text-muted-foreground">Source on the connect card, with plugged-in share and average days.</p>
+          {bySource.map(([k, v]) => (
+            <Bar key={k} label={k} value={v.total} max={maxSource}
+              suffix={`${v.total} · ${Math.round((v.plugged / v.total) * 100)}% in${avg(v.days) !== null ? ` · ${avg(v.days)}d` : ""}`} />
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4 space-y-2.5">
+        <h2 className="text-sm font-semibold">Does a quick first message help?</h2>
+        <p className="text-xs text-muted-foreground">Plugged-in rate by how fast the first contact happened.</p>
+        {contactBuckets.map((b) => (
+          <Bar key={b.label} label={b.label} value={b.rate} max={100} suffix={`${b.rate}% of ${b.total}`} />
+        ))}
+      </div>
     </div>
   );
 }
