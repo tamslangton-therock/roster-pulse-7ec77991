@@ -315,7 +315,7 @@ function DiscipleshipPage() {
                                       : "text-muted-foreground"
                                   }`}
                                 >
-                                  {INTEREST_ICONS[i] ?? "•"} {i}
+                                  {emojiOf(i)} {i}
                                   {done ? " ✓" : ""}
                                 </span>
                               );
@@ -989,7 +989,7 @@ function Insights({ rows }: { rows: DiscipleshipRow[] }) {
           <h2 className="text-sm font-semibold">What people ask for</h2>
           <p className="text-xs text-muted-foreground">How many asked, and what share of them are plugged in.</p>
           {byInterest.map(([k, v]) => (
-            <Bar key={k} label={`${INTEREST_ICONS[k] ?? ""} ${k}`} value={v.total} max={maxInterest}
+            <Bar key={k} label={`${interestEmoji(configured.find((c) => c.name === k)?.emoji, k)} ${k}`} value={v.total} max={maxInterest}
               suffix={`${v.total} · ${Math.round((v.plugged / v.total) * 100)}% in${avg(v.days) !== null ? ` · ${avg(v.days)}d` : ""}`} />
           ))}
         </div>
