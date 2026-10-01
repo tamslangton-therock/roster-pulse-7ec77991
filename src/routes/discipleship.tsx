@@ -388,6 +388,7 @@ function AddCardDialog({
   const [interests, setInterests] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
+  const { interests: interestList } = useInterestList();
   const volunteers = useRoster((s) => s.volunteers);
   const match = findIndividual(volunteers, name);
   const cardMatch = existingRows.find((r) => personKey(r.person_name) === personKey(name));
