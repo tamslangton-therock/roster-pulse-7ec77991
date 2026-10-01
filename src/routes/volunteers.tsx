@@ -32,6 +32,7 @@ import { ProfileHoverCard } from "@/components/profile-hover-card";
 import { useAuth } from "@/lib/auth";
 import { areaInScope, canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
+import { findIndividual } from "@/lib/person-link";
 
 
 export const Route = createFileRoute("/volunteers")({
@@ -341,6 +342,11 @@ function VolunteersPage() {
               onClick={() => {
                 if (!newDraft.full_name.trim()) {
                   toast.error("Name is required");
+                  return;
+                }
+                const existing = findIndividual(volunteers, newDraft.full_name);
+                if (existing) {
+                  toast.error(`${existing.full_name} already has a profile — edit that one instead so there's no duplicate.`);
                   return;
                 }
                 addVolunteer({
