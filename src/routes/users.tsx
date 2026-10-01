@@ -65,6 +65,7 @@ function UserAccessPage() {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplay, setNewDisplay] = useState("");
+  const { interests: interestList } = useInterestList();
 
   const areas = useMemo(() => {
     const set = new Set<string>();
@@ -124,6 +125,7 @@ function UserAccessPage() {
         health_view_areas: [],
         individuals_view_areas: [],
         discipleship_access: "none",
+        discipleship_interests: [],
       },
     ]);
     setAddOpen(false);
