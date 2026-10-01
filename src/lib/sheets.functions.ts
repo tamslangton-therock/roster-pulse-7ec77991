@@ -988,7 +988,7 @@ export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
     let data: { values?: string[][] };
     try {
       data = await gwFetch(
-        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:M2000`,
+        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:N2000`,
       );
     } catch {
       return [];
@@ -1031,7 +1031,7 @@ export const writeUserAccess = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await ensureUserAccessTab();
     await gwFetch(
-      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:M2000:clear`,
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:N2000:clear`,
       { method: "POST", body: "{}" },
     );
     const values: string[][] = [
