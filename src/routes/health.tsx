@@ -144,15 +144,19 @@ function HealthPage() {
 
   // Serving-area scope for this login (empty = all areas; admin sees everything)
   const scope = useMemo(
-    () => healthViewAreas(isMaster, authUser).map((a) => a.toLowerCase()),
+    () => healthViewAreas(isMaster, authUser),
     [isMaster, authUser],
   );
   const inScope = (v: (typeof volunteers)[number]) =>
-    scope.length === 0 || v.serving_areas.some((a) => scope.includes(a.toLowerCase()));
+    scope.length === 0 || v.serving_areas.some((a) => areaInScope(scope, a));
 
   const areas = useMemo(() => {
     const set = new Set<string>();
-    volunteers.filter(inScope).forEach((v) => v.serving_areas.forEach((a) => a && set.add(a)));
+    volunteers
+      .filter(inScope)
+      .forEach((v) =>
+        v.serving_areas.forEach((a) => a && (scope.length === 0 || areaInScope(scope, a)) && set.add(a)),
+      );
     return Array.from(set).sort();
   }, [volunteers, scope]);
 

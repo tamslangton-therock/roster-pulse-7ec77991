@@ -178,7 +178,7 @@ function VolunteersPage() {
             <SelectContent>
               <SelectItem value="all">All areas</SelectItem>
               {allAreas
-                .filter((a) => scopeAreas.length === 0 || scopeAreas.some((s) => s.toLowerCase() === a.toLowerCase()))
+                .filter((a) => scopeAreas.length === 0 || areaInScope(scopeAreas, a))
                 .map((a) => (
                 <SelectItem key={a} value={a}>
                   {a}
