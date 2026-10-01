@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useLiveUser } from "@/lib/use-live-user";
 import { useMemo, useState } from "react";
-import { Edit2, Plus, Trash2, X } from "lucide-react";
+import { Edit2, Plus, Trash2, X, Target } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import { useAuth } from "@/lib/auth";
 import { areaInScope, canEditIndividuals, canViewIndividuals, individualsViewAreas, inIndividualsScope } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 import { findIndividual } from "@/lib/person-link";
+import { InterestPathwayDialog } from "@/components/interest-pathway-dialog";
 
 
 export const Route = createFileRoute("/volunteers")({
