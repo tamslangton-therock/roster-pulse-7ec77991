@@ -334,6 +334,54 @@ function UserAccessPage() {
                 </Select>
               </div>
             </div>
+
+            {/* Discipleship interest scope */}
+            <div className="rounded-lg border px-3 py-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label className="text-sm">Discipleship interest scope</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Leave empty to show every interest. Pick only the interests whose connect cards
+                    they may see — people with other interests stay hidden.
+                  </p>
+                </div>
+                {(u.discipleship_interests ?? []).length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs shrink-0"
+                    onClick={() => updateUser(u.username, { discipleship_interests: [] })}
+                  >
+                    All interests
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {interestList.map((i) => {
+                  const on = (u.discipleship_interests ?? []).includes(i.name);
+                  return (
+                    <button
+                      key={i.name}
+                      type="button"
+                      onClick={() =>
+                        updateUser(u.username, {
+                          discipleship_interests: on
+                            ? (u.discipleship_interests ?? []).filter((x) => x !== i.name)
+                            : [...(u.discipleship_interests ?? []), i.name],
+                        })
+                      }
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                        on
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "text-muted-foreground hover:bg-accent/60"
+                      }`}
+                    >
+                      {i.emoji || "•"} {i.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </section>
         ))}
       </div>
