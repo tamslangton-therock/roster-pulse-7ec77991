@@ -15,3 +15,5 @@ Serving-area columns on Live_Roster are data, not constants: `src/lib/roster-gri
 - AI auto-roster: `src/lib/ai-roster.functions.ts` calls the Lovable AI Gateway `/v1/responses` (`openai/gpt-6-astra`, streamed SSE, strict json_schema) — client sends the volunteer/slot snapshot; the server fn owns the key and prompt. Review-then-apply lives in `src/components/ai-roster-dialog.tsx`.
 
 - Team Health labels and thresholds are master settings persisted in the `Health_Config` sheet tab so every login uses the same definitions.
+
+- Discipleship pipeline (`/discipleship`) reads/writes the `Discipleship` sheet tab via its own fetch/write functions in sheets.functions.ts (not the main store); access is the `discipleship_access` column (none/view/edit) on `User_Access`, checked by `canViewDiscipleship`/`canEditDiscipleship`. Blank column = no access (new permission), so grant leaders explicitly.
