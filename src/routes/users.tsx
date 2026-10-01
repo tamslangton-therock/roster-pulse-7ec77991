@@ -626,19 +626,6 @@ function HealthRulesEditor() {
                 onChange={(n) => patchS({ highThreshold: n + 1 })}
                 hint={`Up to this many serves; more shows “${draftLabels.burnout.label}”`}
               />
-              <HealthNumberField
-                label={`“${draftLabels.burnout.label || "Over-served"}” at (serves ≥)`}
-                min={1}
-                value={draftSettings.highThreshold}
-                onChange={(n) => patchS({ highThreshold: n })}
-                hint="Flags red"
-              />
-              <HealthNumberField
-                label={`“${draftLabels.could_do_more.label || "Could do more"}” at (serves ≤)`}
-                value={draftSettings.lowThreshold}
-                onChange={(n) => patchS({ lowThreshold: n })}
-                hint="Flags yellow"
-              />
             </>
           )}
           {draftSettings.mode === "preference" && (
@@ -668,14 +655,18 @@ function HealthRulesEditor() {
             label={`“${draftLabels.burnout.label || "Burnout"}” streak (weeks in a row)`}
             min={2}
             value={draftSettings.burnoutStreak}
-            onChange={(n) => patchS({ burnoutStreak: n })}
+            onChange={(n) => patchS({
+              burnoutStreak: Math.max(draftSettings.noRestStreak + 1, n),
+            })}
             hint="Consecutive weeks that flag red"
           />
           <HealthNumberField
             label={`“${draftLabels.no_rest.label || "No rest"}” streak (weeks in a row)`}
             min={1}
             value={draftSettings.noRestStreak}
-            onChange={(n) => patchS({ noRestStreak: n })}
+            onChange={(n) => patchS({
+              noRestStreak: Math.min(draftSettings.burnoutStreak - 1, n),
+            })}
             hint="Back-to-back weeks that flag amber"
           />
         </div>

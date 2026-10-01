@@ -405,19 +405,6 @@ function HealthPage() {
                     onChange={(n) => patch({ highThreshold: n + 1 })}
                     hint={`More shows ${healthLabels.burnout.label}`}
                   />
-                  <NumberField
-                    label="Over-served at (serves ≥)"
-                    min={1}
-                    value={settings.highThreshold}
-                    onChange={(n) => patch({ highThreshold: n })}
-                    hint="Flags red"
-                  />
-                  <NumberField
-                    label="Could do more at (serves ≤)"
-                    value={settings.lowThreshold}
-                    onChange={(n) => patch({ lowThreshold: n })}
-                    hint="Flags yellow"
-                  />
                 </>
               )}
               {settings.mode === "preference" && (
@@ -440,14 +427,18 @@ function HealthPage() {
                 label="Burnout streak (weeks in a row)"
                 min={2}
                 value={settings.burnoutStreak}
-                onChange={(n) => patch({ burnoutStreak: n })}
+                  onChange={(n) => patch({
+                    burnoutStreak: Math.max(settings.noRestStreak + 1, n),
+                  })}
               />
               {settings.mode === "consecutive" && (
                 <NumberField
                   label="No-rest streak (weeks in a row)"
                   min={1}
                   value={settings.noRestStreak}
-                  onChange={(n) => patch({ noRestStreak: n })}
+                  onChange={(n) => patch({
+                    noRestStreak: Math.min(settings.burnoutStreak - 1, n),
+                  })}
                 />
               )}
             </div>
