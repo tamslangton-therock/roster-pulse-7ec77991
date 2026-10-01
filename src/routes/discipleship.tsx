@@ -240,13 +240,13 @@ function DiscipleshipPage() {
         </div>
       )}
 
-      {view === "insights" && !isLoading && !isError && rows.length > 0 ? (
-        <Insights rows={rows} />
+      {view === "insights" && !isLoading && !isError && scopedRows.length > 0 ? (
+        <Insights rows={scopedRows} />
       ) : (
       <>
-      {!isLoading && !isError && rows.length > 0 && (
+      {!isLoading && !isError && scopedRows.length > 0 && (
         <InterestPools
-          rows={rows}
+          rows={scopedRows}
           canEdit={canEdit}
           onOpen={setDetailId}
           onMarkAllDone={(interest, ids) =>
