@@ -939,7 +939,7 @@ export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
     let data: { values?: string[][] };
     try {
       data = await gwFetch(
-        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:K2000`,
+        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:L2000`,
       );
     } catch {
       return [];
@@ -968,6 +968,7 @@ export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
         can_view_roster: toBool(String(r[8] ?? ""), true),
         can_view_life_groups: toBool(String(r[9] ?? "")),
         health_view_areas: toList(String(r[10] ?? "")),
+        individuals_view_areas: toList(String(r[11] ?? "")),
       });
     }
     return out;
@@ -979,7 +980,7 @@ export const writeUserAccess = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await ensureUserAccessTab();
     await gwFetch(
-      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:K2000:clear`,
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:L2000:clear`,
       { method: "POST", body: "{}" },
     );
     const values: string[][] = [
@@ -996,6 +997,7 @@ export const writeUserAccess = createServerFn({ method: "POST" })
         r.can_view_roster === false ? "FALSE" : "TRUE",
         r.can_view_life_groups ? "TRUE" : "FALSE",
         (r.health_view_areas ?? []).join(" | "),
+        (r.individuals_view_areas ?? []).join(" | "),
       ]),
     ];
     await gwFetch(

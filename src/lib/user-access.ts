@@ -22,6 +22,8 @@ export interface UserAccessRecord {
   canViewLifeGroups: boolean;
   /** Serving areas shown on Team Health. Empty = all areas. */
   healthViewAreas: string[];
+  /** Serving areas visible on the Individuals tab. Empty = all areas. */
+  individualsViewAreas: string[];
 }
 
 /** What the login flow stores in the session — never includes the password. */
@@ -36,6 +38,7 @@ export interface SessionUser {
   canViewRoster: boolean;
   canViewLifeGroups: boolean;
   healthViewAreas: string[];
+  individualsViewAreas: string[];
 }
 
 export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
@@ -54,6 +57,7 @@ export function recordFromTabValues(t: UserAccessTabValues): UserAccessRecord {
     canViewRoster: t.can_view_roster !== false,
     canViewLifeGroups: t.can_view_life_groups === true,
     healthViewAreas: t.health_view_areas ?? [],
+    individualsViewAreas: t.individuals_view_areas ?? [],
   };
 }
 
@@ -69,6 +73,7 @@ export function toSessionUser(r: UserAccessRecord): SessionUser {
     canViewRoster: r.canViewRoster,
     canViewLifeGroups: r.canViewLifeGroups,
     healthViewAreas: r.healthViewAreas,
+    individualsViewAreas: r.individualsViewAreas,
   };
 }
 
@@ -129,6 +134,19 @@ export function canViewHealth(isMaster: boolean, user: SessionUser | null): bool
 export function healthViewAreas(isMaster: boolean, user: SessionUser | null): string[] {
   if (isMaster || !user) return [];
   return user.healthViewAreas;
+}
+
+/** Serving areas this login may see on the Individuals tab. Empty = all areas. */
+export function individualsViewAreas(isMaster: boolean, user: SessionUser | null): string[] {
+  if (isMaster || !user) return [];
+  return user.individualsViewAreas ?? [];
+}
+
+/** Whether a person (by serving areas) falls inside the login's Individuals scope. */
+export function inIndividualsScope(isMaster: boolean, user: SessionUser | null, servingAreas: string[] | undefined): boolean {
+  const scope = individualsViewAreas(isMaster, user);
+  if (scope.length === 0) return true;
+  return (servingAreas ?? []).some((a) => inScope(scope, a));
 }
 
 export function canViewIndividuals(isMaster: boolean, user: SessionUser | null): boolean {
