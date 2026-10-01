@@ -143,6 +143,7 @@ export const USER_ACCESS_SCHEMA = [
   "can_view_life_groups",
   "health_view_areas",
   "individuals_view_areas",
+  "discipleship_access",
 ] as const;
 
 /** Row shape as stored in the sheet (raw strings). */
@@ -162,6 +163,8 @@ export interface UserAccessTabValues {
   health_view_areas: string[];
   /** Serving areas visible on the Individuals tab. Empty = all areas. */
   individuals_view_areas: string[];
+  /** "none" | "view" | "edit" — access to the Discipleship pipeline. */
+  discipleship_access?: string;
 }
 
 // Master Team Health rules & category labels (edited on the User Access page,
@@ -169,3 +172,22 @@ export interface UserAccessTabValues {
 export const HEALTH_CONFIG_TAB = "Health_Config";
 export const HEALTH_CONFIG_SCHEMA = ["key", "value"] as const;
 
+
+// Discipleship pipeline — one row per connect card (new person / follow-up).
+export const DISCIPLESHIP_TAB = "Discipleship";
+export const DISCIPLESHIP_SCHEMA = [
+  "id",
+  "person_name",
+  "phone",
+  "email",
+  "date_connected",
+  "source",
+  "stage",
+  "contacted",
+  "contacted_date",
+  "interests",
+  "interest_done",
+  "assigned_to",
+  "plugged_in_date",
+  "notes",
+] as const;

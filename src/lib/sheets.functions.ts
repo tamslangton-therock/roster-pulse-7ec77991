@@ -22,6 +22,8 @@ import {
   HEALTH_CONFIG_TAB,
   HEALTH_CONFIG_SCHEMA,
   type UserAccessTabValues,
+  DISCIPLESHIP_TAB,
+  DISCIPLESHIP_SCHEMA,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
 
@@ -941,7 +943,7 @@ export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
     let data: { values?: string[][] };
     try {
       data = await gwFetch(
-        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:L2000`,
+        `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:M2000`,
       );
     } catch {
       return [];
@@ -971,6 +973,7 @@ export const fetchUserAccess = createServerFn({ method: "GET" }).handler(
         can_view_life_groups: toBool(String(r[9] ?? "")),
         health_view_areas: toList(String(r[10] ?? "")),
         individuals_view_areas: toList(String(r[11] ?? "")),
+        discipleship_access: String(r[12] ?? "").trim() || "none",
       });
     }
     return out;
@@ -982,7 +985,7 @@ export const writeUserAccess = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await ensureUserAccessTab();
     await gwFetch(
-      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:L2000:clear`,
+      `/spreadsheets/${SPREADSHEET_ID}/values/${USER_ACCESS_TAB}!A1:M2000:clear`,
       { method: "POST", body: "{}" },
     );
     const values: string[][] = [
@@ -1000,6 +1003,7 @@ export const writeUserAccess = createServerFn({ method: "POST" })
         r.can_view_life_groups ? "TRUE" : "FALSE",
         (r.health_view_areas ?? []).join(" | "),
         (r.individuals_view_areas ?? []).join(" | "),
+        r.discipleship_access ?? "none",
       ]),
     ];
     await gwFetch(
@@ -1079,4 +1083,98 @@ export const writeHealthConfig = createServerFn({ method: "POST" })
       { method: "PUT", body: JSON.stringify({ values }) },
     );
     return { ok: true, count: values.length };
+  });
+
+// ---------- Discipleship (new people pipeline) ----------
+
+export interface DiscipleshipRow {
+  id: string;
+  person_name: string;
+  phone: string;
+  email: string;
+  date_connected: string;
+  source: string;
+  stage: string;
+  contacted: boolean;
+  contacted_date: string;
+  interests: string[];
+  interest_done: string[];
+  assigned_to: string;
+  plugged_in_date: string;
+  notes: string;
+}
+
+async function ensureDiscipleshipTab() {
+  const header = { method: "PUT", body: JSON.stringify({ values: [DISCIPLESHIP_SCHEMA.slice()] }) };
+  const path = `/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1?valueInputOption=RAW`;
+  try {
+    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!1:1`);
+    if (((data.values?.[0] ?? []) as string[]).length === 0) await gwFetch(path, header);
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          { addSheet: { properties: { title: DISCIPLESHIP_TAB, gridProperties: { frozenRowCount: 1 } } } },
+        ],
+      }),
+    });
+    await gwFetch(path, header);
+  }
+}
+
+const splitList = (s: unknown) =>
+  String(s ?? "").split(/\s*[|,;]\s*/).map((x) => x.trim()).filter(Boolean);
+
+export const fetchDiscipleship = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DiscipleshipRow[]> => {
+    await ensureDiscipleshipTab();
+    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1:N3000`);
+    const out: DiscipleshipRow[] = [];
+    for (const r of ((data.values ?? []) as string[][]).slice(1)) {
+      const name = String(r[1] ?? "").trim();
+      if (!name) continue;
+      out.push({
+        id: String(r[0] ?? "").trim() || `dc-${Math.random().toString(36).slice(2, 10)}`,
+        person_name: name,
+        phone: String(r[2] ?? "").trim(),
+        email: String(r[3] ?? "").trim(),
+        date_connected: String(r[4] ?? "").trim(),
+        source: String(r[5] ?? "").trim(),
+        stage: String(r[6] ?? "").trim() || "needs_contact",
+        contacted: /^(true|1|yes|y)$/i.test(String(r[7] ?? "").trim()),
+        contacted_date: String(r[8] ?? "").trim(),
+        interests: splitList(r[9]),
+        interest_done: splitList(r[10]),
+        assigned_to: String(r[11] ?? "").trim(),
+        plugged_in_date: String(r[12] ?? "").trim(),
+        notes: String(r[13] ?? ""),
+      });
+    }
+    return out;
+  },
+);
+
+export const writeDiscipleship = createServerFn({ method: "POST" })
+  .inputValidator((data: { rows: DiscipleshipRow[] }) => data)
+  .handler(async ({ data }) => {
+    await ensureDiscipleshipTab();
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1:N3000:clear`, {
+      method: "POST",
+      body: "{}",
+    });
+    const values: string[][] = [
+      DISCIPLESHIP_SCHEMA.slice(),
+      ...data.rows.map((r) => [
+        r.id, r.person_name, r.phone ?? "", r.email ?? "", r.date_connected ?? "", r.source ?? "",
+        r.stage ?? "needs_contact", r.contacted ? "TRUE" : "FALSE", r.contacted_date ?? "",
+        (r.interests ?? []).join(" | "), (r.interest_done ?? []).join(" | "),
+        r.assigned_to ?? "", r.plugged_in_date ?? "", r.notes ?? "",
+      ]),
+    ];
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1?valueInputOption=RAW`, {
+      method: "PUT",
+      body: JSON.stringify({ values }),
+    });
+    return { ok: true, count: data.rows.length };
   });

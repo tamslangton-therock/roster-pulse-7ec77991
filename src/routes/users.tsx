@@ -123,6 +123,7 @@ function UserAccessPage() {
         can_view_life_groups: false,
         health_view_areas: [],
         individuals_view_areas: [],
+        discipleship_access: "none",
       },
     ]);
     setAddOpen(false);
@@ -288,6 +289,20 @@ function UserAccessPage() {
                   checked={u.can_view_life_groups === true}
                   onCheckedChange={(v) => updateUser(u.username, { can_view_life_groups: v })}
                 />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+                <Label className="text-sm">Discipleship access</Label>
+                <Select
+                  value={u.discipleship_access || "none"}
+                  onValueChange={(v) => updateUser(u.username, { discipleship_access: v })}
+                >
+                  <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="view">View</SelectItem>
+                    <SelectItem value="edit">Edit</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center justify-between rounded-lg border px-3 py-2">
                 <Label className="text-sm" htmlFor={`ind-${u.username}`}>
