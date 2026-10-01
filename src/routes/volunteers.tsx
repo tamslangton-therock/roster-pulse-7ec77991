@@ -334,9 +334,9 @@ function VolunteersPage() {
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add Volunteer</DialogTitle>
+            <DialogTitle>Add family member</DialogTitle>
             <DialogDescription>
-              Create a full volunteer profile — it syncs straight to the sheet.
+              Create a full profile — it syncs straight to the sheet.
             </DialogDescription>
           </DialogHeader>
 
@@ -372,7 +372,7 @@ function VolunteersPage() {
                 toast.success("Volunteer added");
               }}
             >
-              Add Volunteer
+              Add family member
             </Button>
           </DialogFooter>
         </DialogContent>
