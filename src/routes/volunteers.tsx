@@ -124,8 +124,6 @@ function VolunteersPage() {
   };
 
 
-  const isMaster = useAuth((s) => s.master);
-  const authUser = useAuth((s) => s.user);
   const canEditPeople = canEditIndividuals(isMaster, authUser);
   if (!canViewIndividuals(isMaster, authUser)) {
     return <AccessNotice title="Individuals is not switched on for your login" />;
@@ -139,6 +137,9 @@ function VolunteersPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {filtered.length} shown · {volunteers.length} in directory ·{" "}
             {volunteerCount} active volunteers
+            {scopeAreas.length > 0 && (
+              <> · showing only: {scopeAreas.join(", ")}</>
+            )}
           </p>
           <div className="mt-3 inline-flex rounded-md border bg-muted/40 p-0.5">
             {([
@@ -176,7 +177,9 @@ function VolunteersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All areas</SelectItem>
-              {allAreas.map((a) => (
+              {allAreas
+                .filter((a) => scopeAreas.length === 0 || scopeAreas.some((s) => s.toLowerCase() === a.toLowerCase()))
+                .map((a) => (
                 <SelectItem key={a} value={a}>
                   {a}
                 </SelectItem>
