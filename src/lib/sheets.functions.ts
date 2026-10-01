@@ -19,6 +19,8 @@ import {
   LIFE_GROUPS_SCHEMA,
   USER_ACCESS_TAB,
   USER_ACCESS_SCHEMA,
+  HEALTH_CONFIG_TAB,
+  HEALTH_CONFIG_SCHEMA,
   type UserAccessTabValues,
   DOC_TEMPLATE_TAB,
   DOC_TEMPLATE_SCHEMA,
@@ -1005,4 +1007,76 @@ export const writeUserAccess = createServerFn({ method: "POST" })
       { method: "PUT", body: JSON.stringify({ values }) },
     );
     return { ok: true, count: data.rows.length };
+  });
+
+// ---------- Health_Config (master Team Health rules & labels) ----------
+
+async function ensureHealthConfigTab() {
+  try {
+    const data = await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${HEALTH_CONFIG_TAB}!1:1`,
+    );
+    if (((data.values?.[0] ?? []) as string[]).length === 0) {
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${HEALTH_CONFIG_TAB}!A1?valueInputOption=RAW`,
+        { method: "PUT", body: JSON.stringify({ values: [HEALTH_CONFIG_SCHEMA.slice()] }) },
+      );
+    }
+  } catch {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: { title: HEALTH_CONFIG_TAB, gridProperties: { frozenRowCount: 1 } },
+            },
+          },
+        ],
+      }),
+    });
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${HEALTH_CONFIG_TAB}!A1?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [HEALTH_CONFIG_SCHEMA.slice()] }) },
+    );
+  }
+}
+
+export const fetchHealthConfig = createServerFn({ method: "GET" }).handler(
+  async (): Promise<Record<string, string>> => {
+    await ensureHealthConfigTab();
+    let data: { values?: string[][] };
+    try {
+      data = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${HEALTH_CONFIG_TAB}!A2:B2000`,
+      );
+    } catch {
+      return {};
+    }
+    const rows = (data.values ?? []) as string[][];
+    const out: Record<string, string> = {};
+    for (const r of rows) {
+      const key = String(r[0] ?? "").trim();
+      if (!key) continue;
+      out[key] = String(r[1] ?? "");
+    }
+    return out;
+  },
+);
+
+export const writeHealthConfig = createServerFn({ method: "POST" })
+  .inputValidator((data: { config: Record<string, string> }) => data)
+  .handler(async ({ data }) => {
+    await ensureHealthConfigTab();
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${HEALTH_CONFIG_TAB}!A2:B2000:clear`,
+      { method: "POST", body: "{}" },
+    );
+    const values: string[][] = Object.entries(data.config).map(([key, value]) => [key, value]);
+    if (values.length === 0) return { ok: true, count: 0 };
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${HEALTH_CONFIG_TAB}!A2?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values }) },
+    );
+    return { ok: true, count: values.length };
   });

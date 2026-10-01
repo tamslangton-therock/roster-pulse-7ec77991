@@ -46,6 +46,144 @@ export const DEFAULT_HEALTH_SETTINGS: HealthSettings = {
 
 const STORAGE_KEY = "roster-pulse:health-settings";
 
+/** Master-configurable label + emoji per health status (edited in User Access). */
+export interface HealthLabels {
+  healthy: { label: string; emoji: string };
+  could_do_more: { label: string; emoji: string };
+  no_rest: { label: string; emoji: string };
+  burnout: { label: string; emoji: string };
+  paused: { label: string; emoji: string };
+  inactive: { label: string; emoji: string };
+}
+
+export type HealthLabelKey = keyof HealthLabels;
+
+export const DEFAULT_HEALTH_LABELS: HealthLabels = {
+  healthy: { label: "Healthy", emoji: "🍏" },
+  could_do_more: { label: "Could do more", emoji: "⚠️" },
+  no_rest: { label: "No rest weeks", emoji: "⚠️" },
+  burnout: { label: "Burnout risk", emoji: "🚨" },
+  paused: { label: "Paused", emoji: "⏸️" },
+  inactive: { label: "Inactive", emoji: "💤" },
+};
+
+/** The statuses whose labels can be renamed in the Health Rules settings. */
+export const LABEL_STATUSES: HealthLabelKey[] = [
+  "healthy",
+  "could_do_more",
+  "no_rest",
+  "burnout",
+  "paused",
+  "inactive",
+];
+
+/** Merge partial/parsed label data over the defaults. */
+export function mergeHealthLabels(raw: unknown): HealthLabels {
+  const src = (raw ?? {}) as Partial<Record<HealthLabelKey, { label?: unknown; emoji?: unknown }>>;
+  const out = { ...DEFAULT_HEALTH_LABELS } as HealthLabels;
+  for (const key of LABEL_STATUSES) {
+    const entry = src[key];
+    if (!entry) continue;
+    const label = typeof entry.label === "string" ? entry.label.trim() : "";
+    const emoji = typeof entry.emoji === "string" ? entry.emoji.trim() : "";
+    out[key] = {
+      label: label || DEFAULT_HEALTH_LABELS[key].label,
+      emoji: emoji || DEFAULT_HEALTH_LABELS[key].emoji,
+    };
+  }
+  return out;
+}
+
+/** statusMeta with master-configurable labels; falls back to built-in defaults. */
+export function statusMetaWith(
+  labels: HealthLabels | undefined,
+  s: FatigueStatus,
+): { label: string; emoji: string; tone: "green" | "yellow" | "amber" | "red" | "blue" | "slate" } {
+  const tones = {
+    healthy: "green",
+    could_do_more: "yellow",
+    no_rest: "amber",
+    burnout: "red",
+    paused: "blue",
+    inactive: "slate",
+  } as const;
+  const tone = tones[s];
+  const custom = labels?.[s];
+  if (custom) return { label: custom.label, emoji: custom.emoji, tone };
+  const fallback = {
+    healthy: { label: "Healthy", emoji: "🍏" },
+    could_do_more: { label: "Could do more", emoji: "⚠️" },
+    no_rest: { label: "No rest weeks", emoji: "⚠️" },
+    burnout: { label: "Burnout risk", emoji: "🚨" },
+    paused: { label: "Paused", emoji: "⏸️" },
+    inactive: { label: "Inactive", emoji: "💤" },
+  }[s];
+  return { ...fallback, tone };
+}
+
+/** Flatten settings + labels into key/value rows for the Health_Config tab. */
+export function healthConfigRows(
+  s: HealthSettings,
+  labels: HealthLabels,
+): Record<string, string> {
+  const rows: Record<string, string> = {
+    mode: s.mode,
+    pastWeeks: String(s.pastWeeks),
+    futureWeeks: String(s.futureWeeks),
+    rangeStart: s.rangeStart,
+    rangeEnd: s.rangeEnd,
+    highThreshold: String(s.highThreshold),
+    lowThreshold: String(s.lowThreshold),
+    burnoutStreak: String(s.burnoutStreak),
+    noRestStreak: String(s.noRestStreak),
+    tolerancePct: String(s.tolerancePct),
+    area: s.area,
+    includePaused: s.includePaused ? "TRUE" : "FALSE",
+  };
+  for (const key of LABEL_STATUSES) {
+    rows[`label_${key}`] = labels[key].label;
+    rows[`emoji_${key}`] = labels[key].emoji;
+  }
+  return rows;
+}
+
+/** Parse key/value rows from the Health_Config tab into settings + labels. */
+export function parseHealthConfig(
+  rows: Record<string, string>,
+): { settings: HealthSettings; labels: HealthLabels } {
+  const s: HealthSettings = { ...DEFAULT_HEALTH_SETTINGS };
+  const num = (key: keyof HealthSettings, min: number) => {
+    const raw = rows[key as string];
+    if (raw === undefined || raw === "") return;
+    const n = Number(raw);
+    if (Number.isFinite(n)) (s[key] as number) = Math.max(min, n);
+  };
+  if (rows.mode && ["preference", "past", "future", "range", "consecutive"].includes(rows.mode)) {
+    s.mode = rows.mode as HealthMode;
+  }
+  num("pastWeeks", 1);
+  num("futureWeeks", 1);
+  num("highThreshold", 1);
+  num("lowThreshold", 0);
+  num("burnoutStreak", 2);
+  num("noRestStreak", 1);
+  num("tolerancePct", 0);
+  if (rows.rangeStart !== undefined) s.rangeStart = rows.rangeStart;
+  if (rows.rangeEnd !== undefined) s.rangeEnd = rows.rangeEnd;
+  if (rows.area) s.area = rows.area;
+  if (rows.includePaused) s.includePaused = /^(true|1|yes)$/i.test(rows.includePaused);
+  const labelRaw: Record<string, { label?: string; emoji?: string }> = {};
+  for (const key of LABEL_STATUSES) {
+    const label = rows[`label_${key}`];
+    const emoji = rows[`emoji_${key}`];
+    if (label !== undefined || emoji !== undefined) {
+      labelRaw[key] = { label, emoji };
+    }
+  }
+  return { settings: s, labels: mergeHealthLabels(labelRaw) };
+}
+
+
 export function loadHealthSettings(): HealthSettings {
   if (typeof window === "undefined") return DEFAULT_HEALTH_SETTINGS;
   try {

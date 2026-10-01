@@ -1,13 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Plus, Shield, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Shield, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import type { IndividualsAccess } from "@/lib/user-access";
+import {
+  DEFAULT_HEALTH_SETTINGS,
+  DEFAULT_HEALTH_LABELS,
+  LABEL_STATUSES,
+  MODE_OPTIONS,
+  statusMetaWith,
+  type HealthLabels,
+  type HealthMode,
+  type HealthSettings,
+} from "@/lib/health-settings";
+import type { FatigueStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -136,6 +148,15 @@ function UserAccessPage() {
         </Button>
       </div>
 
+      <Tabs defaultValue="logins">
+        <TabsList>
+          <TabsTrigger value="logins">Leader logins</TabsTrigger>
+          <TabsTrigger value="health" className="gap-1.5">
+            <SlidersHorizontal className="h-3.5 w-3.5" /> Health rules &amp; labels
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="logins" className="space-y-6 mt-4">
       {users.length === 0 && (
         <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
           No custom logins yet. Create one for each team leader — they sign in with their name and
@@ -293,6 +314,13 @@ function UserAccessPage() {
         ))}
       </div>
 
+        </TabsContent>
+
+        <TabsContent value="health" className="mt-4">
+          <HealthRulesEditor />
+        </TabsContent>
+      </Tabs>
+
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
@@ -381,6 +409,269 @@ function AreaScope({
         {areas.length === 0 && (
           <span className="text-xs text-muted-foreground">No serving areas defined yet.</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+const TONE_CLASSES: Record<string, string> = {
+  green: "bg-status-green text-status-green-foreground",
+  yellow: "bg-status-yellow text-status-yellow-foreground",
+  amber: "bg-status-amber text-status-amber-foreground",
+  red: "bg-status-red text-status-red-foreground",
+  blue: "bg-status-blue text-status-blue-foreground",
+  slate: "bg-status-slate text-status-slate-foreground",
+};
+
+const DEFAULT_TITLES: Record<string, string> = {
+  healthy: "Healthy",
+  could_do_more: "Could do more",
+  no_rest: "No rest weeks",
+  burnout: "Burnout risk",
+  paused: "Paused",
+  inactive: "Inactive",
+};
+
+function HealthNumberField({
+  label,
+  value,
+  onChange,
+  min = 0,
+  hint,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+  min?: number;
+  hint?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      <Input
+        type="number"
+        min={min}
+        value={value}
+        onChange={(e) => onChange(Math.max(min, parseInt(e.target.value) || 0))}
+      />
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function HealthRulesEditor() {
+  const settings = useRoster((s) => s.healthSettings);
+  const labels = useRoster((s) => s.healthLabels);
+  const setHealthSettings = useRoster((s) => s.setHealthSettings);
+  const resetHealthSettings = useRoster((s) => s.resetHealthSettings);
+
+  const [draftSettings, setDraftSettings] = useState<HealthSettings>(settings);
+  const [draftLabels, setDraftLabels] = useState<HealthLabels>(labels);
+
+  // Follow the sheet-backed store if it reloads (e.g. after hydration).
+  useEffect(() => setDraftSettings(settings), [settings]);
+  useEffect(() => setDraftLabels(labels), [labels]);
+
+  const dirty =
+    JSON.stringify(draftSettings) !== JSON.stringify(settings) ||
+    JSON.stringify(draftLabels) !== JSON.stringify(labels);
+
+  const patchS = (p: Partial<HealthSettings>) => setDraftSettings((s) => ({ ...s, ...p }));
+  const patchLabel = (key: (typeof LABEL_STATUSES)[number], field: "label" | "emoji", value: string) =>
+    setDraftLabels((l) => ({ ...l, [key]: { ...l[key], [field]: value } }));
+
+  const save = () => {
+    setHealthSettings(draftSettings, draftLabels);
+    toast.success("Health rules saved — synced to the Health_Config tab in Google Sheets.");
+  };
+
+  const resetDefaults = () => {
+    setDraftSettings(DEFAULT_HEALTH_SETTINGS);
+    setDraftLabels(DEFAULT_HEALTH_LABELS);
+    resetHealthSettings();
+    toast.info("Health rules reset to the built-in defaults.");
+  };
+
+  const countModes =
+    draftSettings.mode !== "consecutive" && draftSettings.mode !== "preference";
+
+  return (
+    <div className="rounded-xl border bg-card p-6 shadow-sm space-y-6 max-w-4xl">
+      <div>
+        <h2 className="text-lg font-semibold">Team Health — rules &amp; category names</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          These master settings apply to everyone — every Team Health page, badge and history
+          drawer uses these names and rules. Saved to the{" "}
+          <span className="font-medium">Health_Config</span> tab in Google Sheets.
+        </p>
+      </div>
+
+      {/* Status categories */}
+      <div className="space-y-2">
+        <div className="text-sm font-medium">Category names &amp; emojis</div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {LABEL_STATUSES.map((key) => {
+            const meta = statusMetaWith(draftLabels, key as FatigueStatus);
+            return (
+              <div key={key} className="rounded-lg border p-3 flex items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${TONE_CLASSES[meta.tone]}`}
+                >
+                  <span>{draftLabels[key].emoji}</span>
+                  {draftLabels[key].label || DEFAULT_TITLES[key]}
+                </span>
+                <div className="flex-1 grid grid-cols-[1fr_64px] gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">
+                      Name for “{DEFAULT_TITLES[key]}”
+                    </Label>
+                    <Input
+                      value={draftLabels[key].label}
+                      onChange={(e) => patchLabel(key, "label", e.target.value)}
+                      placeholder={DEFAULT_TITLES[key]}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Emoji</Label>
+                    <Input
+                      value={draftLabels[key].emoji}
+                      onChange={(e) => patchLabel(key, "emoji", e.target.value)}
+                      className="h-8 text-sm text-center"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Rename any category (e.g. “Healthy” → “Thriving”, “Burnout risk” → “Over Achievers”) and
+          pick the emoji shown next to it.
+        </p>
+      </div>
+
+      {/* Rules */}
+      <div className="space-y-3 border-t pt-4">
+        <div className="text-sm font-medium">Rules &amp; thresholds</div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="space-y-1.5 sm:col-span-3">
+            <Label className="text-xs">Default calculation mode</Label>
+            <Select
+              value={draftSettings.mode}
+              onValueChange={(v) => patchS({ mode: v as HealthMode })}
+            >
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODE_OPTIONS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              {MODE_OPTIONS.find((m) => m.value === draftSettings.mode)?.hint}
+            </p>
+          </div>
+          {draftSettings.mode === "past" && (
+            <HealthNumberField
+              label="Look back (weeks)"
+              min={1}
+              value={draftSettings.pastWeeks}
+              onChange={(n) => patchS({ pastWeeks: n })}
+            />
+          )}
+          {draftSettings.mode === "future" && (
+            <HealthNumberField
+              label="Look ahead (weeks)"
+              min={1}
+              value={draftSettings.futureWeeks}
+              onChange={(n) => patchS({ futureWeeks: n })}
+            />
+          )}
+          {draftSettings.mode === "range" && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Start date</Label>
+                <Input
+                  type="date"
+                  value={draftSettings.rangeStart}
+                  onChange={(e) => patchS({ rangeStart: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">End date</Label>
+                <Input
+                  type="date"
+                  value={draftSettings.rangeEnd}
+                  onChange={(e) => patchS({ rangeEnd: e.target.value })}
+                />
+              </div>
+            </>
+          )}
+          {countModes && (
+            <>
+              <HealthNumberField
+                label={`“${draftLabels.burnout.label || "Over-served"}” at (serves ≥)`}
+                min={1}
+                value={draftSettings.highThreshold}
+                onChange={(n) => patchS({ highThreshold: n })}
+                hint="Flags red"
+              />
+              <HealthNumberField
+                label={`“${draftLabels.could_do_more.label || "Could do more"}” at (serves ≤)`}
+                value={draftSettings.lowThreshold}
+                onChange={(n) => patchS({ lowThreshold: n })}
+                hint="Flags yellow"
+              />
+            </>
+          )}
+          {draftSettings.mode === "preference" && (
+            <HealthNumberField
+              label="Tolerance above preference (%)"
+              value={draftSettings.tolerancePct}
+              onChange={(n) => patchS({ tolerancePct: n })}
+              hint="How far over their requested frequency is still OK"
+            />
+          )}
+          <HealthNumberField
+            label={`“${draftLabels.burnout.label || "Burnout"}” streak (weeks in a row)`}
+            min={2}
+            value={draftSettings.burnoutStreak}
+            onChange={(n) => patchS({ burnoutStreak: n })}
+            hint="Consecutive weeks that flag red"
+          />
+          <HealthNumberField
+            label={`“${draftLabels.no_rest.label || "No rest"}” streak (weeks in a row)`}
+            min={1}
+            value={draftSettings.noRestStreak}
+            onChange={(n) => patchS({ noRestStreak: n })}
+            hint="Back-to-back weeks that flag amber"
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+          <div>
+            <Label className="text-sm">Include paused volunteers</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Show people who have paused serving in the Team Health table.
+            </p>
+          </div>
+          <Switch
+            checked={draftSettings.includePaused}
+            onCheckedChange={(c) => patchS({ includePaused: c })}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t pt-4">
+        <Button variant="outline" onClick={resetDefaults}>
+          Reset to defaults
+        </Button>
+        <Button onClick={save} disabled={!dirty}>
+          {dirty ? "Save settings" : "Saved"}
+        </Button>
       </div>
     </div>
   );
