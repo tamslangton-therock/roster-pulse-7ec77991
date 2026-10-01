@@ -20,6 +20,8 @@ export interface UserAccessRecord {
   individualsAccess: IndividualsAccess;
   canViewRoster: boolean;
   canViewLifeGroups: boolean;
+  /** Serving areas shown on Team Health. Empty = all areas. */
+  healthViewAreas: string[];
 }
 
 /** What the login flow stores in the session — never includes the password. */
