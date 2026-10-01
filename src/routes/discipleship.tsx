@@ -469,7 +469,9 @@ function AddCardDialog({
           <div className="grid gap-1.5">
             <Label>Interested in</Label>
             <div className="grid grid-cols-2 gap-1.5">
-              {INTERESTS.map((i) => (
+              {interestList.map((def) => {
+                const i = def.name;
+                return (
                 <label
                   key={i}
                   className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm cursor-pointer hover:bg-accent/50"
@@ -480,9 +482,10 @@ function AddCardDialog({
                       setInterests((prev) => (v ? [...prev, i] : prev.filter((x) => x !== i)))
                     }
                   />
-                  <span>{INTEREST_ICONS[i]} {i}</span>
+                  <span>{interestEmoji(def.emoji, i)} {i}</span>
                 </label>
-              ))}
+                );
+              })}
             </div>
           </div>
           <div className="grid gap-1.5">
