@@ -844,7 +844,8 @@ function InterestPools({
         <div className="space-y-3 border-t pt-3">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-semibold">
-              {INTEREST_ICONS[pool] ?? "•"} {pool} — {waiting.length} still waiting
+              <h2 className="text-sm font-semibold">
+              {emojiOf(pool)} {pool} — {waiting.length} still waiting
             </h2>
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
               <Checkbox checked={showDone} onCheckedChange={(v) => setShowDone(v === true)} />
