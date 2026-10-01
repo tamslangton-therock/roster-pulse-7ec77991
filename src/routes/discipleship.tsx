@@ -774,11 +774,16 @@ function InterestPools({
 }) {
   const [pool, setPool] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const { interests: configured } = useInterestList();
+  const saveInterests = useSaveInterestList();
 
   const allInterests = useMemo(() => {
-    const extra = rows.flatMap((r) => r.interests).filter((i) => !(INTERESTS as readonly string[]).includes(i));
-    return [...INTERESTS, ...Array.from(new Set(extra))];
-  }, [rows]);
+    const known = new Set(configured.map((i) => i.name));
+    const extra = rows.flatMap((r) => r.interests).filter((i) => !known.has(i));
+    return [...configured.map((i) => i.name), ...Array.from(new Set(extra))];
+  }, [rows, configured]);
+  const emojiOf = (i: string) => interestEmoji(configured.find((c) => c.name === i)?.emoji, i);
 
   const waitingCount = (i: string) =>
     rows.filter((r) => r.interests.includes(i) && !r.interest_done.includes(i)).length;
