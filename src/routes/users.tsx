@@ -613,6 +613,20 @@ function HealthRulesEditor() {
           {countModes && (
             <>
               <HealthNumberField
+                label={`“${draftLabels.healthy.label || "Healthy"}” minimum serves`}
+                min={1}
+                value={draftSettings.lowThreshold + 1}
+                onChange={(n) => patchS({ lowThreshold: Math.max(0, n - 1) })}
+                hint={`At least this many serves; fewer shows “${draftLabels.could_do_more.label}”`}
+              />
+              <HealthNumberField
+                label={`“${draftLabels.healthy.label || "Healthy"}” maximum serves`}
+                min={1}
+                value={Math.max(1, draftSettings.highThreshold - 1)}
+                onChange={(n) => patchS({ highThreshold: n + 1 })}
+                hint={`Up to this many serves; more shows “${draftLabels.burnout.label}”`}
+              />
+              <HealthNumberField
                 label={`“${draftLabels.burnout.label || "Over-served"}” at (serves ≥)`}
                 min={1}
                 value={draftSettings.highThreshold}
@@ -628,12 +642,27 @@ function HealthRulesEditor() {
             </>
           )}
           {draftSettings.mode === "preference" && (
-            <HealthNumberField
-              label="Tolerance above preference (%)"
-              value={draftSettings.tolerancePct}
-              onChange={(n) => patchS({ tolerancePct: n })}
-              hint="How far over their requested frequency is still OK"
-            />
+            <>
+              <HealthNumberField
+                label={`“${draftLabels.healthy.label || "Healthy"}” starts at (% of preference)`}
+                value={draftSettings.healthyMinimumPct}
+                onChange={(n) => patchS({ healthyMinimumPct: Math.min(100, n) })}
+                hint={`Below this shows “${draftLabels.could_do_more.label}”`}
+              />
+              <HealthNumberField
+                label={`“${draftLabels.healthy.label || "Healthy"}” allowance above preference (%)`}
+                value={draftSettings.tolerancePct}
+                onChange={(n) => patchS({ tolerancePct: n })}
+                hint={`Above this shows “${draftLabels.burnout.label}”`}
+              />
+            </>
+          )}
+          {draftSettings.mode === "consecutive" && (
+            <p className="text-xs text-muted-foreground sm:col-span-3 rounded-lg border bg-muted/30 p-3">
+              “{draftLabels.healthy.label || "Healthy"}” applies when someone has served before and
+              their longest streak is fewer than {draftSettings.noRestStreak} consecutive weeks.
+              Adjust the no-rest threshold below to change this.
+            </p>
           )}
           <HealthNumberField
             label={`“${draftLabels.burnout.label || "Burnout"}” streak (weeks in a row)`}

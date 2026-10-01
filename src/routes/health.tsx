@@ -392,6 +392,20 @@ function HealthPage() {
               {countModes && (
                 <>
                   <NumberField
+                    label={`${healthLabels.healthy.label} minimum serves`}
+                    min={1}
+                    value={settings.lowThreshold + 1}
+                    onChange={(n) => patch({ lowThreshold: Math.max(0, n - 1) })}
+                    hint={`Fewer shows ${healthLabels.could_do_more.label}`}
+                  />
+                  <NumberField
+                    label={`${healthLabels.healthy.label} maximum serves`}
+                    min={1}
+                    value={Math.max(1, settings.highThreshold - 1)}
+                    onChange={(n) => patch({ highThreshold: n + 1 })}
+                    hint={`More shows ${healthLabels.burnout.label}`}
+                  />
+                  <NumberField
                     label="Over-served at (serves ≥)"
                     min={1}
                     value={settings.highThreshold}
@@ -407,12 +421,20 @@ function HealthPage() {
                 </>
               )}
               {settings.mode === "preference" && (
-                <NumberField
-                  label="Tolerance above preference (%)"
-                  value={settings.tolerancePct}
-                  onChange={(n) => patch({ tolerancePct: n })}
-                  hint="How far over their requested frequency is still OK"
-                />
+                <>
+                  <NumberField
+                    label={`${healthLabels.healthy.label} starts at (% of preference)`}
+                    value={settings.healthyMinimumPct}
+                    onChange={(n) => patch({ healthyMinimumPct: Math.min(100, n) })}
+                    hint={`Below this shows ${healthLabels.could_do_more.label}`}
+                  />
+                  <NumberField
+                    label={`${healthLabels.healthy.label} allowance above preference (%)`}
+                    value={settings.tolerancePct}
+                    onChange={(n) => patch({ tolerancePct: n })}
+                    hint={`Above this shows ${healthLabels.burnout.label}`}
+                  />
+                </>
               )}
               <NumberField
                 label="Burnout streak (weeks in a row)"
