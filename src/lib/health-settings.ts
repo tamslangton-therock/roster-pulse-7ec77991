@@ -23,6 +23,8 @@ export interface HealthSettings {
   noRestStreak: number;
   /** % tolerance above a person's target before flagging over-serving */
   tolerancePct: number;
+  /** % of a person's target they must reach to be considered healthy */
+  healthyMinimumPct: number;
   area: string; // "all" or a serving area
   includePaused: boolean;
 }
@@ -40,6 +42,7 @@ export const DEFAULT_HEALTH_SETTINGS: HealthSettings = {
   burnoutStreak: 3,
   noRestStreak: 2,
   tolerancePct: 0,
+  healthyMinimumPct: 60,
   area: "all",
   includePaused: false,
 };
@@ -137,6 +140,7 @@ export function healthConfigRows(
     burnoutStreak: String(s.burnoutStreak),
     noRestStreak: String(s.noRestStreak),
     tolerancePct: String(s.tolerancePct),
+    healthyMinimumPct: String(s.healthyMinimumPct),
     area: s.area,
     includePaused: s.includePaused ? "TRUE" : "FALSE",
   };
@@ -168,6 +172,7 @@ export function parseHealthConfig(
   num("burnoutStreak", 2);
   num("noRestStreak", 1);
   num("tolerancePct", 0);
+  num("healthyMinimumPct", 0);
   if (rows.rangeStart !== undefined) s.rangeStart = rows.rangeStart;
   if (rows.rangeEnd !== undefined) s.rangeEnd = rows.rangeEnd;
   if (rows.area) s.area = rows.area;
@@ -335,7 +340,7 @@ export function computeHealthRow(
     } else if (count > allowed) {
       status = "burnout";
       detail = `${count} vs ~${expected.toFixed(0)} requested`;
-    } else if (count < expected * 0.6) {
+    } else if (count < expected * (s.healthyMinimumPct / 100)) {
       status = "could_do_more";
       detail = `${count} vs ~${expected.toFixed(0)} requested`;
     } else {
