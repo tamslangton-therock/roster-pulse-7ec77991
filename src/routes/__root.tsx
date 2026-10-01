@@ -289,11 +289,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
+      {/* Browser extensions (e.g. Grammarly) inject attributes on <body> before React loads. */}
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
