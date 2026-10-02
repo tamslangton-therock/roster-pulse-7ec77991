@@ -95,7 +95,7 @@ export function AppSidebar() {
             <Sparkles className="h-4 w-4" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold tracking-tight">Roster Pulse</span>
+            <span className="text-sm font-semibold tracking-tight">The Rock Church</span>
             <span className="text-[11px] text-muted-foreground">Church roster ops</span>
           </div>
         </div>

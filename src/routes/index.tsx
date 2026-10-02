@@ -57,13 +57,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Roster Pulse — Church Roster Home" },
+      { title: "The Rock Church — Church Roster Home" },
       {
         name: "description",
         content:
-          "Home menu for Roster Pulse: jump into the live Sunday roster, family, team health, life groups and print docs.",
+          "Home menu for The Rock Church: jump into the live Sunday roster, family, team health, life groups and print docs.",
       },
-      { property: "og:title", content: "Roster Pulse — Church Roster Home" },
+      { property: "og:title", content: "The Rock Church — Church Roster Home" },
       {
         property: "og:description",
         content:
@@ -164,7 +164,7 @@ function HomeMenu() {
       <header className="mb-10">
         <div className="mb-3 flex items-center gap-2 text-primary">
           <Sparkles className="h-5 w-5" />
-          <span className="text-xs font-medium uppercase tracking-widest">Roster Pulse</span>
+          <span className="text-xs font-medium uppercase tracking-widest">The Rock Church</span>
         </div>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           What would you like to work on?

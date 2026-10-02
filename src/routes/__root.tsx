@@ -135,7 +135,7 @@ function LoginGate({ children }: { children: ReactNode }) {
           <div className="w-12 h-12 bg-primary/20 text-primary rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
             🔒
           </div>
-          <h2 className="text-2xl font-bold mb-1 tracking-tight text-white">Roster Pulse</h2>
+          <h2 className="text-2xl font-bold mb-1 tracking-tight text-white">The Rock Church</h2>
           <p className="text-xs text-slate-400 mb-6">
             {mode === "leader"
               ? "Team leader sign-in"
@@ -231,7 +231,7 @@ function LoginGate({ children }: { children: ReactNode }) {
           <header className="h-14 flex items-center justify-between border-b bg-background/80 backdrop-blur px-4 sticky top-0 z-30">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
-              <div className="text-sm font-medium tracking-tight">Roster Pulse</div>
+              <div className="text-sm font-medium tracking-tight">The Rock Church</div>
             </div>
             <div className="flex items-center gap-2">
               {whoami && (
@@ -261,14 +261,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Roster Pulse — Church Roster Management" },
+      { name: "theme-color", content: "#f7eace" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "The Rock" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { title: "The Rock Church — Church Roster Management" },
       {
         name: "description",
         content:
-          "Roster Pulse is a clean, intuitive church roster manager with clash detection, fatigue tracking, and smart swaps.",
+          "The Rock Church is a clean, intuitive church roster manager with clash detection, fatigue tracking, and smart swaps.",
       },
-      { name: "author", content: "Roster Pulse" },
-      { property: "og:title", content: "Roster Pulse — Church Roster Management" },
+      { name: "author", content: "The Rock Church" },
+      { property: "og:title", content: "The Rock Church — Church Roster Management" },
       {
         property: "og:description",
         content: "Plan Sundays with clash detection, fatigue insights, and one-click smart swaps.",
@@ -279,6 +284,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,

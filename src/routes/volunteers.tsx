@@ -39,13 +39,13 @@ import { InterestPathwayDialog } from "@/components/interest-pathway-dialog";
 export const Route = createFileRoute("/volunteers")({
   head: () => ({
     meta: [
-      { title: "Family — Roster Pulse" },
+      { title: "Family — The Rock Church" },
       {
         name: "description",
         content:
           "Family directory of every person — serving areas, availability, context, challenges and prayer notes.",
       },
-      { property: "og:title", content: "Family — Roster Pulse" },
+      { property: "og:title", content: "Family — The Rock Church" },
       {
         property: "og:description",
         content: "Add, edit, and filter family profiles, volunteer flags and serving rules.",
