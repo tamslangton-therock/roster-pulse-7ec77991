@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -49,22 +50,34 @@ export function BirthdayInput({
   onChange: (value: string) => void;
 }) {
   const current = readMonthDay(value);
-  const pendingDay = value.match(/^day:(\d{1,2})$/);
-  const pendingMonth = value.match(/^month:(\d{1,2})$/);
-  const rawDay = pendingDay ? Number(pendingDay[1]) : current.day;
-  const month = pendingMonth ? Number(pendingMonth[1]) : current.month;
+  const [day, setDay] = useState<number | null>(current.day);
+  const [month, setMonth] = useState<number | null>(current.month);
   const dayLimit = daysInMonth(month);
-  const day = rawDay && rawDay <= dayLimit ? rawDay : null;
+
+  useEffect(() => {
+    const next = readMonthDay(value);
+    setDay(next.day);
+    setMonth(next.month);
+  }, [value]);
 
   const changeDay = (next: string) => {
     const nextDay = Number(next);
-    onChange(month ? birthdayValue(nextDay, month) : `day:${nextDay}`);
+    setDay(nextDay);
+    if (month) onChange(birthdayValue(nextDay, month));
   };
 
   const changeMonth = (next: string) => {
     const nextMonth = Number(next);
     const nextDay = day && day <= daysInMonth(nextMonth) ? day : null;
-    onChange(nextDay ? birthdayValue(nextDay, nextMonth) : `month:${nextMonth}`);
+    setMonth(nextMonth);
+    setDay(nextDay);
+    if (nextDay) onChange(birthdayValue(nextDay, nextMonth));
+  };
+
+  const clear = () => {
+    setDay(null);
+    setMonth(null);
+    onChange("");
   };
 
   return (
@@ -89,8 +102,8 @@ export function BirthdayInput({
           ))}
         </SelectContent>
       </Select>
-      {value && (
-        <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")}>
+      {(value || day || month) && (
+        <Button type="button" variant="ghost" size="sm" onClick={clear}>
           Clear
         </Button>
       )}
