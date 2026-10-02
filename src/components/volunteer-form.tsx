@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { BirthdayInput } from "@/components/birthday-input";
 import {
   Select,
   SelectContent,
@@ -439,13 +440,9 @@ export function VolunteerForm({
 
         <div>
           <Label>Birthday</Label>
-          <Input
-            type="date"
-            value={draft.birthday}
-            onChange={(e) => set("birthday", e.target.value)}
-          />
+          <BirthdayInput value={draft.birthday} onChange={(value) => set("birthday", value)} />
           <p className="mt-1 text-xs text-muted-foreground">
-            Used to remind the right leaders the week of their birthday.
+            Day and month only. Used to remind the right leaders that week.
           </p>
         </div>
         <div>

@@ -49,24 +49,23 @@ export function BirthdayInput({
   onChange: (value: string) => void;
 }) {
   const current = readMonthDay(value);
-  const dayLimit = daysInMonth(current.month);
-  const selectedDay = current.day && current.day <= dayLimit ? current.day : null;
+  const pendingDay = value.match(/^day:(\d{1,2})$/);
+  const pendingMonth = value.match(/^month:(\d{1,2})$/);
+  const rawDay = pendingDay ? Number(pendingDay[1]) : current.day;
+  const month = pendingMonth ? Number(pendingMonth[1]) : current.month;
+  const dayLimit = daysInMonth(month);
+  const day = rawDay && rawDay <= dayLimit ? rawDay : null;
 
   const changeDay = (next: string) => {
-    const day = Number(next);
-    onChange(current.month ? birthdayValue(day, current.month) : `day:${day}`);
+    const nextDay = Number(next);
+    onChange(month ? birthdayValue(nextDay, month) : `day:${nextDay}`);
   };
 
   const changeMonth = (next: string) => {
-    const month = Number(next);
-    const day = current.day && current.day <= daysInMonth(month) ? current.day : null;
-    onChange(day ? birthdayValue(day, month) : `month:${month}`);
+    const nextMonth = Number(next);
+    const nextDay = day && day <= daysInMonth(nextMonth) ? day : null;
+    onChange(nextDay ? birthdayValue(nextDay, nextMonth) : `month:${nextMonth}`);
   };
-
-  const pendingDay = value.match(/^day:(\d{1,2})$/);
-  const pendingMonth = value.match(/^month:(\d{1,2})$/);
-  const day = pendingDay ? Number(pendingDay[1]) : selectedDay;
-  const month = pendingMonth ? Number(pendingMonth[1]) : current.month;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
