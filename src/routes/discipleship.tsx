@@ -47,6 +47,7 @@ import {
   cardInInterestScope,
 } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
+import { BirthdayInput } from "@/components/birthday-input";
 import {
   fetchDiscipleship,
   writeDiscipleship,
@@ -493,7 +494,7 @@ function AddCardDialog({
             </div>
             <div className="grid gap-1.5">
               <Label>Birthday</Label>
-              <Input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+              <BirthdayInput value={birthday} onChange={setBirthday} />
             </div>
           </div>
           <div className="grid gap-1.5">
@@ -788,13 +789,12 @@ function DetailDialog({
                 onChange={(e) => onUpdate({ email: e.target.value })}
                 placeholder="Email"
               />
-              <Input
-                type="date"
-                value={row.birthday ?? ""}
-                onChange={(e) => onUpdate({ birthday: e.target.value })}
-                placeholder="Birthday"
-                className="col-span-2"
-              />
+              <div className="col-span-2">
+                <BirthdayInput
+                  value={row.birthday ?? ""}
+                  onChange={(birthday) => onUpdate({ birthday })}
+                />
+              </div>
             </div>
           </div>
 
