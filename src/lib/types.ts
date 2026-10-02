@@ -29,6 +29,8 @@ export interface Volunteer {
   context?: string;
   challenges?: string;
   praying_for?: string;
+  /** Full date of birth, ISO YYYY-MM-DD (drives birthday reminders). */
+  birthday?: string;
 }
 
 export interface Team {

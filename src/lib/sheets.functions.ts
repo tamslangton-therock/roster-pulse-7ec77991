@@ -1149,6 +1149,7 @@ export interface DiscipleshipRow {
   assigned_to: string;
   plugged_in_date: string;
   notes: string;
+  birthday: string;
 }
 
 async function ensureDiscipleshipTab() {
@@ -1176,7 +1177,7 @@ const splitList = (s: unknown) =>
 export const fetchDiscipleship = createServerFn({ method: "GET" }).handler(
   async (): Promise<DiscipleshipRow[]> => {
     await ensureDiscipleshipTab();
-    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1:N3000`);
+    const data = await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1:O3000`);
     const out: DiscipleshipRow[] = [];
     for (const r of ((data.values ?? []) as string[][]).slice(1)) {
       const name = String(r[1] ?? "").trim();
@@ -1196,6 +1197,7 @@ export const fetchDiscipleship = createServerFn({ method: "GET" }).handler(
         assigned_to: String(r[11] ?? "").trim(),
         plugged_in_date: String(r[12] ?? "").trim(),
         notes: String(r[13] ?? ""),
+        birthday: String(r[14] ?? "").trim(),
       });
     }
     return out;
@@ -1206,7 +1208,7 @@ export const writeDiscipleship = createServerFn({ method: "POST" })
   .inputValidator((data: { rows: DiscipleshipRow[] }) => data)
   .handler(async ({ data }) => {
     await ensureDiscipleshipTab();
-    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1:N3000:clear`, {
+    await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1:O3000:clear`, {
       method: "POST",
       body: "{}",
     });
@@ -1216,7 +1218,7 @@ export const writeDiscipleship = createServerFn({ method: "POST" })
         r.id, r.person_name, r.phone ?? "", r.email ?? "", r.date_connected ?? "", r.source ?? "",
         r.stage ?? "needs_contact", r.contacted ? "TRUE" : "FALSE", r.contacted_date ?? "",
         (r.interests ?? []).join(" | "), (r.interest_done ?? []).join(" | "),
-        r.assigned_to ?? "", r.plugged_in_date ?? "", r.notes ?? "",
+        r.assigned_to ?? "", r.plugged_in_date ?? "", r.notes ?? "", r.birthday ?? "",
       ]),
     ];
     await gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${DISCIPLESHIP_TAB}!A1?valueInputOption=RAW`, {

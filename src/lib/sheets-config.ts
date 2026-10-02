@@ -30,6 +30,7 @@ export const SHEET_SCHEMAS: Record<SheetTab, readonly string[]> = {
     "context",
     "challenges",
     "praying_for",
+    "birthday",
   ],
   teams: ["id", "team_name", "serving_area", "member_names"],
   assignments: [
@@ -192,8 +193,9 @@ export const DISCIPLESHIP_SCHEMA = [
   "interest_done",
   "assigned_to",
   "plugged_in_date",
-  "notes",
-] as const;
+   "notes",
+   "birthday",
+ ] as const;
 
 // Customisable Discipleship interest lists (Baptism, Alpha, …) — one row each, in display order.
 export const INTERESTS_TAB = "Discipleship_Interests";

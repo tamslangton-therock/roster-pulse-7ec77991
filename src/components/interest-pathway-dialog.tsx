@@ -71,6 +71,7 @@ export function InterestPathwayDialog({
         assigned_to: "",
         plugged_in_date: "",
         notes: `Added from the Family directory — already ${volunteer.is_volunteer !== false ? "serving" : "in the directory"}.`,
+        birthday: volunteer.birthday ?? "",
       };
       save([row, ...rows], `${volunteer.full_name} added to ${name}.`);
       return;

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
+  Cake,
   CalendarDays,
   FileText,
   HeartHandshake,
@@ -20,6 +21,11 @@ import {
   canViewLifeGroups,
   canViewRosterPage,
 } from "@/lib/user-access";
+import {
+  upcomingBirthdays,
+  birthdayLabel,
+  whatsappBirthdayUrl,
+} from "@/lib/birthdays";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -150,6 +156,8 @@ function HomeMenu() {
         </div>
       </header>
 
+      <BirthdayCard />
+
       <nav className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {allowedTiles.map((tile) => (
           <Link
@@ -166,5 +174,74 @@ function HomeMenu() {
         ))}
       </nav>
     </div>
+  );
+}
+
+function BirthdayCard() {
+  const volunteers = useRoster((s) => s.volunteers);
+  const lifeGroups = useRoster((s) => s.lifeGroups);
+  const isMaster = useAuth((s) => s.master);
+  const authUser = useAuth((s) => s.user);
+
+  const reminders = upcomingBirthdays({
+    volunteers,
+    lifeGroups,
+    isMaster,
+    user: authUser,
+    withinDays: 7,
+  });
+
+  if (reminders.length === 0) return null;
+
+  return (
+    <section className="mb-8 rounded-xl border bg-card p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 text-primary">
+        <Cake className="h-5 w-5" />
+        <h2 className="text-sm font-semibold uppercase tracking-widest">
+          Birthdays this week
+        </h2>
+      </div>
+      <ul className="space-y-3">
+        {reminders.map(({ person, inDays, nextDate, reasons }) => {
+          const wa = whatsappBirthdayUrl(person.full_name, person.phone);
+          return (
+            <li
+              key={person.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{person.full_name}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      inDays === 0
+                        ? "bg-primary text-primary-foreground"
+                        : "border bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {birthdayLabel(inDays, nextDate)}
+                  </span>
+                </div>
+                {reasons.length > 0 && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {reasons.slice(0, 3).join(" · ")}
+                  </p>
+                )}
+              </div>
+              {wa && (
+                <a
+                  href={wa}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700"
+                >
+                  WhatsApp birthday wish
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

@@ -31,6 +31,7 @@ export type VolunteerDraft = {
   context: string;
   challenges: string;
   praying_for: string;
+  birthday: string;
 };
 
 export const FREQUENCIES = [
@@ -58,6 +59,7 @@ export function emptyDraft(): VolunteerDraft {
     context: "",
     challenges: "",
     praying_for: "",
+    birthday: "",
   };
 }
 
@@ -78,6 +80,7 @@ export function toDraft(v: Volunteer): VolunteerDraft {
     context: v.context ?? "",
     challenges: v.challenges ?? "",
     praying_for: v.praying_for ?? "",
+    birthday: v.birthday ?? "",
   };
 }
 
@@ -434,8 +437,19 @@ export function VolunteerForm({
         </div>
       </div>
 
-      <div>
-        <Label>Notes</Label>
+        <div>
+          <Label>Birthday</Label>
+          <Input
+            type="date"
+            value={draft.birthday}
+            onChange={(e) => set("birthday", e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Used to remind the right leaders the week of their birthday.
+          </p>
+        </div>
+        <div>
+          <Label>Notes</Label>
         <Textarea
           rows={3}
           value={draft.notes}
