@@ -564,6 +564,7 @@ function DetailDialog({
       const fill: Partial<Volunteer> = {};
       if (!existing.phone && row.phone) fill.phone = row.phone;
       if (!existing.email && row.email) fill.email = row.email;
+      if (!existing.birthday && row.birthday) fill.birthday = row.birthday;
       if (Object.keys(fill).length) updateVolunteer(existing.id, fill);
       if (existing.full_name !== row.person_name) onUpdate({ person_name: existing.full_name });
       if (announce) toast.success(`Linked to existing profile ${existing.full_name}.`);
@@ -574,6 +575,7 @@ function DetailDialog({
       full_name: name,
       phone: row.phone,
       email: row.email,
+      birthday: row.birthday ?? "",
       is_volunteer: false,
       serving_areas: [],
       notes: [row.source && `Connected ${row.date_connected} via ${row.source}`, row.notes]
@@ -785,6 +787,13 @@ function DetailDialog({
                 value={row.email}
                 onChange={(e) => onUpdate({ email: e.target.value })}
                 placeholder="Email"
+              />
+              <Input
+                type="date"
+                value={row.birthday ?? ""}
+                onChange={(e) => onUpdate({ birthday: e.target.value })}
+                placeholder="Birthday"
+                className="col-span-2"
               />
             </div>
           </div>
