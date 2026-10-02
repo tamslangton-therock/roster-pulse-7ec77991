@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
+  Cake,
   CalendarDays,
   FileText,
   HeartHandshake,
@@ -20,6 +21,11 @@ import {
   canViewLifeGroups,
   canViewRosterPage,
 } from "@/lib/user-access";
+import {
+  upcomingBirthdays,
+  birthdayLabel,
+  whatsappBirthdayUrl,
+} from "@/lib/birthdays";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -149,6 +155,8 @@ function HomeMenu() {
           </span>
         </div>
       </header>
+
+      <BirthdayCard />
 
       <nav className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {allowedTiles.map((tile) => (
