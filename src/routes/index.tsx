@@ -10,8 +10,34 @@ import {
   Printer,
   Shield,
   Sparkles,
+  MessageCircle,
+  Pencil,
+  Plus,
+  Trash2,
   Users,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import {
@@ -25,6 +51,7 @@ import {
   upcomingBirthdays,
   birthdayLabel,
   whatsappBirthdayUrl,
+  type BirthdayMessageTemplate,
 } from "@/lib/birthdays";
 
 export const Route = createFileRoute("/")({
@@ -182,6 +209,18 @@ function BirthdayCard() {
   const lifeGroups = useRoster((s) => s.lifeGroups);
   const isMaster = useAuth((s) => s.master);
   const authUser = useAuth((s) => s.user);
+  const templates = useRoster((s) => s.birthdayTemplates);
+  const setBirthdayTemplates = useRoster((s) => s.setBirthdayTemplates);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id ?? "default");
+
+  useEffect(() => {
+    if (!templates.some((template) => template.id === selectedTemplateId)) {
+      setSelectedTemplateId(templates[0]?.id ?? "default");
+    }
+  }, [selectedTemplateId, templates]);
+
+  const selectedTemplate =
+    templates.find((template) => template.id === selectedTemplateId) ?? templates[0];
 
   const reminders = upcomingBirthdays({
     volunteers,
@@ -195,15 +234,35 @@ function BirthdayCard() {
 
   return (
     <section className="mb-8 rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2 text-primary">
-        <Cake className="h-5 w-5" />
-        <h2 className="text-sm font-semibold uppercase tracking-widest">
-          Birthdays this week
-        </h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-primary">
+          <Cake className="h-5 w-5" />
+          <h2 className="text-sm font-semibold uppercase tracking-widest">
+            Birthdays this week
+          </h2>
+        </div>
+        {isMaster && (
+          <BirthdayTemplateDialog templates={templates} onSave={setBirthdayTemplates} />
+        )}
+      </div>
+      {templates.length > 1 && (
+        <div className="mb-4 max-w-sm space-y-1.5">
+          <Label htmlFor="birthday-template">Message template</Label>
+          <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+            <SelectTrigger id="birthday-template">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((template) => (
+                <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <ul className="space-y-3">
         {reminders.map(({ person, inDays, nextDate, reasons }) => {
-          const wa = whatsappBirthdayUrl(person.full_name, person.phone);
+          const wa = whatsappBirthdayUrl(person.full_name, person.phone, selectedTemplate?.message);
           return (
             <li
               key={person.id}
@@ -228,20 +287,114 @@ function BirthdayCard() {
                   </p>
                 )}
               </div>
-              {wa && (
-                <a
-                  href={wa}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700"
-                >
-                  WhatsApp birthday wish
-                </a>
-              )}
+              {wa && <Button asChild size="sm"><a href={wa} target="_blank" rel="noreferrer"><MessageCircle />WhatsApp wish</a></Button>}
             </li>
           );
         })}
       </ul>
     </section>
+  );
+}
+
+function BirthdayTemplateDialog({
+  templates,
+  onSave,
+}: {
+  templates: BirthdayMessageTemplate[];
+  onSave: (templates: BirthdayMessageTemplate[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [drafts, setDrafts] = useState<BirthdayMessageTemplate[]>(templates);
+
+  useEffect(() => {
+    if (!open) setDrafts(templates);
+  }, [open, templates]);
+
+  const update = (id: string, patch: Partial<BirthdayMessageTemplate>) => {
+    setDrafts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  };
+
+  const save = () => {
+    const clean = drafts.map((item) => ({
+      ...item,
+      name: item.name.trim(),
+      message: item.message.trim(),
+    }));
+    if (clean.some((item) => !item.name || !item.message)) {
+      toast.error("Each template needs a name and a message.");
+      return;
+    }
+    onSave(clean);
+    setOpen(false);
+    toast.success("Birthday messages saved for every leader.");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm"><Pencil />Edit messages</Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Birthday message templates</DialogTitle>
+          <DialogDescription>
+            The first template is the default. Use {"{first_name}"} to add the person’s first name automatically.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {drafts.map((template, index) => (
+            <div key={template.id} className="space-y-3 rounded-lg border p-4">
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Label htmlFor={`template-name-${template.id}`}>
+                    {index === 0 ? "Default template name" : "Template name"}
+                  </Label>
+                  <Input
+                    id={`template-name-${template.id}`}
+                    value={template.name}
+                    onChange={(event) => update(template.id, { name: event.target.value })}
+                  />
+                </div>
+                {index > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Delete ${template.name || "template"}`}
+                    title="Delete template"
+                    onClick={() => setDrafts((current) => current.filter((item) => item.id !== template.id))}
+                  >
+                    <Trash2 />
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`template-message-${template.id}`}>Message</Label>
+                <Textarea
+                  id={`template-message-${template.id}`}
+                  className="min-h-28 resize-y"
+                  value={template.message}
+                  onChange={(event) => update(template.id, { message: event.target.value })}
+                />
+              </div>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDrafts((current) => [
+              ...current,
+              { id: `birthday-${Date.now()}`, name: "", message: "Hi {first_name}, " },
+            ])}
+          >
+            <Plus />Add template
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button type="button" onClick={save}>Save templates</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
