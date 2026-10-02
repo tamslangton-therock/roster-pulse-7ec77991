@@ -412,6 +412,7 @@ function AddCardDialog({
   const [email, setEmail] = useState("");
   const [date, setDate] = useState(today());
   const [source, setSource] = useState("Connect card");
+  const [birthday, setBirthday] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
@@ -445,6 +446,7 @@ function AddCardDialog({
       assigned_to: "",
       plugged_in_date: "",
       notes,
+      birthday,
     });
     onOpenChange(false);
     setName("");
@@ -452,6 +454,7 @@ function AddCardDialog({
     setEmail("");
     setInterests([]);
     setNotes("");
+    setBirthday("");
   };
 
   return (
@@ -488,6 +491,11 @@ function AddCardDialog({
               <Label>Date connected</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
+            <div className="grid gap-1.5">
+              <Label>Birthday</Label>
+              <Input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+            </div>
+          </div>
             <div className="grid gap-1.5">
               <Label>Source</Label>
               <Input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Form, visit, friend…" />
