@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useRoster } from "@/lib/store";
+import { InstallAppButton } from "@/components/install-app-button";
 import { useAuth } from "@/lib/auth";
 import {
   canViewDiscipleship,
@@ -182,6 +183,8 @@ function HomeMenu() {
           </span>
         </div>
       </header>
+
+      <InstallAppButton />
 
       <BirthdayCard />
 
