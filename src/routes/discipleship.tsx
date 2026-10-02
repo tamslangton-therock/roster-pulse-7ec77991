@@ -496,10 +496,9 @@ function AddCardDialog({
               <Input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
             </div>
           </div>
-            <div className="grid gap-1.5">
-              <Label>Source</Label>
-              <Input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Form, visit, friend…" />
-            </div>
+          <div className="grid gap-1.5">
+            <Label>Source</Label>
+            <Input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Form, visit, friend…" />
           </div>
           <div className="grid gap-1.5">
             <Label>Interested in</Label>
