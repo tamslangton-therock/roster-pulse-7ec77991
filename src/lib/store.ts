@@ -627,6 +627,7 @@ function stripVolunteer(v: Volunteer): Record<string, unknown> {
     context: v.context ?? "",
     challenges: v.challenges ?? "",
     praying_for: v.praying_for ?? "",
+    birthday: v.birthday ?? "",
   };
 }
 
@@ -841,6 +842,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
       context: (volunteer.context as string) ?? "",
       challenges: (volunteer.challenges as string) ?? "",
       praying_for: (volunteer.praying_for as string) ?? "",
+      birthday: (volunteer.birthday as string) ?? "",
     };
     set((state) => ({ volunteers: [...state.volunteers, v] }));
     scheduleSync("volunteers", () => get().volunteers.map(stripVolunteer));
