@@ -67,13 +67,13 @@ export const DEFAULT_INTEREST_NAMES = DEFAULT_INTERESTS.map((i) => i.name);
 export const Route = createFileRoute("/discipleship")({
   head: () => ({
     meta: [
-      { title: "Discipleship — Roster Pulse" },
+      { title: "Discipleship — The Rock Church" },
       {
         name: "description",
         content:
           "Track new people from first visit to plugged in: contact follow-up, interest requests (Life Groups, Baptism, Alpha, New Partners, Serving) and handover to leaders.",
       },
-      { property: "og:title", content: "Discipleship — Roster Pulse" },
+      { property: "og:title", content: "Discipleship — The Rock Church" },
       {
         property: "og:description",
         content:

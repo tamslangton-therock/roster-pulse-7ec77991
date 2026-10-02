@@ -86,7 +86,7 @@ export const Route = createFileRoute("/roster")({
   validateSearch: (search) => rosterSearchSchema.parse(search),
   head: () => ({
     meta: [
-      { title: "Live Roster — Roster Pulse" },
+      { title: "Live Roster — The Rock Church" },
       {
         name: "description",
         content:
@@ -716,7 +716,7 @@ function LiveRosterPage() {
 
       {/* Printable Header Banner */}
       <div className="hidden print:block mb-4">
-        <h1 className="text-xl font-bold">Roster Pulse — Service Schedule</h1>
+        <h1 className="text-xl font-bold">The Rock Church — Service Schedule</h1>
         <p className="text-sm text-gray-600">
           Team: {selectedTeam === "all" ? "All Departments" : selectedTeam} | Range:{" "}
           {filterMonth === "all" ? "Full Roster" : filterMonth}

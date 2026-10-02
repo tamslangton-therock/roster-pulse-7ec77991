@@ -28,13 +28,13 @@ export const Route = createFileRoute("/print")({
   validateSearch: (search) => printSearchSchema.parse(search),
   head: () => ({
     meta: [
-      { title: "Team Roster Print — Roster Pulse" },
+      { title: "Team Roster Print — The Rock Church" },
       {
         name: "description",
         content:
           "Generate a colour-coded, print-ready Sunday roster for a single serving team across selected months.",
       },
-      { property: "og:title", content: "Team Roster Print — Roster Pulse" },
+      { property: "og:title", content: "Team Roster Print — The Rock Church" },
       {
         property: "og:description",
         content: "Colour-coded, print-ready Sunday rosters for each serving team.",

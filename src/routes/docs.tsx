@@ -30,13 +30,13 @@ import { areasOf } from "@/lib/roster-grid";
 export const Route = createFileRoute("/docs")({
   head: () => ({
     meta: [
-      { title: "Sunday Doc Templates — Roster Pulse" },
+      { title: "Sunday Doc Templates — The Rock Church" },
       {
         name: "description",
         content:
           "Design the Sunday huddle document templates — sections, base text, table rows and page breaks — that the roster generator fills names into.",
       },
-      { property: "og:title", content: "Sunday Doc Templates — Roster Pulse" },
+      { property: "og:title", content: "Sunday Doc Templates — The Rock Church" },
       {
         property: "og:description",
         content: "Edit the draft Sunday docs that the roster generator fills with names.",

@@ -1,4 +1,4 @@
-// Signed-in session for Roster Pulse. `master` = full admin (access code);
+// Signed-in session for The Rock Church. `master` = full admin (access code);
 // `user` = a team leader with per-area permissions.
 import { create } from "zustand";
 import { loginTeamUser } from "./auth.functions";

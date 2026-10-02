@@ -32,13 +32,13 @@ import { AccessNotice } from "@/components/access-notice";
 export const Route = createFileRoute("/teams")({
   head: () => ({
     meta: [
-      { title: "Team Builder — Roster Pulse" },
+      { title: "Team Builder — The Rock Church" },
       {
         name: "description",
         content:
           "Build ideal sub-teams inside each serving area and push them onto any Sunday of the live roster.",
       },
-      { property: "og:title", content: "Team Builder — Roster Pulse" },
+      { property: "og:title", content: "Team Builder — The Rock Church" },
       {
         property: "og:description",
         content:

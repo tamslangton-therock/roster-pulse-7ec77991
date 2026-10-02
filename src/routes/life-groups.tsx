@@ -40,13 +40,13 @@ import { AccessNotice } from "@/components/access-notice";
 export const Route = createFileRoute("/life-groups")({
   head: () => ({
     meta: [
-      { title: "Life Groups — Roster Pulse" },
+      { title: "Life Groups — The Rock Church" },
       {
         name: "description",
         content:
           "Create and manage church life groups, their leaders, meeting times, locations and members.",
       },
-      { property: "og:title", content: "Life Groups — Roster Pulse" },
+      { property: "og:title", content: "Life Groups — The Rock Church" },
       {
         property: "og:description",
         content:

@@ -40,13 +40,13 @@ import { AccessNotice } from "@/components/access-notice";
 export const Route = createFileRoute("/health")({
   head: () => ({
     meta: [
-      { title: "Team Health & Fatigue — Roster Pulse" },
+      { title: "Team Health & Fatigue — The Rock Church" },
       {
         name: "description",
         content:
           "Configurable fatigue lenses: preference-based load, rolling windows, custom date ranges and consecutive-week streaks.",
       },
-      { property: "og:title", content: "Team Health & Fatigue — Roster Pulse" },
+      { property: "og:title", content: "Team Health & Fatigue — The Rock Church" },
       {
         property: "og:description",
         content:

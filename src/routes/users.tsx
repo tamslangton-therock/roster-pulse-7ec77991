@@ -41,12 +41,12 @@ import { useInterestList } from "@/lib/interest-list";
 export const Route = createFileRoute("/users")({
   head: () => ({
     meta: [
-      { title: "User Access — Roster Pulse" },
+      { title: "User Access — The Rock Church" },
       {
         name: "description",
         content: "Create team-leader logins and switch their access to each area on or off.",
       },
-      { property: "og:title", content: "User Access — Roster Pulse" },
+      { property: "og:title", content: "User Access — The Rock Church" },
       {
         property: "og:description",
         content: "Create team-leader logins and control what each person can see and edit.",

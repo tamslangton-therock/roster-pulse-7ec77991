@@ -14,7 +14,7 @@ export function HydrateStore({ children }: { children: ReactNode }) {
   if (!mounted || !ready) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading Roster Pulse…
+        Loading The Rock Church…
       </div>
     );
   }
