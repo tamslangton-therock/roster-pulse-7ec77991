@@ -259,7 +259,7 @@ function BirthdayCard() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      )}
       <ul className="space-y-3">
         {reminders.map(({ person, inDays, nextDate, reasons }) => {
           const wa = whatsappBirthdayUrl(person.full_name, person.phone, selectedTemplate?.message);
