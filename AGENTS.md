@@ -18,3 +18,4 @@ Serving-area columns on Live_Roster are data, not constants: `src/lib/roster-gri
 
 - Discipleship pipeline (`/discipleship`) reads/writes the `Discipleship` sheet tab via its own fetch/write functions in sheets.functions.ts (not the main store); access is the `discipleship_access` column (none/view/edit) on `User_Access`, checked by `canViewDiscipleship`/`canEditDiscipleship`. Blank column = no access (new permission), so grant leaders explicitly.
 - Google Sheets reads go through the cached `gwFetch` in sheets.functions.ts (in-flight dedupe, 20s data TTL, long-lived row-1 probes, cleared on writes) — the ~60 reads/min quota otherwise turns reloads into 60s 429 stalls.
+- Shared birthday WhatsApp templates are persisted as JSON in the existing `Health_Config` key/value tab so every login uses the same messages without adding another Sheets read.

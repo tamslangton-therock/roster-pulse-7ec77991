@@ -49,6 +49,12 @@ import {
   type HealthSettings,
   type HealthLabels,
 } from "./health-settings";
+import {
+  DEFAULT_BIRTHDAY_TEMPLATES,
+  birthdayTemplatesConfig,
+  parseBirthdayTemplates,
+  type BirthdayMessageTemplate,
+} from "./birthdays";
 import { toast } from "sonner";
 
 
@@ -75,6 +81,8 @@ interface RosterState {
   healthSettings: HealthSettings;
   /** Master Team Health status labels + emojis — two-way with the Health_Config tab. */
   healthLabels: HealthLabels;
+  /** Shared WhatsApp birthday messages, saved in Health_Config. */
+  birthdayTemplates: BirthdayMessageTemplate[];
   // key: `${date}::${slot label}` -> status
   statuses: Record<string, AssignmentStatus>;
   /** Current column layout of the Live_Roster grid (areas × roles), synced two-way. */
@@ -158,6 +166,7 @@ interface RosterState {
   setUserAccess: (users: UserAccessTabValues[]) => void;
   setHealthSettings: (settings: HealthSettings, labels: HealthLabels) => void;
   resetHealthSettings: () => void;
+  setBirthdayTemplates: (templates: BirthdayMessageTemplate[]) => void;
 }
 
 
@@ -502,8 +511,13 @@ function scheduleHealthConfigSync() {
     setPending("health_config", null);
     try {
       const state = useRoster.getState();
-      await writeHealthConfig({
-        data: { config: healthConfigRows(state.healthSettings, state.healthLabels) },
+       await writeHealthConfig({
+         data: {
+           config: {
+             ...healthConfigRows(state.healthSettings, state.healthLabels),
+             ...birthdayTemplatesConfig(state.birthdayTemplates),
+           },
+         },
       });
       useRoster.setState({ syncStatus: "idle", error: null });
     } catch (err) {
@@ -667,6 +681,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
   userAccess: [],
   healthSettings: DEFAULT_HEALTH_SETTINGS,
   healthLabels: DEFAULT_HEALTH_LABELS,
+  birthdayTemplates: DEFAULT_BIRTHDAY_TEMPLATES,
   statuses: {},
 
 
@@ -776,6 +791,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         userAccess,
         healthSettings: parsedHealth.settings,
         healthLabels: parsedHealth.labels,
+        birthdayTemplates: parseBirthdayTemplates(healthConfigRowsIn),
         statuses,
         rosterMeta,
         dates,
@@ -1255,6 +1271,10 @@ export const useRoster = create<RosterState>()((set, get) => ({
   },
   resetHealthSettings: () => {
     set({ healthSettings: DEFAULT_HEALTH_SETTINGS, healthLabels: DEFAULT_HEALTH_LABELS });
+    scheduleHealthConfigSync();
+  },
+  setBirthdayTemplates: (templates) => {
+    set({ birthdayTemplates: templates });
     scheduleHealthConfigSync();
   },
 

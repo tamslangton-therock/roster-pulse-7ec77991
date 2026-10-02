@@ -6,6 +6,52 @@ import type { SessionUser } from "./user-access";
 import { areaMatches, areaInScope } from "./user-access";
 import type { LifeGroupRow } from "./sheets.functions";
 
+export interface BirthdayMessageTemplate {
+  id: string;
+  name: string;
+  message: string;
+}
+
+export const DEFAULT_BIRTHDAY_TEMPLATES: BirthdayMessageTemplate[] = [
+  {
+    id: "default",
+    name: "Birthday blessing",
+    message:
+      "Hi {first_name}, wishing you a very blessed and happy birthday! 🎉🎂 Hope you have a wonderful and special day ahead!",
+  },
+];
+
+const BIRTHDAY_TEMPLATES_KEY = "birthday_message_templates";
+
+export function parseBirthdayTemplates(config: Record<string, string>): BirthdayMessageTemplate[] {
+  const raw = config[BIRTHDAY_TEMPLATES_KEY];
+  if (!raw) return DEFAULT_BIRTHDAY_TEMPLATES;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return DEFAULT_BIRTHDAY_TEMPLATES;
+    const templates = parsed.flatMap((entry): BirthdayMessageTemplate[] => {
+      if (!entry || typeof entry !== "object") return [];
+      const candidate = entry as Partial<BirthdayMessageTemplate>;
+      const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+      const name = typeof candidate.name === "string" ? candidate.name.trim() : "";
+      const message = typeof candidate.message === "string" ? candidate.message.trim() : "";
+      return id && name && message ? [{ id, name, message }] : [];
+    });
+    return templates.length > 0 ? templates : DEFAULT_BIRTHDAY_TEMPLATES;
+  } catch {
+    return DEFAULT_BIRTHDAY_TEMPLATES;
+  }
+}
+
+export function birthdayTemplatesConfig(templates: BirthdayMessageTemplate[]): Record<string, string> {
+  return { [BIRTHDAY_TEMPLATES_KEY]: JSON.stringify(templates) };
+}
+
+export function renderBirthdayMessage(template: string, name: string): string {
+  const first = name.trim().split(/\s+/)[0] || name.trim();
+  return template.replaceAll("{first_name}", first).replaceAll("{name}", name.trim());
+}
+
 export interface BirthdayReminder {
   person: Volunteer;
   /** Days from today until the birthday (0 = today). */
@@ -60,10 +106,9 @@ export function birthdayLabel(inDays: number, nextDate: string): string {
 }
 
 /** Prefilled WhatsApp birthday greeting. */
-export function whatsappBirthdayUrl(name: string, phone?: string): string {
-  const first = name.trim().split(/\s+/)[0];
+export function whatsappBirthdayUrl(name: string, phone?: string, template?: string): string {
   const text = encodeURIComponent(
-    `Hi ${first}, wishing you a very blessed and happy birthday! 🎉🎂 Hope you have a wonderful and special day ahead!`,
+    renderBirthdayMessage(template ?? DEFAULT_BIRTHDAY_TEMPLATES[0].message, name),
   );
   const digits = (phone ?? "").replace(/[^\d+]/g, "").replace(/^\+/, "");
   return digits ? `https://wa.me/${digits}?text=${text}` : "";
