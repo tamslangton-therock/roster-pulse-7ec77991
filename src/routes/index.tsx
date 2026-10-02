@@ -230,7 +230,7 @@ function BirthdayCard() {
     withinDays: 7,
   });
 
-  if (reminders.length === 0) return null;
+  if (reminders.length === 0 && !isMaster) return null;
 
   return (
     <section className="mb-8 rounded-xl border bg-card p-5 shadow-sm">
@@ -259,6 +259,9 @@ function BirthdayCard() {
             </SelectContent>
           </Select>
         </div>
+      )}
+      {reminders.length === 0 && (
+        <p className="text-sm text-muted-foreground">No birthdays in the next seven days.</p>
       )}
       <ul className="space-y-3">
         {reminders.map(({ person, inDays, nextDate, reasons }) => {
