@@ -1,4 +1,4 @@
-const PUBLIC_ORIGIN = "https://roster-flow-keeper.lovable.app";
+const PUBLIC_ORIGIN = "https://the-rock-roster.lovable.app";
 
 export function portalUrl(id: string): string {
   return `${PUBLIC_ORIGIN}/my-roster?id=${encodeURIComponent(id)}`;
@@ -14,6 +14,6 @@ export function waDigits(phone: string): string {
 
 export function portalWhatsappUrl(name: string, phone: string, id: string): string {
   const first = (name || "").trim().split(/\s+/)[0] || "there";
-  const msg = `Hi ${first}! Here is your personal link to view your Rock Church serving dates, mark dates you're away, or update your details: ${portalUrl(id)}`;
+  const msg = `Hi ${first}! ⛰️\n\nHere is your personal link to view your Rock Church serving dates, mark dates you're away, or update your contact details:\n\n👉 ${portalUrl(id)}`;
   return `https://wa.me/${waDigits(phone)}?text=${encodeURIComponent(msg)}`;
 }
