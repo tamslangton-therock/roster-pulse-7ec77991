@@ -14,6 +14,7 @@ import { Route as DiscipleshipRouteImport } from './routes/discipleship'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as LifeGroupsRouteImport } from './routes/life-groups'
+import { Route as MyRosterRouteImport } from './routes/my-roster'
 import { Route as PrintRouteImport } from './routes/print'
 import { Route as RosterRouteImport } from './routes/roster'
 import { Route as TeamsRouteImport } from './routes/teams'
@@ -43,6 +44,11 @@ const HealthRoute = HealthRouteImport.update({
 const LifeGroupsRoute = LifeGroupsRouteImport.update({
   id: '/life-groups',
   path: '/life-groups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyRosterRoute = MyRosterRouteImport.update({
+  id: '/my-roster',
+  path: '/my-roster',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrintRoute = PrintRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
+  '/my-roster': typeof MyRosterRoute
   '/print': typeof PrintRoute
   '/roster': typeof RosterRoute
   '/teams': typeof TeamsRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
+  '/my-roster': typeof MyRosterRoute
   '/print': typeof PrintRoute
   '/roster': typeof RosterRoute
   '/teams': typeof TeamsRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/docs': typeof DocsRoute
   '/health': typeof HealthRoute
   '/life-groups': typeof LifeGroupsRoute
+  '/my-roster': typeof MyRosterRoute
   '/print': typeof PrintRoute
   '/roster': typeof RosterRoute
   '/teams': typeof TeamsRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/health'
     | '/life-groups'
+    | '/my-roster'
     | '/print'
     | '/roster'
     | '/teams'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/health'
     | '/life-groups'
+    | '/my-roster'
     | '/print'
     | '/roster'
     | '/teams'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/health'
     | '/life-groups'
+    | '/my-roster'
     | '/print'
     | '/roster'
     | '/teams'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   DocsRoute: typeof DocsRoute
   HealthRoute: typeof HealthRoute
   LifeGroupsRoute: typeof LifeGroupsRoute
+  MyRosterRoute: typeof MyRosterRoute
   PrintRoute: typeof PrintRoute
   RosterRoute: typeof RosterRoute
   TeamsRoute: typeof TeamsRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/life-groups'
       fullPath: '/life-groups'
       preLoaderRoute: typeof LifeGroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-roster': {
+      id: '/my-roster'
+      path: '/my-roster'
+      fullPath: '/my-roster'
+      preLoaderRoute: typeof MyRosterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/print': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRoute: DocsRoute,
   HealthRoute: HealthRoute,
   LifeGroupsRoute: LifeGroupsRoute,
+  MyRosterRoute: MyRosterRoute,
   PrintRoute: PrintRoute,
   RosterRoute: RosterRoute,
   TeamsRoute: TeamsRoute,

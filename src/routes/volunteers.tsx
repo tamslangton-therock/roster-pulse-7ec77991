@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useLiveUser } from "@/lib/use-live-user";
 import { useMemo, useState } from "react";
-import { Edit2, Plus, Trash2, X, Target } from "lucide-react";
+import { Edit2, Plus, Trash2, X, Target, Send } from "lucide-react";
+import { portalWhatsappUrl } from "@/lib/portal-link";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,30 @@ function VolunteersPage() {
   const [editingVolunteer, setEditingVolunteer] = useState<Volunteer | null>(null);
   const [editDraft, setEditDraft] = useState<VolunteerDraft>(emptyDraft);
   const [pathwaysFor, setPathwaysFor] = useState<Volunteer | null>(null);
+  const [linkFor, setLinkFor] = useState<Volunteer | null>(null);
+  const [linkPhone, setLinkPhone] = useState("");
+
+  const sendPortalLink = (v: Volunteer) => {
+    if (v.phone && v.phone.replace(/\D/g, "").length >= 9) {
+      window.open(portalWhatsappUrl(v.full_name, v.phone, v.id), "_blank");
+    } else {
+      setLinkPhone("");
+      setLinkFor(v);
+    }
+  };
+
+  const savePhoneAndSend = () => {
+    if (!linkFor) return;
+    const phone = linkPhone.trim();
+    if (phone.replace(/\D/g, "").length < 9) {
+      toast.error("Please enter a valid cell number");
+      return;
+    }
+    updateVolunteer(linkFor.id, { phone });
+    window.open(portalWhatsappUrl(linkFor.full_name, phone, linkFor.id), "_blank");
+    toast.success(`Saved number for ${linkFor.full_name}`);
+    setLinkFor(null);
+  };
 
   const allAreas = useMemo(() => {
     const set = new Set<string>();
@@ -254,6 +279,18 @@ function VolunteersPage() {
                 <td className="px-4 py-3 text-right">
                   {canEditPeople ? (
                     <div className="flex items-center justify-end gap-1">
+                      {v.is_volunteer !== false && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => sendPortalLink(v)}
+                          className="h-8 gap-1.5 px-2.5"
+                          title="Send their personal link on WhatsApp"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          <span>Link</span>
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -292,6 +329,29 @@ function VolunteersPage() {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={Boolean(linkFor)} onOpenChange={(o) => !o && setLinkFor(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add cell number for {linkFor?.full_name}</DialogTitle>
+            <DialogDescription>
+              Enter their number to save it to their profile and send their personal link.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            inputMode="tel"
+            placeholder="e.g. 082 123 4567"
+            value={linkPhone}
+            onChange={(e) => setLinkPhone(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && savePhoneAndSend()}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLinkFor(null)}>Cancel</Button>
+            <Button onClick={savePhoneAndSend}>Save & open WhatsApp</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Volunteer Dialog */}
       <Dialog
