@@ -92,7 +92,7 @@ function LoginGate({ children }: { children: ReactNode }) {
   const lock = useAuth((s) => s.lock);
 
   const [mode, setMode] = useState<"serving" | "leader" | "admin">("leader");
-  const servers = useRoster((s) => s.volunteers).filter((v) => v.is_volunteer !== false);
+  const servers = useRoster().volunteers.filter((v) => v.is_volunteer !== false);
   const [query, setQuery] = useState("");
   const [savedServer, setSavedServer] = useState<string | null>(null);
   useEffect(() => { const id = localStorage.getItem("rock-portal-id"); setSavedServer(id); if (id) setMode("serving"); }, []);
