@@ -642,6 +642,7 @@ function stripVolunteer(v: Volunteer): Record<string, unknown> {
     challenges: v.challenges ?? "",
     praying_for: v.praying_for ?? "",
     birthday: v.birthday ?? "",
+    pin: v.pin ?? "",
   };
 }
 

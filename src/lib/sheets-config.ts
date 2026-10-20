@@ -31,6 +31,7 @@ export const SHEET_SCHEMAS: Record<SheetTab, readonly string[]> = {
     "challenges",
     "praying_for",
     "birthday",
+    "pin",
   ],
   teams: ["id", "team_name", "serving_area", "member_names"],
   assignments: [

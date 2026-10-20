@@ -38,6 +38,9 @@ function MyRosterPage() {
   const { volunteers, assignments, blockouts, dates, ready, error, updateVolunteer, toggleBlockout } = useRoster();
   const [savedId, setSavedId] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [pinA, setPinA] = useState("");
+  const [pinB, setPinB] = useState("");
+  const [pinErr, setPinErr] = useState("");
 
   useEffect(() => {
     setSavedId(localStorage.getItem(STORE_KEY));
@@ -94,23 +97,47 @@ function MyRosterPage() {
     );
 
   const first = me.full_name.split(/\s+/)[0];
+  const hasPin = /^\d{4}$/.test(me.pin ?? "");
 
-  if (!confirmed)
+  if (!confirmed) {
+    const unlock = () => {
+      if (hasPin) {
+        if (pinA !== me.pin) return setPinErr("Incorrect PIN. Ask a leader if you've forgotten it.");
+      } else {
+        if (!/^\d{4}$/.test(pinA)) return setPinErr("Please enter 4 digits.");
+        if (pinA !== pinB) return setPinErr("The PINs don't match.");
+        updateVolunteer(me.id, { pin: pinA });
+      }
+      localStorage.setItem(STORE_KEY, me.id);
+      setSavedId(me.id);
+    };
+    const pinInput = (v: string, set: (s: string) => void, ph: string) => (
+      <Input
+        type="password"
+        inputMode="numeric"
+        maxLength={4}
+        placeholder={ph}
+        value={v}
+        onChange={(e) => { set(e.target.value.replace(/\D/g, "").slice(0, 4)); setPinErr(""); }}
+        onKeyDown={(e) => e.key === "Enter" && unlock()}
+        className="text-center text-lg tracking-[0.5em]"
+      />
+    );
     return shell(
       <div className="rounded-xl border bg-card p-6 space-y-4 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome, {me.full_name}!</h1>
-        <p className="text-sm text-muted-foreground">Tap below to open your personal serving schedule & details.</p>
-        <Button
-          className="w-full"
-          onClick={() => {
-            localStorage.setItem(STORE_KEY, me.id);
-            setSavedId(me.id);
-          }}
-        >
-          Continue as {first}
+        <p className="text-sm text-muted-foreground">
+          {hasPin ? "Enter your 4-digit PIN to open your schedule." : "Create a 4-digit PIN so only you can open your schedule and details."}
+        </p>
+        {pinInput(pinA, setPinA, hasPin ? "PIN" : "New PIN")}
+        {!hasPin && pinInput(pinB, setPinB, "Confirm PIN")}
+        {pinErr && <p className="text-xs text-destructive">{pinErr}</p>}
+        <Button className="w-full" onClick={unlock}>
+          {hasPin ? "Unlock" : "Save & open my schedule"}
         </Button>
       </div>,
     );
+  }
 
   const saveDetails = () => {
     updateVolunteer(me.id, { phone: phone.trim(), email: email.trim(), birthday });
