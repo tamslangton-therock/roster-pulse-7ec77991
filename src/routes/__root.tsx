@@ -3,6 +3,7 @@ import {
   Outlet,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
@@ -311,14 +312,20 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isPortal = pathname.startsWith("/my-roster");
 
   return (
     <QueryClientProvider client={queryClient}>
       <HydrateStore>
-        <LoginGate>
+        {isPortal ? (
           <Outlet />
-          <SaveBar />
-        </LoginGate>
+        ) : (
+          <LoginGate>
+            <Outlet />
+            <SaveBar />
+          </LoginGate>
+        )}
         <Toaster position="top-right" />
       </HydrateStore>
     </QueryClientProvider>

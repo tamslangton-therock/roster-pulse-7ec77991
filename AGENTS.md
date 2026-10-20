@@ -20,3 +20,4 @@ Serving-area columns on Live_Roster are data, not constants: `src/lib/roster-gri
 - Google Sheets reads go through the cached `gwFetch` in sheets.functions.ts (in-flight dedupe, 20s data TTL, long-lived row-1 probes, cleared on writes) — the ~60 reads/min quota otherwise turns reloads into 60s 429 stalls.
 - Shared birthday WhatsApp templates are persisted as JSON in the existing `Health_Config` key/value tab so every login uses the same messages without adding another Sheets read.
 - Birthdays are stored without a birth year as `DD/MM`; birthday parsing remains compatible with older ISO values already in the sheet.
+- Volunteer portal `/my-roster?id=<volunteer id>` bypasses LoginGate in __root (path check); identity = profile ID from the WhatsApp link, remembered in localStorage. Why: no-password access for serving volunteers without duplicate profiles.
