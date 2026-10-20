@@ -96,7 +96,8 @@ function LoginGate({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState("");
   const [savedServer, setSavedServer] = useState<string | null>(null);
   useEffect(() => { const id = localStorage.getItem("rock-portal-id"); setSavedServer(id); if (id) setMode("serving"); }, []);
-  const openServer = (id: string) => { localStorage.setItem("rock-portal-id", id); window.location.href = `/my-roster?id=${encodeURIComponent(id)}`; };
+  // Remembering the device happens only after the PIN is verified on /my-roster.
+  const openServer = (id: string) => { window.location.href = `/my-roster?id=${encodeURIComponent(id)}`; };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");

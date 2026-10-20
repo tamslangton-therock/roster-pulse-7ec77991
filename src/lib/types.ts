@@ -31,6 +31,8 @@ export interface Volunteer {
   praying_for?: string;
   /** Birthday as DD/MM without a birth year (legacy ISO dates are also accepted). */
   birthday?: string;
+  /** 4-digit serving-portal PIN, set by the volunteer on first open. */
+  pin?: string;
 }
 
 export interface Team {

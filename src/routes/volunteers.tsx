@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useLiveUser } from "@/lib/use-live-user";
 import { useMemo, useState } from "react";
 import { Edit2, Plus, Trash2, X, Target, Send } from "lucide-react";
-import { portalWhatsappUrl } from "@/lib/portal-link";
+import { portalWhatsappUrl, waDigits } from "@/lib/portal-link";
 import { useRoster } from "@/lib/store";
 import type { Volunteer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,8 @@ function VolunteersPage() {
   const [editDraft, setEditDraft] = useState<VolunteerDraft>(emptyDraft);
   const [pathwaysFor, setPathwaysFor] = useState<Volunteer | null>(null);
   const [linkFor, setLinkFor] = useState<Volunteer | null>(null);
+  const [pinFor, setPinFor] = useState<Volunteer | null>(null);
+  const [pinDraft, setPinDraft] = useState("");
   const [linkPhone, setLinkPhone] = useState("");
 
   const sendPortalLink = (v: Volunteer) => {
@@ -291,6 +293,17 @@ function VolunteersPage() {
                           <span>Link</span>
                         </Button>
                       )}
+                      {isMaster && v.is_volunteer !== false && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setPinFor(v); setPinDraft(v.pin ?? ""); }}
+                          className="h-8 px-2.5"
+                          title="View or reset their PIN"
+                        >
+                          PIN
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -329,6 +342,47 @@ function VolunteersPage() {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={Boolean(pinFor)} onOpenChange={(o) => !o && setPinFor(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>PIN for {pinFor?.full_name}</DialogTitle>
+            <DialogDescription>
+              {pinFor?.pin ? `Current PIN: ${pinFor.pin}` : "Not set yet — they'll create one when they first open their schedule."}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="New 4-digit PIN"
+            value={pinDraft}
+            onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          />
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              disabled={!pinFor?.pin || !pinFor?.phone}
+              onClick={() => {
+                if (!pinFor?.pin || !pinFor.phone) return;
+                const msg = `Hi ${pinFor.full_name.split(" ")[0]}, your 4-digit PIN for The Rock Church serving schedule is: ${pinFor.pin}`;
+                window.open(`https://wa.me/${waDigits(pinFor.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
+              }}
+            >
+              WhatsApp PIN
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pinFor || !/^\d{4}$/.test(pinDraft)) return toast.error("PIN must be 4 digits");
+                updateVolunteer(pinFor.id, { pin: pinDraft });
+                setPinFor({ ...pinFor, pin: pinDraft });
+                toast.success("PIN saved");
+              }}
+            >
+              Save PIN
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(linkFor)} onOpenChange={(o) => !o && setLinkFor(null)}>
         <DialogContent className="max-w-sm">
