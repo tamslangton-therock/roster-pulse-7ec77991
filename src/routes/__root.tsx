@@ -90,7 +90,12 @@ function LoginGate({ children }: { children: ReactNode }) {
   const loginUserFn = useAuth((s) => s.loginUser);
   const lock = useAuth((s) => s.lock);
 
-  const [mode, setMode] = useState<"leader" | "admin">("leader");
+  const [mode, setMode] = useState<"serving" | "leader" | "admin">("leader");
+  const servers = useRoster((s) => s.volunteers).filter((v) => v.is_volunteer !== false);
+  const [query, setQuery] = useState("");
+  const [savedServer, setSavedServer] = useState<string | null>(null);
+  useEffect(() => { const id = localStorage.getItem("rock-portal-id"); setSavedServer(id); if (id) setMode("serving"); }, []);
+  const openServer = (id: string) => { localStorage.setItem("rock-portal-id", id); window.location.href = `/my-roster?id=${encodeURIComponent(id)}`; };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -138,12 +143,23 @@ function LoginGate({ children }: { children: ReactNode }) {
           </div>
           <h2 className="text-2xl font-bold mb-1 tracking-tight text-white">The Rock Church</h2>
           <p className="text-xs text-slate-400 mb-6">
-            {mode === "leader"
+            {mode === "serving"
+              ? "Serving team — open your schedule"
+              : mode === "leader"
               ? "Team leader sign-in"
               : "Enter the admin access code"}
           </p>
 
           <div className="flex rounded-lg bg-slate-900 p-1 mb-6 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => { setMode("serving"); setError(""); }}
+              className={`flex-1 py-2 rounded-md transition-colors ${
+                mode === "serving" ? "bg-primary text-primary-foreground" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Serving
+            </button>
             <button
               type="button"
               onClick={() => { setMode("leader"); setError(""); }}
@@ -164,7 +180,35 @@ function LoginGate({ children }: { children: ReactNode }) {
             </button>
           </div>
 
-          {mode === "leader" ? (
+          {mode === "serving" ? (
+            <div className="space-y-3 text-left">
+              {savedServer && servers.find((v) => v.id === savedServer) && (
+                <button type="button" onClick={() => openServer(savedServer)} className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg text-sm">
+                  Continue as {servers.find((v) => v.id === savedServer)!.full_name.split(" ")[0]}
+                </button>
+              )}
+              <input
+                type="text"
+                placeholder="Search your name"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              {query.trim().length >= 2 && (
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-700 divide-y divide-slate-700">
+                  {servers
+                    .filter((v) => v.full_name.toLowerCase().includes(query.trim().toLowerCase()))
+                    .slice(0, 20)
+                    .map((v) => (
+                      <button key={v.id} type="button" onClick={() => openServer(v.id)} className="w-full text-left px-4 py-3 text-sm text-slate-100 hover:bg-slate-700">
+                        {v.full_name}
+                      </button>
+                    ))}
+                </div>
+              )}
+              <p className="text-[11px] text-slate-500">Type at least 2 letters, then tap your name.</p>
+            </div>
+          ) : mode === "leader" ? (
             <form onSubmit={handleLeaderLogin} className="space-y-4">
               <input
                 type="text"
