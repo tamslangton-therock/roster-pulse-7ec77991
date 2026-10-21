@@ -6,6 +6,7 @@ import { useRoster } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BirthdayInput } from "@/components/birthday-input";
+import { Calendar } from "@/components/ui/calendar";
 
 export const Route = createFileRoute("/my-roster")({
   validateSearch: (s: Record<string, unknown>) => ({ id: typeof s.id === "string" ? s.id : "" }),
@@ -28,6 +29,10 @@ export const Route = createFileRoute("/my-roster")({
 });
 
 const STORE_KEY = "rock-portal-id";
+
+function toIso(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function fmt(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
@@ -165,27 +170,30 @@ function MyRosterPage() {
       </section>
 
       <section className="rounded-xl border bg-card p-5 space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><CalendarX className="h-4 w-4" /> Sundays I'm away</h2>
-        <p className="text-xs text-muted-foreground">Tap a date to mark yourself away. Tap again to undo.</p>
-        <div className="grid grid-cols-3 gap-2">
-          {upcomingDates.map((d) => {
-            const away = awaySet.has(d);
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => toggleBlockout(me.full_name, d, "Self-reported")}
-                className={
-                  "rounded-lg border px-2 py-2 text-xs transition-colors " +
-                  (away ? "border-destructive/40 bg-destructive/10 text-destructive" : "hover:bg-accent")
-                }
-              >
-                {away && <Check className="mx-auto mb-0.5 h-3 w-3" />}
-                {fmt(d)}
-              </button>
-            );
-          })}
+        <h2 className="flex items-center gap-2 text-sm font-semibold"><CalendarX className="h-4 w-4" /> Dates I'm away</h2>
+        <p className="text-xs text-muted-foreground">Tap any date to block it off. Red dates are blocked — tap again to undo.</p>
+        <div className="flex justify-center">
+          <Calendar
+            mode="single"
+            selected={undefined}
+            onDayClick={(day: Date) => {
+              const iso = toIso(day);
+              if (iso < today) return;
+              toggleBlockout(me.full_name, iso, "Self-reported");
+            }}
+            disabled={{ before: new Date(today + "T00:00:00") }}
+            modifiers={{ away: (day: Date) => awaySet.has(toIso(day)) }}
+            modifiersClassNames={{ away: "!bg-destructive !text-destructive-foreground rounded-md" }}
+            className="p-0"
+          />
         </div>
+        {awaySet.size > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {[...awaySet].filter((d) => d >= today).sort().map((d) => (
+              <span key={d} className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{fmt(d)}</span>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border bg-card p-5 space-y-3">
