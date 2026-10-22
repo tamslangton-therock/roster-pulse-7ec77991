@@ -35,7 +35,7 @@ export const DEFAULT_SLOT_SPEC: SlotSpec = [
   ["Camera", "", 1],
   ["Bacon and Egg", "", 3],
   ["Preach", "", 1],
-  ["MC", "", 1],
+  ["MC", "", 2],
   ["Kids", "Yellow 8AM", 2],
   ["Kids", "Yellow 10AM", 2],
   ["Kids", "Green 8AM", 2],
