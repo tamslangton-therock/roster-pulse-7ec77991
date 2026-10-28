@@ -521,7 +521,24 @@ function AddCardDialog({
                 </label>
                 );
               })}
+              {interests
+                .filter((i) => !interestList.some((d) => d.name === i))
+                .map((i) => (
+                  <label
+                    key={i}
+                    className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm cursor-pointer hover:bg-accent/50"
+                  >
+                    <Checkbox
+                      checked
+                      onCheckedChange={() => setInterests((prev) => prev.filter((x) => x !== i))}
+                    />
+                    <span>{interestEmoji(undefined, i)} {i}</span>
+                  </label>
+                ))}
             </div>
+            <CustomInterestInput
+              onAdd={(v) => setInterests((prev) => (prev.includes(v) ? prev : [...prev, v]))}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label>Notes</Label>
@@ -534,6 +551,35 @@ function AddCardDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CustomInterestInput({ onAdd }: { onAdd: (v: string) => void }) {
+  const [value, setValue] = useState("");
+  const add = () => {
+    const v = value.trim();
+    if (!v) return;
+    onAdd(v);
+    setValue("");
+  };
+  return (
+    <div className="flex gap-1.5">
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            add();
+          }
+        }}
+        placeholder="Something else? Type it here…"
+        className="h-8 text-sm"
+      />
+      <Button type="button" size="sm" variant="outline" className="h-8" onClick={add} disabled={!value.trim()}>
+        <Plus className="h-4 w-4" /> Add
+      </Button>
+    </div>
   );
 }
 
@@ -773,6 +819,11 @@ function DetailDialog({
                   </SelectContent>
                 </Select>
               </div>
+              <CustomInterestInput
+                onAdd={(v) => {
+                  if (!row.interests.includes(v)) onUpdate({ interests: [...row.interests, v] });
+                }}
+              />
             </div>
           </div>
 
