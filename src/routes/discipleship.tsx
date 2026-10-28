@@ -48,6 +48,7 @@ import {
 } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
 import { BirthdayInput } from "@/components/birthday-input";
+import { ShareConnectCardButton } from "@/components/share-connect-card";
 import {
   fetchDiscipleship,
   writeDiscipleship,
@@ -681,6 +682,7 @@ function DetailDialog({
                 </a>
               </Button>
             )}
+            <ShareConnectCardButton row={row} />
           </div>
 
           {row.contacted && (
