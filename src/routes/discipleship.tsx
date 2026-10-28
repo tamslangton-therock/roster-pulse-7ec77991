@@ -819,6 +819,11 @@ function DetailDialog({
                   </SelectContent>
                 </Select>
               </div>
+              <CustomInterestInput
+                onAdd={(v) => {
+                  if (!row.interests.includes(v)) onUpdate({ interests: [...row.interests, v] });
+                }}
+              />
             </div>
           </div>
 
