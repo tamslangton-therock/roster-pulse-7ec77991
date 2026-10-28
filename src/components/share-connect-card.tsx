@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image as ImageIcon } from "lucide-react";
+import { Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { DiscipleshipRow } from "@/lib/sheets.functions";
@@ -141,38 +141,58 @@ export async function renderConnectCard(row: DiscipleshipRow): Promise<Blob> {
 
 export function ShareConnectCardButton({ row }: { row: DiscipleshipRow }) {
   const [busy, setBusy] = useState(false);
-  const run = async () => {
+  const fileName = `${row.person_name.replace(/\s+/g, "-")}-connect-card.png`;
+
+  const copy = async () => {
     setBusy(true);
+    // Start drawing now and hand the promise to the clipboard inside the tap,
+    // so iPhone Safari allows the copy.
+    const blobPromise = renderConnectCard(row);
     try {
-      const blob = await renderConnectCard(row);
-      const file = new File([blob], `${row.person_name.replace(/\s+/g, "-")}-connect-card.png`, { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: row.person_name });
-          return;
-        } catch (e) {
-          if ((e as Error).name === "AbortError") return;
-        }
-      }
       if (navigator.clipboard && "ClipboardItem" in window) {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        toast.success("Card image copied — paste it into WhatsApp.");
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
+        toast.success("Image copied — open WhatsApp and paste.");
         return;
       }
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = file.name;
-      a.click();
-      toast.success("Card image saved — attach it in WhatsApp.");
+      throw new Error("no clipboard");
     } catch {
-      toast.error("Couldn't make the card image.");
+      try {
+        const blob = await blobPromise;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        toast.success("Couldn't copy here, so the image was saved instead.");
+      } catch {
+        toast.error("Couldn't make the card image.");
+      }
     } finally {
       setBusy(false);
     }
   };
+
+  const share = async () => {
+    try {
+      const blob = await renderConnectCard(row);
+      const file = new File([blob], fileName, { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: row.person_name });
+      } else {
+        toast.error("Sharing isn't available here — use Copy image.");
+      }
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") toast.error("Couldn't share the image.");
+    }
+  };
+
   return (
-    <Button size="sm" variant="outline" onClick={run} disabled={busy}>
-      <ImageIcon className="h-4 w-4" /> {busy ? "Making…" : "Share card image"}
-    </Button>
+    <div className="flex gap-2">
+      <Button size="sm" variant="outline" onClick={copy} disabled={busy}>
+        <Copy className="h-4 w-4" /> {busy ? "Copying…" : "Copy image"}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={share} aria-label="Share image">
+        <Share2 className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }
