@@ -140,11 +140,45 @@ function LifeGroupsPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {filtered.map((group) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {filtered.map((group) => {
+          const { day, time } = splitDayTime(group.MeetingDayTime);
+          return (
+            <button
+              key={group.GroupID}
+              type="button"
+              onClick={() => setOpenId(group.GroupID)}
+              className="group flex items-start gap-3 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-colors hover:bg-muted/40"
+            >
+              <Folder className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {group.GroupName || "Untitled group"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {group.Leaders || "No leader yet"}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {[day, time].filter(Boolean).join(" · ") || "No meeting time"} ·{" "}
+                  {group.MembersList.length} member{group.MembersList.length === 1 ? "" : "s"}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {lifeGroups
+        .filter((g) => g.GroupID === openId)
+        .map((group) => (
+        <Dialog key={group.GroupID} open onOpenChange={(o) => !o && setOpenId(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{group.GroupName || "Life group"}</DialogTitle>
+              <DialogDescription>Details and members — changes save automatically.</DialogDescription>
+            </DialogHeader>
           <section
-            key={group.GroupID}
-            className="rounded-xl border bg-card p-4 shadow-sm space-y-4"
+            className="space-y-4"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 space-y-3">
@@ -311,8 +345,9 @@ function LifeGroupsPage() {
               )}
             </div>
           </section>
-        ))}
-      </div>
+          </DialogContent>
+        </Dialog>
+      ))}
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>
