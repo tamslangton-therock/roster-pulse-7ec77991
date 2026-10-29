@@ -62,6 +62,15 @@ export function ProfileHoverCard({
   const volunteers = useRoster((s) => s.volunteers);
   const updateVolunteer = useRoster((s) => s.updateVolunteer);
   const person = findVolunteer(volunteers, name);
+  const lifeGroups = useRoster((s) => s.lifeGroups);
+  const nameKey = (person?.full_name ?? name).trim().toLowerCase();
+  const myGroups = lifeGroups
+    .filter(
+      (g) =>
+        g.MembersList.some((m) => m.trim().toLowerCase() === nameKey) ||
+        g.Leaders.split(/\s*[|,;]\s*/).some((l) => l.trim().toLowerCase() === nameKey),
+    )
+    .map((g) => g.GroupName || "Untitled");
   const color = teamColor(name);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<VolunteerDraft>(emptyDraft);
@@ -114,6 +123,9 @@ export function ProfileHoverCard({
                 <p className="truncate text-sm font-semibold">{name}</p>
                 <p className="truncate text-[11px] text-muted-foreground">
                   {(person?.serving_areas ?? []).join(", ") || "No serving areas"}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  Life group: {myGroups.join(", ") || "—"}
                 </p>
               </div>
             </div>
