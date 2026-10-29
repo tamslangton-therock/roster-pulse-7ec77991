@@ -1275,3 +1275,80 @@ export const writeInterestList = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+// ---------- Public Life Group update form ----------
+// Used by /life-group-update (no login). Returns only what the form needs:
+// group basics + Family names (no phones, PINs or notes).
+
+export const fetchLifeGroupForm = createServerFn({ method: "GET" }).handler(async () => {
+  const [lg, vol] = await Promise.all([
+    gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1:H2000`).catch(() => ({ values: [] })),
+    gwFetch(`/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_TABS.volunteers)}`).catch(() => ({ values: [] })),
+  ]);
+  const groups = ((lg.values ?? []) as string[][]).slice(1)
+    .filter((r) => String(r[0] ?? "").trim() || String(r[1] ?? "").trim())
+    .map((r) => ({
+      id: String(r[0] ?? "").trim(),
+      name: String(r[1] ?? "").trim(),
+      leaders: String(r[2] ?? "").trim(),
+      meeting: String(r[3] ?? "").trim(),
+      address: String(r[5] ?? "").trim() || String(r[4] ?? "").trim(),
+      members: String(r[7] ?? "").split(/\s*[|,;]\s*/).map((s) => s.trim()).filter(Boolean),
+    }))
+    .filter((g) => g.id);
+  const vrows = (vol.values ?? []) as string[][];
+  const ni = (vrows[0] ?? []).indexOf("full_name");
+  const names = Array.from(new Set(vrows.slice(1).map((r) => String(r[ni] ?? "").trim()).filter(Boolean))).sort();
+  return { groups, names };
+});
+
+export const submitLifeGroupUpdate = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => {
+    const o = d as Record<string, unknown>;
+    const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+    const groupId = str(o.groupId, 100);
+    if (!groupId) throw new Error("Choose a life group");
+    const members = (Array.isArray(o.members) ? o.members : []).map((m) => str(m, 100)).filter(Boolean).slice(0, 200);
+    const newPeople = (Array.isArray(o.newPeople) ? o.newPeople : []).slice(0, 100).map((p) => {
+      const q = p as Record<string, unknown>;
+      return { name: str(q.name, 100), phone: str(q.phone, 30).replace(/[^\d+ ]/g, "") };
+    }).filter((p) => p.name);
+    return { groupId, meeting: str(o.meeting, 200), address: str(o.address, 300), members, newPeople };
+  })
+  .handler(async ({ data }) => {
+    const lg = await gwFetchRaw(`/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!A1:H2000`);
+    const rows = (lg.values ?? []) as string[][];
+    const idx = rows.findIndex((r, i) => i > 0 && String(r[0] ?? "").trim() === data.groupId);
+    if (idx < 0) throw new Error("That life group no longer exists");
+
+    // Add brand-new people to Family (skip anyone whose name already exists).
+    const vol = await gwFetchRaw(`/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_TABS.volunteers)}`);
+    const vrows = (vol.values ?? []) as string[][];
+    const header = (vrows[0] ?? []) as string[];
+    const ni = header.indexOf("full_name");
+    const existing = new Set(vrows.slice(1).map((r) => String(r[ni] ?? "").trim().toLowerCase()));
+    const fresh = data.newPeople.filter((p) => !existing.has(p.name.toLowerCase()));
+    if (fresh.length && header.length) {
+      const values = fresh.map((p) => header.map((f) => {
+        if (f === "id") return `v-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        if (f === "full_name") return p.name;
+        if (f === "phone") return p.phone;
+        if (f === "is_volunteer") return "FALSE";
+        if (f === "is_paused") return "FALSE";
+        return "";
+      }));
+      await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_TABS.volunteers)}!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+        { method: "POST", body: JSON.stringify({ values }) },
+      );
+    }
+
+    const allMembers = Array.from(new Set([...data.members, ...data.newPeople.map((p) => p.name)]));
+    const r = rows[idx];
+    const sheetRow = idx + 1;
+    await gwFetch(
+      `/spreadsheets/${SPREADSHEET_ID}/values/${LIFE_GROUPS_TAB}!D${sheetRow}:H${sheetRow}?valueInputOption=RAW`,
+      { method: "PUT", body: JSON.stringify({ values: [[data.meeting, r[4] ?? "", data.address, r[6] ?? "", allMembers.join(" | ")]] }) },
+    );
+    return { ok: true, added: fresh.length, members: allMembers.length };
+  });
