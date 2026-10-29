@@ -98,7 +98,7 @@ function LifeGroupUpdatePage() {
             >
               <option value="">Select your group…</option>
               {data.groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}{g.leaders ? ` — ${g.leaders}` : ""}</option>
+                <option key={g.id} value={g.id}>{g.leaders || g.name}</option>
               ))}
             </select>
           </Card>
