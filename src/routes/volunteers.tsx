@@ -57,7 +57,7 @@ export const Route = createFileRoute("/volunteers")({
 });
 
 function VolunteersPage() {
-  const { volunteers, updateVolunteer, addVolunteer, removeVolunteer } =
+  const { volunteers, lifeGroups, updateVolunteer, addVolunteer, removeVolunteer } =
     useRoster();
 
   const [search, setSearch] = useState("");
@@ -244,6 +244,27 @@ function VolunteersPage() {
                   <ProfileHoverCard name={v.full_name}>
                     <span className="cursor-default">{v.full_name}</span>
                   </ProfileHoverCard>
+                  {(() => {
+                    const key = v.full_name.trim().toLowerCase();
+                    const groups = lifeGroups.filter((g) =>
+                      g.MembersList.some((m) => m.trim().toLowerCase() === key) ||
+                      g.Leaders.split(/\s*[|,;]\s*/).some((l) => l.trim().toLowerCase() === key),
+                    );
+                    return (
+                      <div className="mt-1 flex flex-wrap gap-1 text-[11px] font-normal text-muted-foreground">
+                        <span>Life group:</span>
+                        {groups.length === 0 ? (
+                          <span>—</span>
+                        ) : (
+                          groups.map((g) => (
+                            <span key={g.GroupID} className="rounded-full border px-1.5">
+                              {g.GroupName || "Untitled"}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
                   {v.is_volunteer === false && (
                     <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                       Non-serving
