@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Check, ChevronsUpDown, MapPin, Plus, Trash2, Users } from "lucide-react";
+import { Check, ChevronsUpDown, Folder, MapPin, Plus, Trash2, Users } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +88,7 @@ function LifeGroupsPage() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [query, setQuery] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -200,6 +201,7 @@ function LifeGroupsPage() {
                 title="Delete life group"
                 onClick={() => {
                   removeLifeGroup(group.GroupID);
+                  setOpenId(null);
                   toast.info(`Removed ${group.GroupName || "life group"}`);
                 }}
               >
