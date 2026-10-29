@@ -123,6 +123,17 @@ function LifeGroupsPage() {
             className="w-[240px]"
           />
           <Button
+            variant="outline"
+            onClick={async () => {
+              const url = `${window.location.origin}/life-group-update`;
+              try { await navigator.clipboard.writeText(url); toast.success("Leader update link copied — paste it in WhatsApp"); }
+              catch { window.prompt("Copy this link:", url); }
+            }}
+          >
+            Copy leader update link
+          </Button>
+
+          <Button
             onClick={() => {
               setNewName("");
               setCreating(true);
