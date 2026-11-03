@@ -99,7 +99,7 @@ async function loadSnapshot(): Promise<Map<string, string[][]> | null> {
   snapshotInFlight = (async () => {
     try {
       const meta = await gwFetch(
-        `/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties.title&_probe=A1`,
+        `/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties.title`,
       );
       const titles: string[] = (meta.sheets ?? []).map((s: any) => s.properties.title);
       if (!titles.length) return null;
@@ -167,7 +167,7 @@ async function gwFetch(path: string, init: RequestInit = {}): Promise<any> {
     const fromSnap = await readFromSnapshot(path);
     if (fromSnap !== undefined) return fromSnap;
   }
-  const value = gwFetchRaw(path.replace(/&_probe=A1$/, ""), init);
+  const value = gwFetchRaw(path, init);
   readCache.set(path, { at: now, probe: isProbePath(path), value });
   value.catch(() => {
     if (readCache.get(path)?.value === value) readCache.delete(path);
