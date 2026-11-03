@@ -698,8 +698,35 @@ export const useRoster = create<RosterState>()((set, get) => ({
 
   hydrate: async () => {
     if (get().ready || get().loading) return;
-    set({ loading: true, error: null });
+    const CACHE_KEY = "rock-roster-cache-v1";
+    const CACHE_FIELDS = [
+      "volunteers", "teams", "assignments", "blockouts", "allowedClashes", "subTeams",
+      "lifeGroups", "docTemplate", "userAccess", "healthSettings", "healthLabels",
+      "birthdayTemplates", "statuses", "rosterMeta", "dates", "slots",
+    ] as const;
+    let hadCache = false;
     try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(CACHE_KEY) : null;
+      if (raw) {
+        set({ ...(JSON.parse(raw) as Partial<RosterState>), ready: true });
+        hadCache = true;
+      }
+    } catch {
+      /* ignore broken cache */
+    }
+    set({ loading: true, error: null });
+    const saveCache = () => {
+      try {
+        const s = get() as unknown as Record<string, unknown>;
+        const snap: Record<string, unknown> = {};
+        for (const k of CACHE_FIELDS) snap[k] = s[k];
+        localStorage.setItem(CACHE_KEY, JSON.stringify(snap));
+      } catch {
+        /* storage full — skip */
+      }
+    };
+    try {
+      if (hadCache && get().pendingWrites > 0) return;
       const [
         data,
         liveGrid,
