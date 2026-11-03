@@ -698,7 +698,33 @@ export const useRoster = create<RosterState>()((set, get) => ({
 
   hydrate: async () => {
     if (get().ready || get().loading) return;
+    const CACHE_KEY = "rock-roster-cache-v1";
+    const CACHE_FIELDS = [
+      "volunteers", "teams", "assignments", "blockouts", "allowedClashes", "subTeams",
+      "lifeGroups", "docTemplate", "userAccess", "healthSettings", "healthLabels",
+      "birthdayTemplates", "statuses", "rosterMeta", "dates", "slots",
+    ] as const;
+    let hadCache = false;
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(CACHE_KEY) : null;
+      if (raw) {
+        set({ ...(JSON.parse(raw) as Partial<RosterState>), ready: true });
+        hadCache = true;
+      }
+    } catch {
+      /* ignore broken cache */
+    }
     set({ loading: true, error: null });
+    const saveCache = () => {
+      try {
+        const s = get() as unknown as Record<string, unknown>;
+        const snap: Record<string, unknown> = {};
+        for (const k of CACHE_FIELDS) snap[k] = s[k];
+        localStorage.setItem(CACHE_KEY, JSON.stringify(snap));
+      } catch {
+        /* storage full — skip */
+      }
+    };
     try {
       const [
         data,
@@ -780,6 +806,11 @@ export const useRoster = create<RosterState>()((set, get) => ({
         for (const d of dates) rosterMeta[d] = { label: d, notes: "", detail: "" };
       }
 
+      if (hadCache && get().pendingWrites > 0) {
+        // An edit was made on the cached view while refreshing — keep it.
+        set({ loading: false });
+        return;
+      }
       set({
         volunteers,
         teams,
@@ -800,7 +831,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         ready: true,
         loading: false,
       });
-
+      saveCache();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[sheets hydrate] failed", err);

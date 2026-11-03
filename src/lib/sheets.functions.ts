@@ -86,16 +86,87 @@ function invalidateAfterWrite(path: string) {
   }
 }
 
+// ---------- Whole-spreadsheet snapshot ----------
+// One values:batchGet pulls every tab in a single request. Individual reads
+// (including row-1 probes) are then answered from this snapshot, so an app
+// load costs ~2 Sheets requests instead of 25+.
+let snapshot: { at: number; tabs: Map<string, string[][]> } | null = null;
+let snapshotInFlight: Promise<Map<string, string[][]> | null> | null = null;
+
+async function loadSnapshot(): Promise<Map<string, string[][]> | null> {
+  if (snapshot && Date.now() - snapshot.at < DATA_TTL_MS) return snapshot.tabs;
+  if (snapshotInFlight) return snapshotInFlight;
+  snapshotInFlight = (async () => {
+    try {
+      const meta = await gwFetch(
+        `/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties.title`,
+      );
+      const titles: string[] = (meta.sheets ?? []).map((s: any) => s.properties.title);
+      if (!titles.length) return null;
+      const qs = titles.map((t) => `ranges=${encodeURIComponent(`'${t.replace(/'/g, "''")}'`)}`).join("&");
+      const data = await gwFetchRaw(`/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${qs}`);
+      const tabs = new Map<string, string[][]>();
+      titles.forEach((t, i) => tabs.set(t, (data.valueRanges?.[i]?.values ?? []) as string[][]));
+      snapshot = { at: Date.now(), tabs };
+      return tabs;
+    } catch (err) {
+      console.warn("[sheets] snapshot failed, falling back to single reads", err);
+      return null;
+    } finally {
+      snapshotInFlight = null;
+    }
+  })();
+  return snapshotInFlight;
+}
+
+const colNum = (letters: string) =>
+  letters.split("").reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0);
+
+function sliceRange(values: string[][], range: string | undefined): string[][] {
+  if (!range) return values;
+  const [a, b = a] = range.split(":");
+  const parse = (ref: string) => {
+    const m = ref.match(/^([A-Z]*)(\d*)$/);
+    if (!m) return null;
+    return { c: m[1] ? colNum(m[1]) : 0, r: m[2] ? Number(m[2]) : 0 };
+  };
+  const s = parse(a), e = parse(b);
+  if (!s || !e) return values;
+  const r0 = (s.r || 1) - 1, r1 = e.r || values.length;
+  const c0 = (s.c || 1) - 1, c1 = e.c || Infinity;
+  const out = values.slice(r0, r1).map((row) => row.slice(c0, c1 === Infinity ? undefined : c1));
+  while (out.length && out[out.length - 1].every((c) => c === "" || c == null)) out.pop();
+  return out;
+}
+
+async function readFromSnapshot(path: string): Promise<any | undefined> {
+  const m = path.match(/^\/spreadsheets\/[^/]+\/values\/([^?:]+(?::[A-Z]*\d*)?)(\?.*)?$/);
+  if (!m || m[2]) return undefined;
+  const raw = decodeURIComponent(m[1]);
+  const bang = raw.indexOf("!");
+  const tab = (bang >= 0 ? raw.slice(0, bang) : raw).replace(/^'|'$/g, "");
+  const range = bang >= 0 ? raw.slice(bang + 1) : undefined;
+  const tabs = await loadSnapshot();
+  if (!tabs || !tabs.has(tab)) return undefined;
+  const values = sliceRange(tabs.get(tab)!, range);
+  return values.length ? { values } : {};
+}
+
 async function gwFetch(path: string, init: RequestInit = {}): Promise<any> {
   const method = (init.method ?? "GET").toUpperCase();
   if (method !== "GET") {
     const result = await gwFetchRaw(path, init);
+    snapshot = null;
     invalidateAfterWrite(path);
     return result;
   }
   const now = Date.now();
   const hit = readCache.get(path);
   if (hit && now - hit.at < (hit.probe ? PROBE_TTL_MS : DATA_TTL_MS)) return hit.value;
+  if (path.includes("/values/")) {
+    const fromSnap = await readFromSnapshot(path);
+    if (fromSnap !== undefined) return fromSnap;
+  }
   const value = gwFetchRaw(path, init);
   readCache.set(path, { at: now, probe: isProbePath(path), value });
   value.catch(() => {
