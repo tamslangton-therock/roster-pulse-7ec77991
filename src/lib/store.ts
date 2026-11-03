@@ -726,7 +726,6 @@ export const useRoster = create<RosterState>()((set, get) => ({
       }
     };
     try {
-      if (hadCache && get().pendingWrites > 0) return;
       const [
         data,
         liveGrid,
@@ -807,6 +806,11 @@ export const useRoster = create<RosterState>()((set, get) => ({
         for (const d of dates) rosterMeta[d] = { label: d, notes: "", detail: "" };
       }
 
+      if (hadCache && get().pendingWrites > 0) {
+        // An edit was made on the cached view while refreshing — keep it.
+        set({ loading: false });
+        return;
+      }
       set({
         volunteers,
         teams,
@@ -827,7 +831,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
         ready: true,
         loading: false,
       });
-
+      saveCache();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[sheets hydrate] failed", err);
