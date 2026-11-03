@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { CalendarPlus, Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarPlus, Palette, Plus, Trash2, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { areasOf } from "@/lib/roster-grid";
 import { Button } from "@/components/ui/button";
@@ -136,79 +136,99 @@ function TeamsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="space-y-6">
         {areas.map((area) => {
           const areaSlots = slots.filter((s) => s.area === area);
           const names = byArea.get(area) ?? [];
+          const editable = canEditThisArea(area);
           return (
-            <section key={area} className="rounded-xl border bg-card p-4 shadow-sm space-y-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-semibold">{area}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {areaSlots.length} slot{areaSlots.length === 1 ? "" : "s"} ·{" "}
-                    {names.length} sub-team{names.length === 1 ? "" : "s"}
-                  </div>
+            <section key={area} className="rounded-lg border bg-card overflow-hidden">
+              <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide">{area}</h2>
+                  <span className="text-xs text-muted-foreground">
+                    {names.length} team{names.length === 1 ? "" : "s"}
+                  </span>
                 </div>
-                {canEditThisArea(area) && (
+                {editable && (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
+                    className="h-7"
                     onClick={() => {
-                      setNewFor(area);
-                      setNewName(`${area} Team ${names.length + 1}`);
+                      let n = names.length + 1;
+                      while (names.includes(`Team ${n}`)) n++;
+                      addSubTeam(area, `Team ${n}`);
                     }}
                   >
-                    <Plus className="h-4 w-4 mr-1" /> Sub-team
+                    <Plus className="h-4 w-4 mr-1" /> Add team
                   </Button>
                 )}
               </div>
-
-              {names.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No sub-teams yet. Create one to group an ideal line-up for {area}.
-                </p>
+              {names.length === 0 ? (
+                <p className="px-3 py-3 text-sm text-muted-foreground">No teams yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/40 text-xs text-muted-foreground">
+                        <th className="w-8 border-r px-2 py-1.5 text-center font-medium">#</th>
+                        <th className="min-w-[120px] border-r px-2 py-1.5 text-left font-medium">Team</th>
+                        {areaSlots.map((s) => (
+                          <th key={s.label} className="min-w-[150px] border-r px-2 py-1.5 text-left font-medium">
+                            {s.role || s.label}
+                          </th>
+                        ))}
+                        <th className="w-24 px-2 py-1.5" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {names.map((name, i) => (
+                        <SubTeamRowView
+                          key={`${area}::${name}`}
+                          index={i + 1}
+                          area={area}
+                          name={name}
+                          slots={areaSlots}
+                          rows={subTeams.filter(
+                            (r) => r.serving_area === area && r.sub_team_name === name,
+                          )}
+                          volunteers={volunteers}
+                          dates={dates}
+                          colorId={
+                            subTeams.find(
+                              (r) => r.serving_area === area && r.sub_team_name === name && r.color,
+                            )?.color
+                          }
+                          onSetColor={(id) => setSubTeamColor(area, name, id)}
+                          onSetSlot={(label, person) => setSubTeamSlot(area, name, label, person)}
+                          onRename={(next) => {
+                            if (!next.trim() || next === name) return;
+                            if (names.includes(next.trim())) {
+                              toast.error("A team with that name already exists");
+                              return;
+                            }
+                            renameSubTeam(area, name, next.trim());
+                          }}
+                          onRemove={() => {
+                            if (!confirm(`Delete ${name} from ${area}?`)) return;
+                            removeSubTeam(area, name);
+                            toast.info(`Removed ${name}`);
+                          }}
+                          onApply={(date) => {
+                            const n = applySubTeamToDate(area, name, date);
+                            toast.success(
+                              `${name} applied to ${format(parseISO(date), "d MMM yyyy")}`,
+                              { description: `${n} slot${n === 1 ? "" : "s"} filled — override any slot on the Live Roster.` },
+                            );
+                          }}
+                          readOnly={!editable}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
-
-              {names.map((name) => (
-                <SubTeamCard
-                  key={`${area}::${name}`}
-                  area={area}
-                  name={name}
-                  slots={areaSlots}
-                  rows={subTeams.filter(
-                    (r) => r.serving_area === area && r.sub_team_name === name,
-                  )}
-                  volunteers={volunteers}
-                  dates={dates}
-                  colorId={
-                    subTeams.find(
-                      (r) =>
-                        r.serving_area === area &&
-                        r.sub_team_name === name &&
-                        r.color,
-                    )?.color
-                  }
-                  onSetColor={(id) => setSubTeamColor(area, name, id)}
-                  onSetSlot={(label, person) => setSubTeamSlot(area, name, label, person)}
-                  onRename={(next) => {
-                    if (!next.trim() || next === name) return;
-                    renameSubTeam(area, name, next.trim());
-                  }}
-                  onRemove={() => {
-                    removeSubTeam(area, name);
-                    toast.info(`Removed ${name}`);
-                  }}
-                  onApply={(date) => {
-                    const n = applySubTeamToDate(area, name, date);
-                    toast.success(
-                      `${name} applied to ${format(parseISO(date), "d MMM yyyy")}`,
-                      { description: `${n} slot${n === 1 ? "" : "s"} filled — override any slot on the Live Roster.` },
-                    );
-                  }}
-                  readOnly={!canEditThisArea(area)}
-                />
-              ))}
             </section>
           );
         })}
@@ -249,7 +269,8 @@ function TeamsPage() {
   );
 }
 
-function SubTeamCard({
+function SubTeamRowView({
+  index,
   area,
   name,
   slots,
@@ -263,8 +284,8 @@ function SubTeamCard({
   colorId,
   onSetColor,
   readOnly = false,
-
 }: {
+  index: number;
   area: string;
   name: string;
   slots: Array<{ label: string; role: string }>;
@@ -282,21 +303,16 @@ function SubTeamCard({
   const color = resolveSubTeamColor(area, name, colorId);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
-  const [applyDate, setApplyDate] = useState("");
 
   const personFor = (label: string) =>
     rows.find((r) => r.slot_label === label)?.person_name ?? "";
 
   const candidates = useMemo(() => {
-    const inArea = volunteers.filter((v) =>
-      v.serving_areas.some((a) => a.toLowerCase() === area.toLowerCase()),
-    );
-    const rest = volunteers.filter((v) => !inArea.includes(v));
-    return [...inArea, ...rest].sort(
-      (a, b) => Number(b.serving_areas.some((x) => x.toLowerCase() === area.toLowerCase())) -
-        Number(a.serving_areas.some((x) => x.toLowerCase() === area.toLowerCase())) ||
-        a.full_name.localeCompare(b.full_name),
-    );
+    const isIn = (v: import("@/lib/types").Volunteer) =>
+      v.serving_areas.some((a) => a.toLowerCase() === area.toLowerCase());
+    return [...volunteers].sort(
+      (a, b) => Number(isIn(b)) - Number(isIn(a)) || a.full_name.localeCompare(b.full_name),
+    ).map((v) => ({ name: v.full_name, inArea: isIn(v) }));
   }, [volunteers, area]);
 
   const upcoming = useMemo(() => {
@@ -304,216 +320,188 @@ function SubTeamCard({
     return dates.filter((d) => d >= today).slice(0, 30);
   }, [dates]);
 
+  const commit = () => {
+    onRename(draft);
+    setEditing(false);
+  };
+
   return (
-    <div
-      className="rounded-lg border bg-background p-3 space-y-3"
-      style={{ borderLeft: `5px solid ${color.border}` }}
-    >
-      <div className="flex items-center justify-between gap-2">
+    <tr className="border-t" style={{ backgroundColor: color.bg, color: color.text }}>
+      <td className="border-r px-2 py-1 text-center font-semibold tabular-nums">{index}</td>
+      <td className="border-r px-2 py-1">
         {editing ? (
-          <div className="flex items-center gap-1 flex-1">
-            <Input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              className="h-8 text-sm"
-            />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => {
-                onRename(draft);
-                setEditing(false);
-              }}
-            >
-              <Check className="h-4 w-4 text-green-600" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => {
+          <Input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              if (e.key === "Escape") {
                 setDraft(name);
                 setEditing(false);
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+              }
+            }}
+            className="h-7 bg-background text-sm"
+          />
         ) : (
-          <div className="flex items-center gap-2">
-        {readOnly ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                tabIndex={-1}
-                title="Sub-team colour (edit is not enabled for your login)"
-                className="h-4 w-4 rounded-full shrink-0 border border-black/10 cursor-default"
-                style={{ backgroundColor: color.border }}
-              />
-            </PopoverTrigger>
-          </Popover>
-        ) : (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                title="Choose sub-team colour"
-                className="h-4 w-4 rounded-full shrink-0 border border-black/10 hover:ring-2 hover:ring-offset-1 hover:ring-muted-foreground/30"
-                style={{ backgroundColor: color.border }}
-              />
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-3" align="start">
-              <div className="text-xs font-medium mb-2">Sub-team colour</div>
-              <div className="grid grid-cols-6 gap-2">
-                {PASTEL_SWATCHES.map((sw) => (
-                  <button
-                    key={sw.id}
-                    type="button"
-                    title={sw.label}
-                    onClick={() => onSetColor(sw.id)}
-                    className={`h-6 w-6 rounded-full border transition ${
-                      colorId === sw.id
-                        ? "ring-2 ring-offset-1 ring-foreground/50"
-                        : "hover:scale-110"
-                    }`}
-                    style={{ backgroundColor: sw.bg, borderColor: sw.border }}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                className="mt-3 text-xs text-muted-foreground underline"
-                onClick={() => onSetColor("")}
-              >
-                Reset to automatic
-              </button>
-            </PopoverContent>
-          </Popover>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => {
+              setDraft(name);
+              setEditing(true);
+            }}
+            className="w-full truncate text-left font-medium disabled:cursor-default"
+            title={readOnly ? name : "Tap to rename"}
+          >
+            {name}
+          </button>
         )}
-            <span
-              className="rounded-md px-2 py-0.5 text-sm font-medium"
-              style={{ backgroundColor: color.bg, color: color.text }}
-            >
-              {name}
-            </span>
-          </div>
-        )}
-
-        {!editing && !readOnly && (
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => setEditing(true)}
-              title="Rename"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive"
-              onClick={onRemove}
-              title="Delete sub-team"
-            >
+      </td>
+      {slots.map((s) => (
+        <td key={s.label} className="border-r p-0">
+          <PersonCell
+            value={personFor(s.label)}
+            candidates={candidates}
+            readOnly={readOnly}
+            onChange={(v) => onSetSlot(s.label, v)}
+          />
+        </td>
+      ))}
+      <td className="px-1 py-1">
+        {!readOnly && (
+          <div className="flex items-center justify-end gap-0.5">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-7 w-7" title="Apply to a Sunday">
+                  <CalendarPlus className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-1" align="end">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Apply {name} to…</div>
+                <div className="max-h-64 overflow-y-auto">
+                  {upcoming.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => onApply(d)}
+                      className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                    >
+                      {format(parseISO(d), "EEE d MMM yyyy")}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-7 w-7" title="Row colour">
+                  <Palette className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="end">
+                <div className="grid grid-cols-6 gap-2">
+                  {PASTEL_SWATCHES.map((sw) => (
+                    <button
+                      key={sw.id}
+                      type="button"
+                      onClick={() => onSetColor(sw.id)}
+                      className={`h-6 w-6 rounded-full border-2 ${colorId === sw.id ? "ring-2 ring-offset-1 ring-foreground/40" : ""}`}
+                      style={{ backgroundColor: sw.bg, borderColor: sw.border }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 text-xs text-muted-foreground underline"
+                  onClick={() => onSetColor("")}
+                >
+                  Reset to automatic
+                </button>
+              </PopoverContent>
+            </Popover>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onRemove} title="Delete team">
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         )}
-      </div>
-
-      <div className="space-y-2">
-        {slots.map((s) => (
-          <div key={s.label} className="flex items-center gap-2">
-            <div className="w-36 shrink-0 text-xs text-muted-foreground truncate" title={s.label}>
-              {s.role || s.label}
-            </div>
-            {readOnly ? (
-              <div className="h-8 flex-1 flex items-center rounded-md border bg-muted/30 px-3 text-sm">
-                {personFor(s.label) || <span className="text-muted-foreground">Empty</span>}
-              </div>
-            ) : (
-              <LazyPersonSelect
-                value={personFor(s.label)}
-                candidates={candidates}
-                onChange={(v) => onSetSlot(s.label, v)}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
-
-      {!readOnly && (
-        <div className="flex items-center gap-2 pt-1">
-          <Select value={applyDate} onValueChange={setApplyDate}>
-            <SelectTrigger className="h-8 flex-1 text-sm">
-              <SelectValue placeholder="Apply to Sunday…" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              {upcoming.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {format(parseISO(d), "EEE d MMM yyyy")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            disabled={!applyDate}
-            onClick={() => {
-              if (applyDate) onApply(applyDate);
-            }}
-          >
-            <CalendarPlus className="h-4 w-4 mr-1" /> Apply
-          </Button>
-        </div>
-      )}
-    </div>
+      </td>
+    </tr>
   );
 }
 
-/**
- * Renders its option list only while the dropdown is open. Team Builder can
- * mount 80+ of these at once, so eagerly building ~200 items per select is
- * what made the page slow to open.
- */
-function LazyPersonSelect({
+/** Spreadsheet-style cell: tap to search and pick a person. Options render only while open. */
+function PersonCell({
   value,
   candidates,
+  readOnly,
   onChange,
 }: {
   value: string;
-  candidates: import("@/lib/types").Volunteer[];
+  candidates: Array<{ name: string; inArea: boolean }>;
+  readOnly: boolean;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-
+  const [q, setQ] = useState("");
+  if (readOnly) {
+    return <div className="min-h-8 px-2 py-1.5 truncate">{value}</div>;
+  }
+  const list = open
+    ? candidates.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 60)
+    : [];
+  const pick = (v: string) => {
+    onChange(v);
+    setOpen(false);
+    setQ("");
+  };
   return (
-    <Select
-      open={open}
-      onOpenChange={setOpen}
-      value={value || NONE}
-      onValueChange={(v) => onChange(v === NONE ? "" : v)}
-    >
-      <SelectTrigger className="h-8 flex-1 text-sm">
-        <SelectValue placeholder="Empty" />
-      </SelectTrigger>
-      <SelectContent className="max-h-72">
-        <SelectItem value={NONE}>— Empty —</SelectItem>
-        {open
-          ? candidates.map((v) => (
-              <SelectItem key={v.id} value={v.full_name}>
-                {v.full_name}
-              </SelectItem>
-            ))
-          : value
-            ? <SelectItem value={value}>{value}</SelectItem>
-            : null}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(""); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="block min-h-8 w-full truncate px-2 py-1.5 text-left hover:bg-background/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/50"
+        >
+          {value || <span className="opacity-0">—</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 p-1" align="start">
+        <Input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && list[0]) pick(list[0].name);
+          }}
+          placeholder="Search name…"
+          className="h-8 text-sm"
+        />
+        <div className="mt-1 max-h-64 overflow-y-auto">
+          {value && (
+            <button
+              type="button"
+              onClick={() => pick("")}
+              className="flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-accent"
+            >
+              <X className="h-3.5 w-3.5" /> Clear cell
+            </button>
+          )}
+          {list.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => pick(c.name)}
+              className={`w-full truncate rounded px-2 py-1.5 text-left text-sm hover:bg-accent ${c.inArea ? "" : "text-muted-foreground"}`}
+            >
+              {c.name}
+            </button>
+          ))}
+          {list.length === 0 && (
+            <div className="px-2 py-2 text-xs text-muted-foreground">No matches</div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
