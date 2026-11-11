@@ -118,16 +118,21 @@ function PrintRosterPage() {
     });
   };
 
-  const slots = useMemo(() => {
+  const slots = useMemo<SlotDef[]>(() => {
     const fixed = layoutSlots.filter((s) => inGroup(s.area));
     if (fixed.length) return fixed;
     // Fallback: derive columns from the assignments themselves so teams that
     // aren't in the fixed slot list still render.
-    const seen = new Map<string, { area: string; role: string; label: string }>();
+    const seen = new Map<string, SlotDef>();
     for (const a of assignments) {
       if (!inGroup(a.area)) continue;
       if (!seen.has(a.label)) {
-        seen.set(a.label, { area: a.area, role: a.role ?? a.label, label: a.label });
+        seen.set(a.label, {
+          col: "",
+          area: a.area,
+          role: a.role ?? a.label,
+          label: a.label,
+        });
       }
     }
     return Array.from(seen.values()).sort((x, y) => x.label.localeCompare(y.label));
