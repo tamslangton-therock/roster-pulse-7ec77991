@@ -68,7 +68,31 @@ function PrintRosterPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [assignments, layoutSlots]);
 
-  const area = String(search.area || "") || areas[0] || "";
+  // Team picker entries. Grouped crews (e.g. Hang Tight & Host) appear as one
+  // option that prints both teams' columns next to each other.
+  const teamOptions = useMemo(() => {
+    const groups = PRINT_TEAM_GROUPS.filter((g) => g.every((a) => areas.includes(a)));
+    const opts: Array<{ value: string; areas: string[] }> = [];
+    for (const a of areas) {
+      const group = groups.find((g) => g.includes(a));
+      if (group) {
+        if (group[0] === a) opts.push({ value: group.join(" & "), areas: [...group] });
+        continue;
+      }
+      opts.push({ value: a, areas: [a] });
+    }
+    return opts;
+  }, [areas]);
+
+  const picked =
+    teamOptions.find((o) => o.value === search.area) ??
+    teamOptions[0] ?? { value: "", areas: [] as string[] };
+  const area = picked.value;
+  const groupAreas = picked.areas;
+  const inGroup = useCallback(
+    (a: string) => groupAreas.some((g) => g.trim().toLowerCase() === a.trim().toLowerCase()),
+    [groupAreas],
+  );
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
