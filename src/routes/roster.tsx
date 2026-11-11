@@ -51,6 +51,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -146,6 +147,19 @@ function LiveRosterPage() {
     !isShareView && canEditSlotLabel(isMaster, authUser, label, slots);
 
   // Local UI State
+  const [areaFilter, setAreaFilterState] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("roster-area-filter");
+      if (raw) setAreaFilterState(JSON.parse(raw));
+    } catch {}
+  }, []);
+  const setAreaFilter = (v: string[]) => {
+    setAreaFilterState(v);
+    try {
+      localStorage.setItem("roster-area-filter", JSON.stringify(v));
+    } catch {}
+  };
   const [showClashesOnly, setShowClashesOnly] = useState(false);
   const [showPartnerSplitsOnly, setShowPartnerSplitsOnly] = useState(false);
   const [hidePastWeeks, setHidePastWeeks] = useState(true);
@@ -281,10 +295,41 @@ function LiveRosterPage() {
     const all = slots
       .filter((s) => canViewArea(isMaster, authUser, s.area))
       .map((s) => ({ area: s.area, label: s.label }));
-    if (selectedTeam === "all") return all;
+    const picked = areaFilter.length ? new Set(areaFilter) : null;
+    const base = picked ? all.filter((c) => picked.has(c.area)) : all;
+    if (selectedTeam === "all") return base;
     const areas = new Set(filteredAssignments.map((a) => a.area));
-    return all.filter((c) => areas.has(c.area));
-  }, [slots, filteredAssignments, selectedTeam, isMaster, authUser]);
+    return base.filter((c) => areas.has(c.area));
+  }, [slots, filteredAssignments, selectedTeam, isMaster, authUser, areaFilter]);
+
+  const allAreas = useMemo(() => {
+    const out: string[] = [];
+    for (const s of slots)
+      if (canViewArea(isMaster, authUser, s.area) && !out.includes(s.area))
+        out.push(s.area);
+    return out;
+  }, [slots, isMaster, authUser]);
+
+  // Consecutive columns of the same area render under one bold-bordered header.
+  const areaGroups = useMemo(() => {
+    const g: { area: string; cols: { area: string; label: string }[] }[] = [];
+    for (const c of columns) {
+      const last = g[g.length - 1];
+      if (last && last.area === c.area) last.cols.push(c);
+      else g.push({ area: c.area, cols: [c] });
+    }
+    return g;
+  }, [columns]);
+  const areaStart = useMemo(
+    () => new Set(areaGroups.map((g) => g.cols[0].label)),
+    [areaGroups]
+  );
+  const subLabel = (area: string, label: string) => {
+    const rest = label.toLowerCase().startsWith(area.toLowerCase())
+      ? label.slice(area.length).trim()
+      : label;
+    return rest || label;
+  };
 
   const months = useMemo(() => {
     const s = new Set<string>();
@@ -391,6 +436,52 @@ function LiveRosterPage() {
   );
 
   /** Dates (within the visible rows) that have at least one split couple. */
+  // Pending partner suggestions: when someone is rostered but their linked
+  // partner isn't, propose the partner for an empty slot in one of their own
+  // serving areas. Advisory only — nothing is assigned until accepted.
+  const partnerSuggestions = useMemo(() => {
+    const out = new Map<string, { name: string; partnerOf: string }>();
+    const byDate = new Map<string, Set<string>>();
+    const taken = new Set<string>();
+    for (const a of assignments) {
+      taken.add(`${a.date}||${a.label}`);
+    }
+    for (const [k, missing] of partnerGaps) {
+      const [date, person] = k.split("||");
+      for (const m of missing) {
+        if (!byDate.has(date)) byDate.set(date, new Set());
+        const seen = byDate.get(date)!;
+        const ml = m.toLowerCase();
+        if (seen.has(ml)) continue;
+        const vol = volunteers.find((v) => v.full_name.toLowerCase() === ml);
+        if (!vol || vol.is_paused || blackoutsMap[ml]?.has(date)) continue;
+        const areas = new Set(vol.serving_areas.map((x) => x.toLowerCase()));
+        if (!areas.size) continue;
+        const prio = vol.priority_area?.toLowerCase();
+        const open = slots
+          .filter(
+            (s) =>
+              areas.has(s.area.toLowerCase()) &&
+              !taken.has(`${date}||${s.label}`) &&
+              !out.has(`${date}||${s.label}`)
+          )
+          .sort(
+            (a, b) =>
+              (a.area.toLowerCase() === prio ? 0 : 1) -
+              (b.area.toLowerCase() === prio ? 0 : 1)
+          );
+        if (!open.length) continue;
+        seen.add(ml);
+        const partnerOf =
+          assignments.find(
+            (a) => a.date === date && a.person_name.toLowerCase() === person
+          )?.person_name ?? person;
+        out.set(`${date}||${open[0].label}`, { name: vol.full_name, partnerOf });
+      }
+    }
+    return out;
+  }, [partnerGaps, assignments, volunteers, slots, blackoutsMap]);
+
   const partnerSplitDates = useMemo(() => {
     const set = new Set<string>();
     for (const a of filteredAssignments) {
@@ -595,6 +686,60 @@ function LiveRosterPage() {
             </Select>
           </div>
 
+          {/* Area Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2">
+                <Layers className="h-4 w-4" />
+                {areaFilter.length === 0
+                  ? "All areas"
+                  : areaFilter.length === 1
+                    ? areaFilter[0]
+                    : `${areaFilter.length} areas`}
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60 p-2" align="start">
+              <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
+                <span>Show areas</span>
+                {areaFilter.length > 0 && (
+                  <button
+                    type="button"
+                    className="underline hover:text-foreground"
+                    onClick={() => setAreaFilter([])}
+                  >
+                    Show all
+                  </button>
+                )}
+              </div>
+              <div className="max-h-72 overflow-auto space-y-0.5">
+                {allAreas.map((a) => {
+                  const on = areaFilter.includes(a);
+                  return (
+                    <label
+                      key={a}
+                      className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={on}
+                        onCheckedChange={() =>
+                          setAreaFilter(
+                            on
+                              ? areaFilter.filter((x) => x !== a)
+                              : allAreas.filter(
+                                  (x) => x === a || areaFilter.includes(x)
+                                )
+                          )
+                        }
+                      />
+                      {a}
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Month Filter */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -770,21 +915,45 @@ function LiveRosterPage() {
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 bg-muted/80 backdrop-blur z-10 print:static print:bg-transparent">
               <tr>
-                <th className="sticky left-0 z-20 bg-muted border-b border-r p-3 text-left font-medium w-[140px] print:static print:bg-transparent">
+                <th
+                  rowSpan={2}
+                  className="sticky left-0 z-20 bg-muted border-b border-r p-3 text-left font-medium w-[140px] print:static print:bg-transparent"
+                >
                   Date
                 </th>
-                {columns.map((c) => (
+                {areaGroups.map((g) => (
                   <th
-                    key={c.label}
-                    className="border-b p-2 text-left font-medium text-xs text-muted-foreground min-w-[160px] whitespace-nowrap"
+                    key={g.area + g.cols[0].label}
+                    colSpan={g.cols.length}
+                    rowSpan={g.cols.length === 1 ? 2 : 1}
+                    className="border-b border-l-2 border-l-foreground/40 px-2 pt-2 pb-1 text-left text-xs font-semibold uppercase tracking-wide text-foreground whitespace-nowrap"
                   >
-                    {c.label}
+                    {g.area}
                   </th>
                 ))}
-                {/* Clashes Header */}
-                <th className="border-b border-l bg-muted/90 p-2 text-left font-semibold text-xs text-foreground min-w-[220px] whitespace-nowrap print:bg-transparent">
+                <th
+                  rowSpan={2}
+                  className="border-b border-l-2 border-l-foreground/40 bg-muted/90 p-2 text-left font-semibold text-xs text-foreground min-w-[220px] whitespace-nowrap print:bg-transparent"
+                >
                   Clashes & Blackouts
                 </th>
+              </tr>
+              <tr>
+                {areaGroups
+                  .filter((g) => g.cols.length > 1)
+                  .flatMap((g) =>
+                    g.cols.map((c, i) => (
+                      <th
+                        key={c.label}
+                        className={cn(
+                          "border-b px-2 pb-2 text-left font-medium text-[11px] text-muted-foreground min-w-[160px] whitespace-nowrap",
+                          i === 0 && "border-l-2 border-l-foreground/40"
+                        )}
+                      >
+                        {subLabel(g.area, c.label)}
+                      </th>
+                    ))
+                  )}
               </tr>
             </thead>
             <tbody>
@@ -820,7 +989,14 @@ function LiveRosterPage() {
                       {columns.map((c) => {
                         const list = cellMap.get(`${d}||${c.label}`) || [];
                         return (
-                          <td key={c.label} className="border-b p-2 align-top">
+                          <td
+                            key={c.label}
+                            className={cn(
+                              "border-b p-2 align-top min-w-[160px]",
+                              areaStart.has(c.label) &&
+                                "border-l-2 border-l-foreground/40"
+                            )}
+                          >
                             <div className="flex flex-col gap-1.5">
                               {list.map((a) => {
                                 const key = a.person_name.toLowerCase();
@@ -897,6 +1073,42 @@ function LiveRosterPage() {
                                   />
                                 );
                               })}
+                              {list.length === 0 &&
+                                (() => {
+                                  const sug = partnerSuggestions.get(
+                                    `${d}||${c.label}`
+                                  );
+                                  if (!sug) return null;
+                                  return (
+                                    <div
+                                      className="flex items-center gap-1 rounded-md border border-dashed border-amber-500/60 bg-amber-500/10 px-2 py-1 text-xs print:hidden"
+                                      title={`Suggested: partner of ${sug.partnerOf}, who is serving this Sunday`}
+                                    >
+                                      <HeartHandshake className="h-3 w-3 shrink-0 text-amber-600" />
+                                      <span className="flex-1 truncate">
+                                        <span className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                                          Pending ·{" "}
+                                        </span>
+                                        {sug.name}
+                                      </span>
+                                      {canEditSlot(c.label) && (
+                                        <button
+                                          type="button"
+                                          aria-label={`Add ${sug.name}`}
+                                          onClick={() => {
+                                            assignSlot(d, c.label, sug.name);
+                                            toast.success(
+                                              `${sug.name} added to ${c.label}`
+                                            );
+                                          }}
+                                          className="rounded p-0.5 hover:bg-amber-500/20"
+                                        >
+                                          <CheckCircle2 className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               {list.length === 0 && canEditSlot(c.label) && (
                                 <button
                                   type="button"
@@ -914,7 +1126,7 @@ function LiveRosterPage() {
                       })}
 
                       {/* Rightmost Clashes Cell */}
-                      <td className="border-b border-l bg-muted/10 p-2 align-top print:bg-transparent">
+                      <td className="border-b border-l-2 border-l-foreground/40 bg-muted/10 p-2 align-top print:bg-transparent">
                         {dayClashesList.length === 0 ? (
                           <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
