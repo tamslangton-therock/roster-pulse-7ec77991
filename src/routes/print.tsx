@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
 import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import type { SlotDef } from "@/lib/roster-grid";
 import { AccessNotice } from "@/components/access-notice";
 
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
@@ -23,6 +24,12 @@ const printSearchSchema = z.object({
   area: z.string().optional().default(""),
   months: z.string().optional().default(""),
 });
+
+/**
+ * Teams that always print as one roster, side by side, because they serve
+ * together as a crew. Add more pairs here to group other teams the same way.
+ */
+const PRINT_TEAM_GROUPS: string[][] = [["Hang Tight", "Host"]];
 
 export const Route = createFileRoute("/print")({
   validateSearch: (search) => printSearchSchema.parse(search),
@@ -61,7 +68,31 @@ function PrintRosterPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [assignments, layoutSlots]);
 
-  const area = String(search.area || "") || areas[0] || "";
+  // Team picker entries. Grouped crews (e.g. Hang Tight & Host) appear as one
+  // option that prints both teams' columns next to each other.
+  const teamOptions = useMemo(() => {
+    const groups = PRINT_TEAM_GROUPS.filter((g) => g.every((a) => areas.includes(a)));
+    const opts: Array<{ value: string; areas: string[] }> = [];
+    for (const a of areas) {
+      const group = groups.find((g) => g.includes(a));
+      if (group) {
+        if (group[0] === a) opts.push({ value: group.join(" & "), areas: [...group] });
+        continue;
+      }
+      opts.push({ value: a, areas: [a] });
+    }
+    return opts;
+  }, [areas]);
+
+  const picked =
+    teamOptions.find((o) => o.value === search.area) ??
+    teamOptions[0] ?? { value: "", areas: [] as string[] };
+  const area = picked.value;
+  const groupAreas = picked.areas;
+  const inGroup = useCallback(
+    (a: string) => groupAreas.some((g) => g.trim().toLowerCase() === a.trim().toLowerCase()),
+    [groupAreas],
+  );
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
@@ -87,22 +118,25 @@ function PrintRosterPage() {
     });
   };
 
-  const slots = useMemo(() => {
-    const fixed = layoutSlots.filter(
-      (s) => s.area.toLowerCase() === area.toLowerCase(),
-    );
+  const slots = useMemo<SlotDef[]>(() => {
+    const fixed = layoutSlots.filter((s) => inGroup(s.area));
     if (fixed.length) return fixed;
     // Fallback: derive columns from the assignments themselves so teams that
     // aren't in the fixed slot list still render.
-    const seen = new Map<string, { area: string; role: string; label: string }>();
+    const seen = new Map<string, SlotDef>();
     for (const a of assignments) {
-      if (a.area.toLowerCase() !== area.toLowerCase()) continue;
+      if (!inGroup(a.area)) continue;
       if (!seen.has(a.label)) {
-        seen.set(a.label, { area: a.area, role: a.role ?? a.label, label: a.label });
+        seen.set(a.label, {
+          col: "",
+          area: a.area,
+          role: a.role ?? a.label,
+          label: a.label,
+        });
       }
     }
     return Array.from(seen.values()).sort((x, y) => x.label.localeCompare(y.label));
-  }, [area, assignments]);
+  }, [inGroup, assignments]);
 
 
   const shownDates = useMemo(
@@ -114,11 +148,11 @@ function PrintRosterPage() {
   const cellMap = useMemo(() => {
     const map: Record<string, Record<string, string>> = {};
     for (const a of assignments) {
-      if (a.area.toLowerCase() !== area.toLowerCase()) continue;
+      if (!inGroup(a.area)) continue;
       (map[a.date] ??= {})[a.label] = a.person_name;
     }
     return map;
-  }, [assignments, area]);
+  }, [assignments, inGroup]);
 
   const people = useMemo(() => {
     const set = new Set<string>();
@@ -145,25 +179,32 @@ function PrintRosterPage() {
       };
       if (r.slot_label?.trim()) bySlot.set(`${r.slot_label}||${person.toLowerCase()}`, entry);
       if (
-        r.serving_area?.trim().toLowerCase() === area.trim().toLowerCase() &&
+        groupAreas.some(
+          (g) => g.trim().toLowerCase() === r.serving_area?.trim().toLowerCase(),
+        ) &&
         !byPerson.has(person.toLowerCase())
       ) {
         byPerson.set(person.toLowerCase(), entry);
       }
     }
     return { bySlot, byPerson };
-  }, [subTeams, area]);
+  }, [subTeams, groupAreas]);
 
   const areaSubTeams = useMemo(() => {
     const map = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
     for (const r of subTeams) {
-      if (r.serving_area?.trim().toLowerCase() !== area.trim().toLowerCase()) continue;
+      if (
+        !groupAreas.some(
+          (g) => g.trim().toLowerCase() === r.serving_area?.trim().toLowerCase(),
+        )
+      )
+        continue;
       const name = r.sub_team_name?.trim();
       if (!name || map.has(name)) continue;
       map.set(name, { name, color: resolveSubTeamColor(r.serving_area, name, r.color) });
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [subTeams, area]);
+  }, [subTeams, groupAreas]);
 
 
 
@@ -172,7 +213,26 @@ function PrintRosterPage() {
     const hit =
       (slotLabel ? subTeamColors.bySlot.get(`${slotLabel}||${key}`) : undefined) ??
       subTeamColors.byPerson.get(key);
-    return hit?.color ?? teamColor(area);
+    const slot = slotLabel ? slots.find((s) => s.label === slotLabel) : undefined;
+    return hit?.color ?? teamColor(slot?.area ?? groupAreas[0] ?? area);
+  };
+
+  // A column only gets a number when the same area/role has several slots
+  // ("Hang Tight 1" / "Hang Tight 2"). Printing two crews side by side must not
+  // make unrelated columns look numbered.
+  const slotGroupSize = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of slots) {
+      const k = `${s.area}\u0000${s.role}`;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  }, [slots]);
+
+  const slotSuffix = (s: SlotDef) => {
+    if ((slotGroupSize.get(`${s.area}\u0000${s.role}`) ?? 0) <= 1) return "";
+    const m = s.label.match(/(\d+)$/);
+    return m ? m[1] : "";
   };
 
 
@@ -308,7 +368,8 @@ function PrintRosterPage() {
           doc.setDrawColor(232, 229, 221);
           doc.line(x, headerY - 18, x, headerY + 10);
           const role = slot.role || slot.area;
-          const suffix = slots.filter((item) => item.role === slot.role).length > 1 ? ` ${slot.label.slice(-1)}` : "";
+          const num = slotSuffix(slot);
+          const suffix = num ? ` ${num}` : "";
           const lines = doc.splitTextToSize(`${role}${suffix}`, Math.max(roleColWidth - 12, 24));
           doc.setTextColor(24, 31, 42);
           doc.setFont("helvetica", "bold");
@@ -566,9 +627,9 @@ function PrintRosterPage() {
                 <SelectValue placeholder="Select team" />
               </SelectTrigger>
               <SelectContent>
-                {areas.map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {a}
+                {teamOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.value}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -698,20 +759,20 @@ function PrintRosterPage() {
                   <th className="border-b-2 border-border p-2 text-left font-semibold w-[130px] align-bottom">
                     Sunday
                   </th>
-                  {slots.map((s) => (
-                    <th
-                      key={s.label}
-                      className="border-b-2 border-l border-border p-2 text-left font-semibold align-bottom whitespace-nowrap"
-                    >
-                      {s.role || s.area}
-                      {slots.filter((x) => x.role === s.role).length > 1 && (
-                        <span className="text-muted-foreground font-normal">
-                          {" "}
-                          {s.label.slice(-1)}
-                        </span>
-                      )}
-                    </th>
-                  ))}
+                  {slots.map((s) => {
+                    const num = slotSuffix(s);
+                    return (
+                      <th
+                        key={s.label}
+                        className="border-b-2 border-l border-border p-2 text-left font-semibold align-bottom whitespace-nowrap"
+                      >
+                        {s.role || s.area}
+                        {num && (
+                          <span className="text-muted-foreground font-normal"> {num}</span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
