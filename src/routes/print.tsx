@@ -119,21 +119,19 @@ function PrintRosterPage() {
   };
 
   const slots = useMemo(() => {
-    const fixed = layoutSlots.filter(
-      (s) => s.area.toLowerCase() === area.toLowerCase(),
-    );
+    const fixed = layoutSlots.filter((s) => inGroup(s.area));
     if (fixed.length) return fixed;
     // Fallback: derive columns from the assignments themselves so teams that
     // aren't in the fixed slot list still render.
     const seen = new Map<string, { area: string; role: string; label: string }>();
     for (const a of assignments) {
-      if (a.area.toLowerCase() !== area.toLowerCase()) continue;
+      if (!inGroup(a.area)) continue;
       if (!seen.has(a.label)) {
         seen.set(a.label, { area: a.area, role: a.role ?? a.label, label: a.label });
       }
     }
     return Array.from(seen.values()).sort((x, y) => x.label.localeCompare(y.label));
-  }, [area, assignments]);
+  }, [inGroup, assignments]);
 
 
   const shownDates = useMemo(
@@ -145,11 +143,11 @@ function PrintRosterPage() {
   const cellMap = useMemo(() => {
     const map: Record<string, Record<string, string>> = {};
     for (const a of assignments) {
-      if (a.area.toLowerCase() !== area.toLowerCase()) continue;
+      if (!inGroup(a.area)) continue;
       (map[a.date] ??= {})[a.label] = a.person_name;
     }
     return map;
-  }, [assignments, area]);
+  }, [assignments, inGroup]);
 
   const people = useMemo(() => {
     const set = new Set<string>();
@@ -176,25 +174,32 @@ function PrintRosterPage() {
       };
       if (r.slot_label?.trim()) bySlot.set(`${r.slot_label}||${person.toLowerCase()}`, entry);
       if (
-        r.serving_area?.trim().toLowerCase() === area.trim().toLowerCase() &&
+        groupAreas.some(
+          (g) => g.trim().toLowerCase() === r.serving_area?.trim().toLowerCase(),
+        ) &&
         !byPerson.has(person.toLowerCase())
       ) {
         byPerson.set(person.toLowerCase(), entry);
       }
     }
     return { bySlot, byPerson };
-  }, [subTeams, area]);
+  }, [subTeams, groupAreas]);
 
   const areaSubTeams = useMemo(() => {
     const map = new Map<string, { name: string; color: ReturnType<typeof resolveSubTeamColor> }>();
     for (const r of subTeams) {
-      if (r.serving_area?.trim().toLowerCase() !== area.trim().toLowerCase()) continue;
+      if (
+        !groupAreas.some(
+          (g) => g.trim().toLowerCase() === r.serving_area?.trim().toLowerCase(),
+        )
+      )
+        continue;
       const name = r.sub_team_name?.trim();
       if (!name || map.has(name)) continue;
       map.set(name, { name, color: resolveSubTeamColor(r.serving_area, name, r.color) });
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [subTeams, area]);
+  }, [subTeams, groupAreas]);
 
 
 
@@ -203,7 +208,26 @@ function PrintRosterPage() {
     const hit =
       (slotLabel ? subTeamColors.bySlot.get(`${slotLabel}||${key}`) : undefined) ??
       subTeamColors.byPerson.get(key);
-    return hit?.color ?? teamColor(area);
+    const slot = slotLabel ? slots.find((s) => s.label === slotLabel) : undefined;
+    return hit?.color ?? teamColor(slot?.area ?? groupAreas[0] ?? area);
+  };
+
+  // A column only gets a number when the same area/role has several slots
+  // ("Hang Tight 1" / "Hang Tight 2"). Printing two crews side by side must not
+  // make unrelated columns look numbered.
+  const slotGroupSize = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of slots) {
+      const k = `${s.area}\u0000${s.role}`;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  }, [slots]);
+
+  const slotSuffix = (s: SlotDef) => {
+    if ((slotGroupSize.get(`${s.area}\u0000${s.role}`) ?? 0) <= 1) return "";
+    const m = s.label.match(/(\d+)$/);
+    return m ? m[1] : "";
   };
 
 
