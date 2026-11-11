@@ -1027,7 +1027,7 @@ function LiveRosterPage() {
                                     isClash={isClash}
                                     overridden={overridden}
                                     totalWorkload={stats.total}
-                                    clashDatesCount={stats.clashDates.size}
+                                    clashDatesCount={isDoubleBookedOnDate ? stats.clashDates.size : 0}
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
