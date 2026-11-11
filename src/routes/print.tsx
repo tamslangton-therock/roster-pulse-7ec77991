@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
 import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import type { SlotDef } from "@/lib/roster-grid";
 import { AccessNotice } from "@/components/access-notice";
 
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
@@ -23,6 +24,12 @@ const printSearchSchema = z.object({
   area: z.string().optional().default(""),
   months: z.string().optional().default(""),
 });
+
+/**
+ * Teams that always print as one roster, side by side, because they serve
+ * together as a crew. Add more pairs here to group other teams the same way.
+ */
+const PRINT_TEAM_GROUPS: string[][] = [["Hang Tight", "Host"]];
 
 export const Route = createFileRoute("/print")({
   validateSearch: (search) => printSearchSchema.parse(search),
