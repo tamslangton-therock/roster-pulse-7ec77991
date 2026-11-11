@@ -363,7 +363,8 @@ function PrintRosterPage() {
           doc.setDrawColor(232, 229, 221);
           doc.line(x, headerY - 18, x, headerY + 10);
           const role = slot.role || slot.area;
-          const suffix = slots.filter((item) => item.role === slot.role).length > 1 ? ` ${slot.label.slice(-1)}` : "";
+          const num = slotSuffix(slot);
+          const suffix = num ? ` ${num}` : "";
           const lines = doc.splitTextToSize(`${role}${suffix}`, Math.max(roleColWidth - 12, 24));
           doc.setTextColor(24, 31, 42);
           doc.setFont("helvetica", "bold");
@@ -621,9 +622,9 @@ function PrintRosterPage() {
                 <SelectValue placeholder="Select team" />
               </SelectTrigger>
               <SelectContent>
-                {areas.map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {a}
+                {teamOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.value}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -753,20 +754,20 @@ function PrintRosterPage() {
                   <th className="border-b-2 border-border p-2 text-left font-semibold w-[130px] align-bottom">
                     Sunday
                   </th>
-                  {slots.map((s) => (
-                    <th
-                      key={s.label}
-                      className="border-b-2 border-l border-border p-2 text-left font-semibold align-bottom whitespace-nowrap"
-                    >
-                      {s.role || s.area}
-                      {slots.filter((x) => x.role === s.role).length > 1 && (
-                        <span className="text-muted-foreground font-normal">
-                          {" "}
-                          {s.label.slice(-1)}
-                        </span>
-                      )}
-                    </th>
-                  ))}
+                  {slots.map((s) => {
+                    const num = slotSuffix(s);
+                    return (
+                      <th
+                        key={s.label}
+                        className="border-b-2 border-l border-border p-2 text-left font-semibold align-bottom whitespace-nowrap"
+                      >
+                        {s.role || s.area}
+                        {num && (
+                          <span className="text-muted-foreground font-normal"> {num}</span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
