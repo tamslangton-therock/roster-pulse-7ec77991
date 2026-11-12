@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "node:test";
+import { deepStrictEqual } from "node:assert";
 import { occupiedPrintSlots } from "./print-slots";
 import type { SlotDef } from "./roster-grid";
 
@@ -15,11 +16,11 @@ const cells = {
 
 describe("printed roster columns", () => {
   test("December and January omit empty Hang Tight 2 and keep Hang Tight beside Host", () => {
-    expect(occupiedPrintSlots(slots, ["2026-12-06", "2027-01-03"], cells).map((s) => s.label))
-      .toEqual(["Hang Tight 1", "Host"]);
+    deepStrictEqual(occupiedPrintSlots(slots, ["2026-12-06", "2027-01-03"], cells).map((s) => s.label),
+      ["Hang Tight 1", "Host"]);
   });
   test("a column with a name on any selected date stays visible", () => {
-    expect(occupiedPrintSlots(slots, ["2026-11-29", "2026-12-06"], cells).map((s) => s.label))
-      .toEqual(["Hang Tight 1", "Hang Tight 2", "Host"]);
+    deepStrictEqual(occupiedPrintSlots(slots, ["2026-11-29", "2026-12-06"], cells).map((s) => s.label),
+      ["Hang Tight 1", "Hang Tight 2", "Host"]);
   });
 });
