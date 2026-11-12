@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Roster layout is dynamic
+Team Builder combines crew areas as a presentation group via `team-builder-groups`; edits and Sunday application retain each slot's original serving area and existing stored team names to preserve Sheets compatibility.
 Printed roster columns are filtered through `occupiedPrintSlots` using only the selected dates; preview, browser print and PDF share that list so empty columns never diverge between outputs.
 
 Serving-area columns on Live_Roster are data, not constants: `src/lib/roster-grid.ts` builds slots from the sheet's header rows (Row 1 = area, Row 2 = role) and clash formulas use the live slot count. Any new page that needs columns must read `slots` from `src/lib/store.ts` (`useRoster()`), never `ROSTER_SLOTS`.
