@@ -7,6 +7,7 @@ import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import type { SlotDef } from "@/lib/roster-grid";
+import { occupiedPrintSlots } from "@/lib/print-slots";
 import { AccessNotice } from "@/components/access-notice";
 
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
@@ -118,7 +119,7 @@ function PrintRosterPage() {
     });
   };
 
-  const slots = useMemo<SlotDef[]>(() => {
+  const teamSlots = useMemo<SlotDef[]>(() => {
     const fixed = layoutSlots.filter((s) => inGroup(s.area));
     if (fixed.length) return fixed;
     // Fallback: derive columns from the assignments themselves so teams that
@@ -136,7 +137,7 @@ function PrintRosterPage() {
       }
     }
     return Array.from(seen.values()).sort((x, y) => x.label.localeCompare(y.label));
-  }, [inGroup, assignments]);
+  }, [inGroup, assignments, layoutSlots]);
 
 
   const shownDates = useMemo(
@@ -153,6 +154,11 @@ function PrintRosterPage() {
     }
     return map;
   }, [assignments, inGroup]);
+
+  const slots = useMemo(
+    () => occupiedPrintSlots(teamSlots, shownDates, cellMap),
+    [teamSlots, shownDates, cellMap],
+  );
 
   const people = useMemo(() => {
     const set = new Set<string>();
