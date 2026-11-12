@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { CalendarPlus, Palette, Plus, Trash2, X } from "lucide-react";
 import { useRoster } from "@/lib/store";
 import { areasOf } from "@/lib/roster-grid";
+import { builderAreas, builderTeamName, sourceAreas } from "@/lib/team-builder-groups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -44,6 +45,8 @@ export const Route = createFileRoute("/teams")({
         content:
           "Group volunteers into repeatable sub-teams per serving area, synced live with Google Sheets.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: TeamsPage,
@@ -74,7 +77,7 @@ function TeamsPage() {
   const [newFor, setNewFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
-  const allAreas = useMemo(() => areasOf(slots), [slots]);
+  const allAreas = useMemo(() => builderAreas(areasOf(slots)), [slots]);
   const areas = useMemo(
     () => (selectedArea === "all" ? allAreas : [selectedArea]),
     [selectedArea, allAreas],
@@ -83,13 +86,15 @@ function TeamsPage() {
   const byArea = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const r of subTeams) {
-      const list = map.get(r.serving_area) ?? [];
-      if (!list.includes(r.sub_team_name)) list.push(r.sub_team_name);
-      map.set(r.serving_area, list);
+      const area = allAreas.find((a) => sourceAreas(a).includes(r.serving_area)) ?? r.serving_area;
+      const list = map.get(area) ?? [];
+      const name = builderTeamName(r.serving_area, r.sub_team_name);
+      if (!list.includes(name)) list.push(name);
+      map.set(area, list);
     }
     for (const [, list] of map) list.sort((a, b) => a.localeCompare(b));
     return map;
-  }, [subTeams]);
+  }, [subTeams, allAreas]);
 
   const totalSubTeams = useMemo(
     () => Array.from(byArea.values()).reduce((n, l) => n + l.length, 0),
@@ -138,9 +143,12 @@ function TeamsPage() {
 
       <div className="space-y-6">
         {areas.map((area) => {
-          const areaSlots = slots.filter((s) => s.area === area);
+          const members = sourceAreas(area);
+          const areaSlots = slots.filter((s) => members.includes(s.area));
           const names = byArea.get(area) ?? [];
-          const editable = canEditThisArea(area);
+          const editable = members.every(canEditThisArea);
+          const storedName = (member: string, name: string) =>
+            subTeams.find((r) => r.serving_area === member && builderTeamName(member, r.sub_team_name) === name)?.sub_team_name ?? name;
           return (
             <section key={area} className="rounded-lg border bg-card overflow-hidden">
               <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
@@ -158,7 +166,7 @@ function TeamsPage() {
                     onClick={() => {
                       let n = names.length + 1;
                       while (names.includes(`Team ${n}`)) n++;
-                      addSubTeam(area, `Team ${n}`);
+                      members.forEach((member) => addSubTeam(member, `Team ${n}`));
                     }}
                   >
                     <Plus className="h-4 w-4 mr-1" /> Add team
@@ -191,32 +199,35 @@ function TeamsPage() {
                           name={name}
                           slots={areaSlots}
                           rows={subTeams.filter(
-                            (r) => r.serving_area === area && r.sub_team_name === name,
+                            (r) => members.includes(r.serving_area) && builderTeamName(r.serving_area, r.sub_team_name) === name,
                           )}
                           volunteers={volunteers}
                           dates={dates}
                           colorId={
                             subTeams.find(
-                              (r) => r.serving_area === area && r.sub_team_name === name && r.color,
+                              (r) => members.includes(r.serving_area) && builderTeamName(r.serving_area, r.sub_team_name) === name && r.color,
                             )?.color
                           }
-                          onSetColor={(id) => setSubTeamColor(area, name, id)}
-                          onSetSlot={(label, person) => setSubTeamSlot(area, name, label, person)}
+                          onSetColor={(id) => members.forEach((member) => setSubTeamColor(member, storedName(member, name), id))}
+                          onSetSlot={(label, person) => {
+                            const slot = areaSlots.find((s) => s.label === label);
+                            if (slot) setSubTeamSlot(slot.area, storedName(slot.area, name), label, person);
+                          }}
                           onRename={(next) => {
                             if (!next.trim() || next === name) return;
                             if (names.includes(next.trim())) {
                               toast.error("A team with that name already exists");
                               return;
                             }
-                            renameSubTeam(area, name, next.trim());
+                            members.forEach((member) => renameSubTeam(member, storedName(member, name), next.trim()));
                           }}
                           onRemove={() => {
                             if (!confirm(`Delete ${name} from ${area}?`)) return;
-                            removeSubTeam(area, name);
+                            members.forEach((member) => removeSubTeam(member, storedName(member, name)));
                             toast.info(`Removed ${name}`);
                           }}
                           onApply={(date) => {
-                            const n = applySubTeamToDate(area, name, date);
+                            const n = members.reduce((count, member) => count + applySubTeamToDate(member, storedName(member, name), date), 0);
                             toast.success(
                               `${name} applied to ${format(parseISO(date), "d MMM yyyy")}`,
                               { description: `${n} slot${n === 1 ? "" : "s"} filled — override any slot on the Live Roster.` },
@@ -288,7 +299,7 @@ function SubTeamRowView({
   index: number;
   area: string;
   name: string;
-  slots: Array<{ label: string; role: string }>;
+  slots: Array<{ label: string; role: string; area: string }>;
   rows: Array<{ slot_label: string; person_name: string }>;
   volunteers: import("@/lib/types").Volunteer[];
   dates: string[];
@@ -307,13 +318,13 @@ function SubTeamRowView({
   const personFor = (label: string) =>
     rows.find((r) => r.slot_label === label)?.person_name ?? "";
 
-  const candidates = useMemo(() => {
+  const candidatesFor = (slotArea: string) => {
     const isIn = (v: import("@/lib/types").Volunteer) =>
-      v.serving_areas.some((a) => a.toLowerCase() === area.toLowerCase());
+      v.serving_areas.some((a) => a.toLowerCase() === slotArea.toLowerCase());
     return [...volunteers].sort(
       (a, b) => Number(isIn(b)) - Number(isIn(a)) || a.full_name.localeCompare(b.full_name),
     ).map((v) => ({ name: v.full_name, inArea: isIn(v) }));
-  }, [volunteers, area]);
+  };
 
   const upcoming = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -363,7 +374,7 @@ function SubTeamRowView({
         <td key={s.label} className="border-r p-0">
           <PersonCell
             value={personFor(s.label)}
-            candidates={candidates}
+            candidates={candidatesFor(s.area)}
             readOnly={readOnly}
             onChange={(v) => onSetSlot(s.label, v)}
           />
