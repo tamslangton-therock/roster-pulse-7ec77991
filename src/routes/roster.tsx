@@ -1258,7 +1258,16 @@ function LiveRosterPage() {
             target={partnerTarget}
             onClose={() => setPartnerTarget(null)}
           />
-          <ClashDialog detail={clashDetail} canOverride={isMaster} onClose={() => setClashDetail(null)} />
+          <ClashDialog
+            detail={clashDetail}
+            canOverride={isMaster}
+            canEditSlot={canEditSlot}
+            onSwap={(assignment) => {
+              setClashDetail(null);
+              setSwapTarget(assignment);
+            }}
+            onClose={() => setClashDetail(null)}
+          />
           <BlackoutManagementDialog
             volunteer={selectedVolunteerForBlackouts}
             blackouts={
@@ -1746,6 +1755,8 @@ function SwapDialog({
 function ClashDialog({
   detail,
   canOverride = false,
+  canEditSlot,
+  onSwap,
   onClose,
 }: {
   detail: {
@@ -1755,6 +1766,8 @@ function ClashDialog({
     isBlackout?: boolean;
   } | null;
   canOverride?: boolean;
+  canEditSlot: (label: string) => boolean;
+  onSwap: (assignment: Assignment) => void;
   onClose: () => void;
 }) {
   const { assignments, setOverride, removeAssignment } = useRoster();
@@ -1808,14 +1821,26 @@ function ClashDialog({
                   className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
                 >
                   <span>{a.label}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={!canOverride}
-                    onClick={() => removeAssignment(a.id)}
-                  >
-                    Remove
-                  </Button>
+                  {canEditSlot(a.label) && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onSwap(a)}
+                      >
+                        <RefreshCcw className="mr-1 h-3 w-3" /> Swap
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (canEditSlot(a.label)) removeAssignment(a.id);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
