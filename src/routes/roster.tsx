@@ -559,7 +559,9 @@ function LiveRosterPage() {
     >();
 
     for (const d of dates) {
-      const dayAssignments = filteredAssignments.filter((a) => a.date === d);
+      // Full assignment list: the Clashes column must surface cross-area
+      // double-bookings even when the view is filtered to specific areas.
+      const dayAssignments = assignments.filter((a) => a.date === d);
       const personMap = new Map<string, Assignment[]>();
 
       for (const a of dayAssignments) {
@@ -596,7 +598,7 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, dates, blackoutsMap, allowedSet]);
+  }, [assignments, dates, blackoutsMap, allowedSet]);
 
   const copyShareableLink = () => {
     const url = window.location.href;
