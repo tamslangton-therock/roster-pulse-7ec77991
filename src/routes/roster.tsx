@@ -711,18 +711,14 @@ function LiveRosterPage() {
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-60 p-2" align="start">
-              <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
+            <PopoverContent className="w-64 p-2" align="start">
+              <div className="flex items-center justify-between px-1 pb-1.5 text-xs text-muted-foreground">
                 <span>Show areas</span>
-                {areaFilter.length > 0 && (
-                  <button
-                    type="button"
-                    className="underline hover:text-foreground"
-                    onClick={() => setAreaFilter([])}
-                  >
-                    Show all
-                  </button>
-                )}
+                <span>
+                  {areaFilter.length === 0
+                    ? "all showing"
+                    : `${areaFilter.length} of ${allAreas.length}`}
+                </span>
               </div>
               <div className="max-h-72 overflow-auto space-y-0.5">
                 {allAreas.map((a) => {
@@ -730,16 +726,20 @@ function LiveRosterPage() {
                   return (
                     <label
                       key={a}
-                      className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted cursor-pointer"
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm hover:bg-muted cursor-pointer",
+                        on && "bg-primary/10 font-medium",
+                      )}
                     >
                       <Checkbox
                         checked={on}
+                        className="h-4 w-4 shrink-0 rounded-[3px]"
                         onCheckedChange={() =>
                           setAreaFilter(
                             on
                               ? areaFilter.filter((x) => x !== a)
                               : allAreas.filter(
-                                  (x) => x === a || areaFilter.includes(x)
+                                  (x) => x === a || areaFilter.includes(x),
                                 )
                           )
                         }
@@ -748,6 +748,20 @@ function LiveRosterPage() {
                     </label>
                   );
                 })}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 border-t px-1 pt-2 text-xs">
+                <span className="text-muted-foreground">
+                  Tick any areas to view them side by side
+                </span>
+                {areaFilter.length > 0 && (
+                  <button
+                    type="button"
+                    className="shrink-0 underline hover:text-foreground"
+                    onClick={() => setAreaFilter([])}
+                  >
+                    Show all
+                  </button>
+                )}
               </div>
             </PopoverContent>
           </Popover>
