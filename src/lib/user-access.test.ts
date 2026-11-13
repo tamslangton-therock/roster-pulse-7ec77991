@@ -5,7 +5,17 @@ import type { SlotDef } from "./roster-grid";
 
 const oly = toSessionUser(recordFromTabValues({
   username: "Oly",
+  password: "",
+  display_name: "Oly",
+  roster_view_areas: [],
   roster_edit_areas: ["Yellow Group", "Green Group", "Teens"],
+  can_view_health: true,
+  team_edit_areas: [],
+  individuals_access: "view",
+  can_view_roster: true,
+  can_view_life_groups: false,
+  health_view_areas: [],
+  individuals_view_areas: [],
 }));
 const slots: SlotDef[] = [
   { col: "A", area: "Teens", role: "", label: "Teens 1" },
