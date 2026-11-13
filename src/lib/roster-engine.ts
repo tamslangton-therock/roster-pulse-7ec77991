@@ -57,6 +57,26 @@ export function groupAllowed(list: Assignment[], allowed: Set<string>): boolean 
   return true;
 }
 
+/**
+ * Keys (`date||person`) for conflicts the master has already approved: every
+ * assignment that person holds on that date is flagged as an exception, so the
+ * clash / blackout warning reads as handled (green) instead of open (red).
+ */
+export function approvedExceptionKeys(assignments: Assignment[]): Set<string> {
+  const byCell = new Map<string, Assignment[]>();
+  for (const a of assignments) {
+    const k = `${a.date}||${a.person_name.toLowerCase()}`;
+    const list = byCell.get(k);
+    if (list) list.push(a);
+    else byCell.set(k, [a]);
+  }
+  const out = new Set<string>();
+  for (const [k, list] of byCell) {
+    if (list.every((a) => a.is_override)) out.add(k);
+  }
+  return out;
+}
+
 export function detectClashes(
   assignments: Assignment[],
   allowed: Set<string> = new Set(),

@@ -31,6 +31,7 @@ import { AiRosterDialog } from "@/components/ai-roster-dialog";
 import {
   assignmentsByCell,
   detectClashes,
+  approvedExceptionKeys,
   buildAllowedSet,
   groupAllowed,
   rankSwapCandidates,
@@ -121,6 +122,8 @@ interface VolunteerWorkloadStats {
   total: number;
   clashDates: Set<string>;
   blackoutClashDates: Set<string>;
+  /** Dates whose conflict was approved as an exception — handled, not open. */
+  resolvedClashDates: Set<string>;
 }
 
 function LiveRosterPage() {
@@ -295,6 +298,10 @@ function LiveRosterPage() {
     return m;
   }, [clashes]);
 
+  // Dates whose conflict the master has approved as an exception — these are
+  // shown green everywhere so it is obvious they have been dealt with.
+  const approvedKeys = useMemo(() => approvedExceptionKeys(assignments), [assignments]);
+
   // Column set from the live slot layout (store state, synced with the sheet),
   // so empty slots stay visible and can be filled. When a team filter is
   // active, narrow to that team's areas.
@@ -389,16 +396,11 @@ function LiveRosterPage() {
           total: 0,
           clashDates: new Set(),
           blackoutClashDates: new Set(),
+          resolvedClashDates: new Set(),
         });
       }
       const stat = map.get(key)!;
       stat.total += 1;
-
-      // Check for Blackout clash
-      const personBlackouts = blackoutsMap[key];
-      if (personBlackouts && personBlackouts.has(a.date)) {
-        stat.blackoutClashDates.add(a.date);
-      }
 
       if (!volDateCounts.has(key)) {
         volDateCounts.set(key, new Map());
@@ -407,16 +409,25 @@ function LiveRosterPage() {
       const currentCount = (dateMap.get(a.date) || 0) + 1;
       dateMap.set(a.date, currentCount);
 
+      const cellKey = `${a.date}||${key}`;
+      // Check for Blackout clash
+      const isBlackoutDate = blackoutsMap[key]?.has(a.date) ?? false;
       // Only a real clash when the pairing isn't an allowed exception.
-      if (currentCount > 1 && clashKey.has(`${a.date}||${key}`)) {
-        stat.clashDates.add(a.date);
-      }
+      const isClashDate = currentCount > 1 && clashKey.has(cellKey);
+
+      if (!isBlackoutDate && !isClashDate) continue;
+
+      // An approved exception means the conflict is already dealt with.
+      if (approvedKeys.has(cellKey)) stat.resolvedClashDates.add(a.date);
+      else if (isBlackoutDate) stat.blackoutClashDates.add(a.date);
+      else stat.clashDates.add(a.date);
     }
 
     return map;
-  }, [assignments, shownDates, blackoutsMap, clashKey]);
+  }, [assignments, shownDates, blackoutsMap, clashKey, approvedKeys]);
 
-  // Double booked count & Blackout clashes count
+  // Double booked count & Blackout clashes count — approved exceptions are left
+  // out, so the red numbers always mean "this still needs attention".
   const doubleBookedVolunteersCount = useMemo(() => {
     let count = 0;
     for (const stat of volunteerStatsMap.values()) {
@@ -424,6 +435,32 @@ function LiveRosterPage() {
     }
     return count;
   }, [volunteerStatsMap]);
+
+  const approvedVolunteersCount = useMemo(() => {
+    let count = 0;
+    for (const stat of volunteerStatsMap.values())
+      if (stat.resolvedClashDates.size > 0) count++;
+    return count;
+  }, [volunteerStatsMap]);
+
+  const openClashCount = useMemo(
+    () =>
+      clashes.filter((c) => !c.is_override).length +
+      Array.from(volunteerStatsMap.values()).reduce(
+        (acc, curr) => acc + curr.blackoutClashDates.size,
+        0
+      ),
+    [clashes, volunteerStatsMap]
+  );
+
+  const approvedClashCount = useMemo(
+    () =>
+      Array.from(volunteerStatsMap.values()).reduce(
+        (acc, curr) => acc + curr.resolvedClashDates.size,
+        0
+      ),
+    [volunteerStatsMap]
+  );
 
   const pausedNames = useMemo(
     () =>
@@ -560,6 +597,7 @@ function LiveRosterPage() {
         roles: string[];
         areas: string[];
         isBlackoutClash?: boolean;
+        resolved: boolean;
       }>
     >();
 
@@ -580,6 +618,7 @@ function LiveRosterPage() {
         roles: string[];
         areas: string[];
         isBlackoutClash?: boolean;
+        resolved: boolean;
       }> = [];
 
       for (const [person, items] of personMap.entries()) {
@@ -593,6 +632,7 @@ function LiveRosterPage() {
             roles: items.map((i) => i.label),
             areas: Array.from(new Set(items.map((i) => i.area))),
             isBlackoutClash: isBlackout,
+            resolved: items.every((i) => i.is_override),
           });
         }
       }
