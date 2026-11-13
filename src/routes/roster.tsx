@@ -296,7 +296,19 @@ function LiveRosterPage() {
       .filter((s) => canViewArea(isMaster, authUser, s.area))
       .map((s) => ({ area: s.area, label: s.label }));
     const picked = areaFilter.length ? new Set(areaFilter) : null;
-    const base = picked ? all.filter((c) => picked.has(c.area)) : all;
+    let base = picked ? all.filter((c) => picked.has(c.area)) : all;
+    // Several areas ticked → show them in the order they were picked
+    // (e.g. "Yellow Group" then "Host"), not the sheet's column order.
+    if (picked && areaFilter.length > 1) {
+      const order = new Map(areaFilter.map((a, i) => [a, i] as const));
+      base = base
+        .map((c, i) => ({ c, i }))
+        .sort(
+          (x, y) =>
+            (order.get(x.c.area) ?? 999) - (order.get(y.c.area) ?? 999) || x.i - y.i,
+        )
+        .map((x) => x.c);
+    }
     if (selectedTeam === "all") return base;
     const areas = new Set(filteredAssignments.map((a) => a.area));
     return base.filter((c) => areas.has(c.area));
