@@ -31,6 +31,7 @@ import { AiRosterDialog } from "@/components/ai-roster-dialog";
 import {
   assignmentsByCell,
   detectClashes,
+  approvedExceptionKeys,
   buildAllowedSet,
   groupAllowed,
   rankSwapCandidates,
@@ -121,6 +122,8 @@ interface VolunteerWorkloadStats {
   total: number;
   clashDates: Set<string>;
   blackoutClashDates: Set<string>;
+  /** Dates whose conflict was approved as an exception — handled, not open. */
+  resolvedClashDates: Set<string>;
 }
 
 function LiveRosterPage() {
@@ -295,6 +298,10 @@ function LiveRosterPage() {
     return m;
   }, [clashes]);
 
+  // Dates whose conflict the master has approved as an exception — these are
+  // shown green everywhere so it is obvious they have been dealt with.
+  const approvedKeys = useMemo(() => approvedExceptionKeys(assignments), [assignments]);
+
   // Column set from the live slot layout (store state, synced with the sheet),
   // so empty slots stay visible and can be filled. When a team filter is
   // active, narrow to that team's areas.
@@ -389,16 +396,11 @@ function LiveRosterPage() {
           total: 0,
           clashDates: new Set(),
           blackoutClashDates: new Set(),
+          resolvedClashDates: new Set(),
         });
       }
       const stat = map.get(key)!;
       stat.total += 1;
-
-      // Check for Blackout clash
-      const personBlackouts = blackoutsMap[key];
-      if (personBlackouts && personBlackouts.has(a.date)) {
-        stat.blackoutClashDates.add(a.date);
-      }
 
       if (!volDateCounts.has(key)) {
         volDateCounts.set(key, new Map());
@@ -407,16 +409,25 @@ function LiveRosterPage() {
       const currentCount = (dateMap.get(a.date) || 0) + 1;
       dateMap.set(a.date, currentCount);
 
+      const cellKey = `${a.date}||${key}`;
+      // Check for Blackout clash
+      const isBlackoutDate = blackoutsMap[key]?.has(a.date) ?? false;
       // Only a real clash when the pairing isn't an allowed exception.
-      if (currentCount > 1 && clashKey.has(`${a.date}||${key}`)) {
-        stat.clashDates.add(a.date);
-      }
+      const isClashDate = currentCount > 1 && clashKey.has(cellKey);
+
+      if (!isBlackoutDate && !isClashDate) continue;
+
+      // An approved exception means the conflict is already dealt with.
+      if (approvedKeys.has(cellKey)) stat.resolvedClashDates.add(a.date);
+      else if (isBlackoutDate) stat.blackoutClashDates.add(a.date);
+      else stat.clashDates.add(a.date);
     }
 
     return map;
-  }, [assignments, shownDates, blackoutsMap, clashKey]);
+  }, [assignments, shownDates, blackoutsMap, clashKey, approvedKeys]);
 
-  // Double booked count & Blackout clashes count
+  // Double booked count & Blackout clashes count — approved exceptions are left
+  // out, so the red numbers always mean "this still needs attention".
   const doubleBookedVolunteersCount = useMemo(() => {
     let count = 0;
     for (const stat of volunteerStatsMap.values()) {
@@ -424,6 +435,32 @@ function LiveRosterPage() {
     }
     return count;
   }, [volunteerStatsMap]);
+
+  const approvedVolunteersCount = useMemo(() => {
+    let count = 0;
+    for (const stat of volunteerStatsMap.values())
+      if (stat.resolvedClashDates.size > 0) count++;
+    return count;
+  }, [volunteerStatsMap]);
+
+  const openClashCount = useMemo(
+    () =>
+      clashes.filter((c) => !c.is_override).length +
+      Array.from(volunteerStatsMap.values()).reduce(
+        (acc, curr) => acc + curr.blackoutClashDates.size,
+        0
+      ),
+    [clashes, volunteerStatsMap]
+  );
+
+  const approvedClashCount = useMemo(
+    () =>
+      Array.from(volunteerStatsMap.values()).reduce(
+        (acc, curr) => acc + curr.resolvedClashDates.size,
+        0
+      ),
+    [volunteerStatsMap]
+  );
 
   const pausedNames = useMemo(
     () =>
@@ -560,6 +597,7 @@ function LiveRosterPage() {
         roles: string[];
         areas: string[];
         isBlackoutClash?: boolean;
+        resolved: boolean;
       }>
     >();
 
@@ -580,6 +618,7 @@ function LiveRosterPage() {
         roles: string[];
         areas: string[];
         isBlackoutClash?: boolean;
+        resolved: boolean;
       }> = [];
 
       for (const [person, items] of personMap.entries()) {
@@ -593,6 +632,7 @@ function LiveRosterPage() {
             roles: items.map((i) => i.label),
             areas: Array.from(new Set(items.map((i) => i.area))),
             isBlackoutClash: isBlackout,
+            resolved: items.every((i) => i.is_override),
           });
         }
       }
@@ -668,13 +708,14 @@ function LiveRosterPage() {
             {shownDates.length} Sundays · {filteredAssignments.length} assignments
             {selectedTeam !== "all" && ` (${selectedTeam})`} ·{" "}
             <span className="text-red-500 font-medium">
-              {clashes.length +
-                Array.from(volunteerStatsMap.values()).reduce(
-                  (acc, curr) => acc + curr.blackoutClashDates.size,
-                  0
-                )}{" "}
-              clashes/blackouts
+              {openClashCount} clashes/blackouts
             </span>
+            {approvedClashCount > 0 && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                {" · "}
+                {approvedClashCount} approved
+              </span>
+            )}
           </p>
         </div>
 
@@ -912,7 +953,9 @@ function LiveRosterPage() {
             <h2 className="text-sm font-semibold">Roster Capacity & Health</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               {doubleBookedVolunteersCount === 0
-                ? "All active volunteers have clear single assignments across scheduled dates."
+                ? approvedVolunteersCount > 0
+                  ? "Every clash and blackout conflict is an approved exception — nothing needs attention."
+                  : "All active volunteers have clear single assignments across scheduled dates."
                 : `${doubleBookedVolunteersCount} volunteer${
                     doubleBookedVolunteersCount > 1 ? "s have" : " has"
                   } clashes or blackout date conflicts.`}
@@ -933,6 +976,12 @@ function LiveRosterPage() {
               {doubleBookedVolunteersCount}
             </strong>
           </span>
+          {approvedVolunteersCount > 0 && (
+            <span className="px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300">
+              Approved exceptions:{" "}
+              <strong className="font-bold">{approvedVolunteersCount}</strong>
+            </span>
+          )}
         </div>
       </div>
 
@@ -1031,10 +1080,14 @@ function LiveRosterPage() {
                                   total: 0,
                                   clashDates: new Set(),
                                   blackoutClashDates: new Set(),
+                                  resolvedClashDates: new Set(),
                                 };
                                 const paused = pausedNames.has(key);
                                 const isClash = clashKey.has(`${a.date}||${key}`);
                                 const overridden = clashKey.get(`${a.date}||${key}`);
+                                const resolvedOnDate = approvedKeys.has(
+                                  `${a.date}||${key}`
+                                );
                                 const isDoubleBookedOnDate = stats.clashDates.has(a.date);
                                 const isBlackoutOnDate =
                                   blackoutsMap[key]?.has(a.date) ?? false;
@@ -1053,8 +1106,10 @@ function LiveRosterPage() {
                                     paused={paused}
                                     isClash={isClash}
                                     overridden={overridden}
+                                    resolvedOnDate={resolvedOnDate}
                                     totalWorkload={stats.total}
                                     clashDatesCount={isDoubleBookedOnDate ? stats.clashDates.size : 0}
+                                    resolvedClashCount={stats.resolvedClashDates.size}
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
@@ -1183,34 +1238,44 @@ function LiveRosterPage() {
                                 }}
                                 className={cn(
                                   "text-left rounded-md border p-2 text-xs transition-colors",
-                                  c.isBlackoutClash
-                                    ? "border-purple-500/40 bg-purple-500/15"
-                                    : "border-red-500/40 bg-red-500/15",
+                                  c.resolved
+                                    ? "border-emerald-500/40 bg-emerald-500/15"
+                                    : c.isBlackoutClash
+                                      ? "border-purple-500/40 bg-purple-500/15"
+                                      : "border-red-500/40 bg-red-500/15",
                                   !isShareView && "hover:opacity-80 cursor-pointer"
                                 )}
                               >
                                 <div className="flex items-center gap-1.5 font-semibold">
-                                  {c.isBlackoutClash ? (
+                                  {c.resolved ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                  ) : c.isBlackoutClash ? (
                                     <CalendarX className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
                                   ) : (
                                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
                                   )}
                                   <span
                                     className={
-                                      c.isBlackoutClash
-                                        ? "text-purple-700 dark:text-purple-300"
-                                        : "text-red-700 dark:text-red-300"
+                                      c.resolved
+                                        ? "text-emerald-700 dark:text-emerald-300"
+                                        : c.isBlackoutClash
+                                          ? "text-purple-700 dark:text-purple-300"
+                                          : "text-red-700 dark:text-red-300"
                                     }
                                   >
                                     {c.person}
                                   </span>
                                 </div>
                                 <div className="mt-1 text-[11px] opacity-90 space-y-0.5">
-                                  {c.isBlackoutClash && (
+                                  {c.resolved ? (
+                                    <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+                                      ✓ Exception approved
+                                    </div>
+                                  ) : c.isBlackoutClash ? (
                                     <div className="font-semibold text-purple-700 dark:text-purple-300">
                                       ⚠ Blackout Date Conflict
                                     </div>
-                                  )}
+                                  ) : null}
                                   <div>
                                     <span className="font-medium">Roles:</span>{" "}
                                     {c.roles.join(", ")}
@@ -1347,8 +1412,10 @@ function StatusCellBadge({
   paused,
   isClash,
   overridden,
+  resolvedOnDate,
   totalWorkload,
   clashDatesCount,
+  resolvedClashCount,
   isDoubleBookedOnDate,
   isBlackoutOnDate,
   isShareView,
@@ -1366,8 +1433,10 @@ function StatusCellBadge({
   paused: boolean;
   isClash: boolean;
   overridden?: boolean;
+  resolvedOnDate?: boolean;
   totalWorkload: number;
   clashDatesCount: number;
+  resolvedClashCount?: number;
   isDoubleBookedOnDate: boolean;
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
@@ -1381,6 +1450,9 @@ function StatusCellBadge({
   onManageBlackouts: () => void;
 }) {
   const getBadgeStyle = () => {
+    if (resolvedOnDate && (isClash || isBlackoutOnDate)) {
+      return "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40";
+    }
     if (isBlackoutOnDate) {
       return "bg-purple-500/20 text-purple-800 dark:text-purple-300 border-purple-500/40 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(168,85,247,0.08)_5px,rgba(168,85,247,0.08)_10px)]";
     }
@@ -1391,7 +1463,7 @@ function StatusCellBadge({
       return "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/40";
     }
     if (isClash && overridden) {
-      return "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/40";
+      return "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40";
     }
     switch (status) {
       case "reminder_sent":
@@ -1407,6 +1479,8 @@ function StatusCellBadge({
   };
 
   const getIcon = () => {
+    if (resolvedOnDate && (isClash || isBlackoutOnDate))
+      return <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />;
     if (isBlackoutOnDate)
       return <CalendarX className="h-3 w-3 text-purple-600 shrink-0" />;
     if (paused) return <Pause className="h-3 w-3 text-amber-600 shrink-0" />;
@@ -1429,7 +1503,7 @@ function StatusCellBadge({
       className={cn(
         "group flex items-center justify-between rounded-md border px-2 py-1 text-xs transition-colors shadow-xs",
         getBadgeStyle(),
-        isDoubleBookedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
+        isDoubleBookedOnDate && !resolvedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
       )}
       style={
         subTeam && !paused && !isClash && !isBlackoutOnDate
@@ -1442,7 +1516,7 @@ function StatusCellBadge({
         disabled={isShareView || (!canEdit && !isClash && !isBlackoutOnDate)}
         onClick={() => {
           if (isShareView) return;
-          if ((isClash && !overridden) || isBlackoutOnDate) {
+          if (isClash || isBlackoutOnDate) {
             onSelectClash();
           } else {
             if (!canEdit) return;
@@ -1475,6 +1549,18 @@ function StatusCellBadge({
           >
             <AlertTriangle className="h-2.5 w-2.5" />
             {clashDatesCount}
+          </span>
+        )}
+
+        {clashDatesCount === 0 && resolvedClashCount && resolvedClashCount > 0 && (
+          <span
+            className="flex items-center gap-0.5 px-1 py-0.2 text-[10px] rounded-full bg-emerald-600 text-white font-bold shrink-0 print:hidden"
+            title={`Exception approved on ${resolvedClashCount} date${
+              resolvedClashCount > 1 ? "s" : ""
+            }`}
+          >
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            {resolvedClashCount}
           </span>
         )}
 
@@ -1800,7 +1886,9 @@ function ClashDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {detail.isBlackout ? (
+                {allOverride ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                ) : detail.isBlackout ? (
                   <CalendarX className="h-5 w-5 text-purple-600" />
                 ) : (
                   <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -1817,6 +1905,13 @@ function ClashDialog({
             {detail.isBlackout && (
               <div className="rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-800 dark:text-purple-300 p-3 text-xs font-medium">
                 ⚠ {detail.person} has marked this date as unavailable / blacked out.
+              </div>
+            )}
+
+            {allOverride && (
+              <div className="rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 p-3 text-xs font-medium">
+                ✓ Exception approved — this conflict is handled and shows green on
+                the roster.
               </div>
             )}
 
