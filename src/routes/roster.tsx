@@ -76,6 +76,7 @@ import {
 } from "@/lib/user-access";
 import { orderAreasByPick } from "@/lib/roster-grid";
 import { AccessNotice } from "@/components/access-notice";
+import { SaveBar } from "@/components/save-bar";
 
 // Zod schema for URL search parameters
 const rosterSearchSchema = z.object({
@@ -94,6 +95,10 @@ export const Route = createFileRoute("/roster")({
         content:
           "Interactive Sunday roster grid with team filtering, blackout date management, shareable view, and smart swaps.",
       },
+      { property: "og:title", content: "Live Roster — The Rock Church" },
+      { property: "og:description", content: "Plan serving dates, resolve clashes and manage availability for The Rock Church." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: RosterAccessGate,
@@ -1643,7 +1648,8 @@ function BlackoutManagementDialog({
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end gap-2 pt-2">
+              <SaveBar inline label="Save away dates" />
               <Button variant="outline" size="sm" onClick={onClose}>
                 Done
               </Button>
@@ -1855,7 +1861,8 @@ function ClashDialog({
                 Allow as exception (approved assignment)
               </label>
             )}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {live.some((a) => canEditSlot(a.label)) && <SaveBar inline />}
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close
               </Button>

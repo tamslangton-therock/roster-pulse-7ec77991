@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
  * Changes already sync automatically a moment after each edit — this lets you
  * force the write through before navigating away, and shows what's pending.
  */
-export function SaveBar() {
+export function SaveBar({ inline = false, label = "Save changes" }: { inline?: boolean; label?: string }) {
   const pending = useRoster((s) => s.pendingWrites);
   const syncStatus = useRoster((s) => s.syncStatus);
   const error = useRoster((s) => s.error);
@@ -35,8 +35,15 @@ export function SaveBar() {
     setSaving(true);
     try {
       await flushPendingSync();
-      if (useRoster.getState().error) toast.error("Some changes failed to save");
-      else toast.success("Saved to Google Sheets");
+      // A queued write can already be in flight when the button is pressed.
+      while (useRoster.getState().syncStatus === "syncing" || useRoster.getState().pendingWrites > 0) {
+        if (useRoster.getState().error) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (useRoster.getState().error) toast.error("Some changes failed to save — please retry");
+      else toast.success("All changes saved");
+    } catch {
+      toast.error("Couldn't save changes — please retry");
     } finally {
       setSaving(false);
     }
@@ -45,7 +52,7 @@ export function SaveBar() {
   const busy = saving || syncStatus === "syncing" || pending > 0;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 print:hidden">
+    <div className={inline ? "print:hidden" : "fixed bottom-4 right-4 z-50 print:hidden"}>
       <Button
         size="sm"
         variant={error ? "destructive" : busy ? "default" : "secondary"}
@@ -68,7 +75,9 @@ export function SaveBar() {
             ? "Saving…"
             : pending > 0
               ? `Save now (${pending} pending)`
-              : "All changes saved"}
+              : syncStatus === "syncing"
+                ? "Saving…"
+                : label}
       </Button>
     </div>
   );

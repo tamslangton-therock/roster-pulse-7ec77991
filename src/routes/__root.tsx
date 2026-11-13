@@ -294,7 +294,7 @@ function LoginGate({ children }: { children: ReactNode }) {
               </button>
             </div>
           </header>
-          <main className="flex-1 min-w-0">
+          <main className="flex-1 min-w-0 pb-20 print:pb-0">
             {children}
           </main>
         </div>
@@ -369,7 +369,7 @@ function RootComponent() {
         ) : (
           <LoginGate>
             <Outlet />
-            <SaveBar />
+            {pathname !== "/discipleship" && <SaveBar />}
           </LoginGate>
         )}
         <Toaster position="top-right" />

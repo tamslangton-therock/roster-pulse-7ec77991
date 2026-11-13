@@ -24,6 +24,7 @@ import {
   type DocSectionType,
 } from "@/lib/doc-template";
 import { areasOf } from "@/lib/roster-grid";
+import { SaveBar } from "@/components/save-bar";
 
 
 
@@ -102,6 +103,8 @@ function DocsTemplatePage() {
             pick on Team Print, and you can still tweak everything before printing.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <SaveBar inline label="Save template" />
         <Button
           variant={confirmReset ? "destructive" : "outline"}
           onClick={() => {
@@ -114,6 +117,7 @@ function DocsTemplatePage() {
           <RotateCcw className="mr-1.5 h-4 w-4" />
           {confirmReset ? "Confirm reset" : "Reset to default"}
         </Button>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Loading template…</p>}

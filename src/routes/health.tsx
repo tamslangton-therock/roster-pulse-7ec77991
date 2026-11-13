@@ -52,6 +52,8 @@ export const Route = createFileRoute("/health")({
         content:
           "Filter volunteer health by preference, past or future weeks, custom months, or consecutive streaks.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: HealthPage,

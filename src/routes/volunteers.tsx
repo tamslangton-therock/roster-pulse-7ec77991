@@ -51,6 +51,8 @@ export const Route = createFileRoute("/volunteers")({
         property: "og:description",
         content: "Add, edit, and filter family profiles, volunteer flags and serving rules.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: VolunteersPage,

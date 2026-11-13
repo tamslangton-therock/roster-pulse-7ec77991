@@ -17,6 +17,8 @@ Serving-area columns on Live_Roster are data, not constants: `src/lib/roster-gri
 
 Clash-dialog swap and remove controls use the same per-slot edit check as roster cells; approving clash exceptions remains master-only so leaders can resolve their own bookings without editing other areas.
 
+Inline SaveBar controls flush existing roster-store writes; draft forms retain their own submit buttons. Discipleship uses a serialized independent write queue and its own Save controls so saving never targets an unrelated sheet or reorders edits.
+
 - AI auto-roster: `src/lib/ai-roster.functions.ts` calls the Lovable AI Gateway `/v1/responses` (`openai/gpt-6-astra`, streamed SSE, strict json_schema) — client sends the volunteer/slot snapshot; the server fn owns the key and prompt. Review-then-apply lives in `src/components/ai-roster-dialog.tsx`.
 
 - Team Health labels and thresholds are master settings persisted in the `Health_Config` sheet tab so every login uses the same definitions.

@@ -29,6 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/lib/auth";
 import { canEditTeamsArea } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
+import { SaveBar } from "@/components/save-bar";
 
 export const Route = createFileRoute("/teams")({
   head: () => ({
@@ -124,6 +125,7 @@ function TeamsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <SaveBar inline label="Save teams" />
           {isMaster && <ManageColumnsDialog />}
           <Select value={selectedArea} onValueChange={setSelectedArea}>
             <SelectTrigger className="w-[200px]">

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Phone,
   Mail,
@@ -13,6 +13,8 @@ import {
   Search,
   Settings2,
   Trash2,
+  Save,
+  Loader2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -132,6 +134,10 @@ function DiscipleshipPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [view, setView] = useState<"pipeline" | "insights">("pipeline");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const writeQueue = useRef<Promise<void>>(Promise.resolve());
+  const writeVersion = useRef(0);
 
   const { interests: configuredInterests } = useInterestList();
   const emojiFor = (i: string) =>
@@ -144,10 +150,38 @@ function DiscipleshipPage() {
 
   const save = (next: DiscipleshipRow[]) => {
     queryClient.setQueryData<DiscipleshipRow[]>(["discipleship"], next);
-    void writeDiscipleship({ data: { rows: next } }).catch(() =>
-      toast.error("Couldn't save to the sheet — check your connection and try again."),
-    );
+    const version = ++writeVersion.current;
+    setSaving(true);
+    setSaveError(false);
+    const job = writeQueue.current.catch(() => {}).then(async () => {
+      await writeDiscipleship({ data: { rows: next } });
+    });
+    writeQueue.current = job;
+    void job.then(() => {
+      if (version === writeVersion.current) setSaveError(false);
+    }).catch(() => {
+      if (version === writeVersion.current) {
+        setSaveError(true);
+        toast.error("Couldn't save changes — please retry.");
+      }
+    }).finally(() => {
+      if (version === writeVersion.current) setSaving(false);
+    });
+    return job;
   };
+
+  const saveNow = async () => {
+    try {
+      await save(queryClient.getQueryData<DiscipleshipRow[]>(["discipleship"]) ?? rows);
+      toast.success("Connect cards saved");
+    } catch { /* The write displays its own retry message. */ }
+  };
+  const saveControl = canEdit ? (
+    <Button size="sm" variant={saveError ? "destructive" : "outline"} disabled={saving || isLoading || isError} onClick={saveNow}>
+      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+      {saving ? "Saving…" : saveError ? "Retry save" : "Save changes"}
+    </Button>
+  ) : null;
 
   const update = (id: string, patch: Partial<DiscipleshipRow>) => {
     save(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -209,6 +243,7 @@ function DiscipleshipPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {saveControl}
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -391,6 +426,7 @@ function DiscipleshipPage() {
           onUpdate={(patch) => update(detail.id, patch)}
           onRemove={() => remove(detail.id)}
           leaderNames={leaderNames}
+          saveControl={saveControl}
         />
       )}
     </div>
@@ -589,11 +625,13 @@ function DetailDialog({
   onOpenChange,
   onUpdate,
   onRemove,
+  saveControl,
 }: {
   row: DiscipleshipRow;
   onOpenChange: (v: boolean) => void;
   onUpdate: (patch: Partial<DiscipleshipRow>) => void;
   onRemove: () => void;
+  saveControl: React.ReactNode;
   leaderNames: string[];
 }) {
   const { interests: interestList } = useInterestList();
@@ -873,6 +911,7 @@ function DetailDialog({
             >
               Remove card
             </Button>
+            {saveControl}
           </div>
         </div>
       </DialogContent>

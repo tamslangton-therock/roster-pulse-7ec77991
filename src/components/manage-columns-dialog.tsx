@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useRoster } from "@/lib/store";
+import { SaveBar } from "@/components/save-bar";
 import { areasOf } from "@/lib/roster-grid";
 import { Settings2, Plus, Trash2, ChevronUp, ChevronDown, Layers } from "lucide-react";
 
@@ -248,6 +249,7 @@ export function ManageColumnsDialog({ children }: { children?: React.ReactNode }
             </p>
           </div>
         </div>
+        <div className="flex justify-end"><SaveBar inline label="Save columns" /></div>
       </DialogContent>
     </Dialog>
   );
