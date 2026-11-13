@@ -139,6 +139,26 @@ export function areasOf(slots: SlotDef[]): string[] {
   return Array.from(new Set(slots.map((s) => s.area)));
 }
 
+/**
+ * Keep columns in the order their areas were ticked in the Live Roster's area
+ * filter, so picking "Yellow Group" then "Host" shows them in that order.
+ * Areas missing from the pick list (or a single pick) keep their sheet order.
+ */
+export function orderAreasByPick<T extends { area: string }>(
+  cols: T[],
+  picked: string[],
+): T[] {
+  if (picked.length < 2) return cols;
+  const order = new Map(picked.map((a, i) => [a, i] as const));
+  return cols
+    .map((c, i) => ({ c, i }))
+    .sort(
+      (x, y) =>
+        (order.get(x.c.area) ?? 999) - (order.get(y.c.area) ?? 999) || x.i - y.i,
+    )
+    .map((x) => x.c);
+}
+
 export function lastSlotCol(slots: SlotDef[]): string {
   return slots.length ? slots[slots.length - 1].col : "A";
 }

@@ -74,6 +74,7 @@ import {
   canViewArea,
   canViewRosterPage,
 } from "@/lib/user-access";
+import { orderAreasByPick } from "@/lib/roster-grid";
 import { AccessNotice } from "@/components/access-notice";
 
 // Zod schema for URL search parameters
@@ -296,7 +297,10 @@ function LiveRosterPage() {
       .filter((s) => canViewArea(isMaster, authUser, s.area))
       .map((s) => ({ area: s.area, label: s.label }));
     const picked = areaFilter.length ? new Set(areaFilter) : null;
-    const base = picked ? all.filter((c) => picked.has(c.area)) : all;
+    let base = picked ? all.filter((c) => picked.has(c.area)) : all;
+    // Several areas ticked → show them in the order they were picked
+    // (e.g. "Yellow Group" then "Host"), not the sheet's column order.
+    base = orderAreasByPick(base, areaFilter);
     if (selectedTeam === "all") return base;
     const areas = new Set(filteredAssignments.map((a) => a.area));
     return base.filter((c) => areas.has(c.area));
@@ -693,24 +697,20 @@ function LiveRosterPage() {
                 <Layers className="h-4 w-4" />
                 {areaFilter.length === 0
                   ? "All areas"
-                  : areaFilter.length === 1
-                    ? areaFilter[0]
+                  : areaFilter.length <= 2
+                    ? areaFilter.join(" · ")
                     : `${areaFilter.length} areas`}
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-60 p-2" align="start">
-              <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
+            <PopoverContent className="w-64 p-2" align="start">
+              <div className="flex items-center justify-between px-1 pb-1.5 text-xs text-muted-foreground">
                 <span>Show areas</span>
-                {areaFilter.length > 0 && (
-                  <button
-                    type="button"
-                    className="underline hover:text-foreground"
-                    onClick={() => setAreaFilter([])}
-                  >
-                    Show all
-                  </button>
-                )}
+                <span>
+                  {areaFilter.length === 0
+                    ? "all showing"
+                    : `${areaFilter.length} of ${allAreas.length}`}
+                </span>
               </div>
               <div className="max-h-72 overflow-auto space-y-0.5">
                 {allAreas.map((a) => {
@@ -718,17 +718,19 @@ function LiveRosterPage() {
                   return (
                     <label
                       key={a}
-                      className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted cursor-pointer"
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm hover:bg-muted cursor-pointer",
+                        on && "bg-primary/10 font-medium",
+                      )}
                     >
                       <Checkbox
                         checked={on}
+                        className="h-4 w-4 shrink-0 rounded-[3px]"
                         onCheckedChange={() =>
                           setAreaFilter(
                             on
                               ? areaFilter.filter((x) => x !== a)
-                              : allAreas.filter(
-                                  (x) => x === a || areaFilter.includes(x)
-                                )
+                              : [...areaFilter, a]
                           )
                         }
                       />
@@ -736,6 +738,20 @@ function LiveRosterPage() {
                     </label>
                   );
                 })}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 border-t px-1 pt-2 text-xs">
+                <span className="text-muted-foreground">
+                  Tick any areas to view them side by side
+                </span>
+                {areaFilter.length > 0 && (
+                  <button
+                    type="button"
+                    className="shrink-0 underline hover:text-foreground"
+                    onClick={() => setAreaFilter([])}
+                  >
+                    Show all
+                  </button>
+                )}
               </div>
             </PopoverContent>
           </Popover>
