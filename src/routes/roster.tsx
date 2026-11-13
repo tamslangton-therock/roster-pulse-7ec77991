@@ -95,6 +95,10 @@ export const Route = createFileRoute("/roster")({
         content:
           "Interactive Sunday roster grid with team filtering, blackout date management, shareable view, and smart swaps.",
       },
+      { property: "og:title", content: "Live Roster — The Rock Church" },
+      { property: "og:description", content: "Plan serving dates, resolve clashes and manage availability for The Rock Church." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: RosterAccessGate,
