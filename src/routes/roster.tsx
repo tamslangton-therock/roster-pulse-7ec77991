@@ -74,6 +74,7 @@ import {
   canViewArea,
   canViewRosterPage,
 } from "@/lib/user-access";
+import { orderAreasByPick } from "@/lib/roster-grid";
 import { AccessNotice } from "@/components/access-notice";
 
 // Zod schema for URL search parameters
@@ -299,16 +300,7 @@ function LiveRosterPage() {
     let base = picked ? all.filter((c) => picked.has(c.area)) : all;
     // Several areas ticked → show them in the order they were picked
     // (e.g. "Yellow Group" then "Host"), not the sheet's column order.
-    if (picked && areaFilter.length > 1) {
-      const order = new Map(areaFilter.map((a, i) => [a, i] as const));
-      base = base
-        .map((c, i) => ({ c, i }))
-        .sort(
-          (x, y) =>
-            (order.get(x.c.area) ?? 999) - (order.get(y.c.area) ?? 999) || x.i - y.i,
-        )
-        .map((x) => x.c);
-    }
+    base = orderAreasByPick(base, areaFilter);
     if (selectedTeam === "all") return base;
     const areas = new Set(filteredAssignments.map((a) => a.area));
     return base.filter((c) => areas.has(c.area));
