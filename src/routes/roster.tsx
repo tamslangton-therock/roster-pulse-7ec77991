@@ -409,7 +409,7 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, shownDates, blackoutsMap, clashKey]);
+  }, [assignments, shownDates, blackoutsMap, clashKey]);
 
   // Double booked count & Blackout clashes count
   const doubleBookedVolunteersCount = useMemo(() => {
