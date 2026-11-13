@@ -708,13 +708,14 @@ function LiveRosterPage() {
             {shownDates.length} Sundays · {filteredAssignments.length} assignments
             {selectedTeam !== "all" && ` (${selectedTeam})`} ·{" "}
             <span className="text-red-500 font-medium">
-              {clashes.length +
-                Array.from(volunteerStatsMap.values()).reduce(
-                  (acc, curr) => acc + curr.blackoutClashDates.size,
-                  0
-                )}{" "}
-              clashes/blackouts
+              {openClashCount} clashes/blackouts
             </span>
+            {approvedClashCount > 0 && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                {" · "}
+                {approvedClashCount} approved
+              </span>
+            )}
           </p>
         </div>
 
@@ -952,7 +953,9 @@ function LiveRosterPage() {
             <h2 className="text-sm font-semibold">Roster Capacity & Health</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               {doubleBookedVolunteersCount === 0
-                ? "All active volunteers have clear single assignments across scheduled dates."
+                ? approvedVolunteersCount > 0
+                  ? "Every clash and blackout conflict is an approved exception — nothing needs attention."
+                  : "All active volunteers have clear single assignments across scheduled dates."
                 : `${doubleBookedVolunteersCount} volunteer${
                     doubleBookedVolunteersCount > 1 ? "s have" : " has"
                   } clashes or blackout date conflicts.`}
@@ -973,6 +976,12 @@ function LiveRosterPage() {
               {doubleBookedVolunteersCount}
             </strong>
           </span>
+          {approvedVolunteersCount > 0 && (
+            <span className="px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300">
+              Approved exceptions:{" "}
+              <strong className="font-bold">{approvedVolunteersCount}</strong>
+            </span>
+          )}
         </div>
       </div>
 
@@ -1071,10 +1080,14 @@ function LiveRosterPage() {
                                   total: 0,
                                   clashDates: new Set(),
                                   blackoutClashDates: new Set(),
+                                  resolvedClashDates: new Set(),
                                 };
                                 const paused = pausedNames.has(key);
                                 const isClash = clashKey.has(`${a.date}||${key}`);
                                 const overridden = clashKey.get(`${a.date}||${key}`);
+                                const resolvedOnDate = approvedKeys.has(
+                                  `${a.date}||${key}`
+                                );
                                 const isDoubleBookedOnDate = stats.clashDates.has(a.date);
                                 const isBlackoutOnDate =
                                   blackoutsMap[key]?.has(a.date) ?? false;
@@ -1093,8 +1106,10 @@ function LiveRosterPage() {
                                     paused={paused}
                                     isClash={isClash}
                                     overridden={overridden}
+                                    resolvedOnDate={resolvedOnDate}
                                     totalWorkload={stats.total}
                                     clashDatesCount={isDoubleBookedOnDate ? stats.clashDates.size : 0}
+                                    resolvedClashCount={stats.resolvedClashDates.size}
                                     isDoubleBookedOnDate={isDoubleBookedOnDate}
                                     isBlackoutOnDate={isBlackoutOnDate}
                                     isShareView={isShareView}
