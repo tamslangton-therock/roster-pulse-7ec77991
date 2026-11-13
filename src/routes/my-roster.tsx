@@ -194,6 +194,7 @@ function MyRosterPage() {
             ))}
           </div>
         )}
+        <SaveBar inline label="Save away dates" />
       </section>
 
       <section className="rounded-xl border bg-card p-5 space-y-3">

@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useInterestList } from "@/lib/interest-list";
+import { SaveBar } from "@/components/save-bar";
 
 export const Route = createFileRoute("/users")({
   head: () => ({
@@ -51,6 +52,8 @@ export const Route = createFileRoute("/users")({
         property: "og:description",
         content: "Create team-leader logins and control what each person can see and edit.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: UserAccessPage,
@@ -147,9 +150,12 @@ function UserAccessPage() {
             visible in that tab, so only share the sheet with people you trust.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <SaveBar inline label="Save access" />
         <Button onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-1" /> New login
         </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="logins">

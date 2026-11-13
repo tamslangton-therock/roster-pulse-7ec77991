@@ -36,6 +36,7 @@ import { teamColor } from "@/lib/person-colors";
 import { useAuth } from "@/lib/auth";
 import { canViewLifeGroups } from "@/lib/user-access";
 import { AccessNotice } from "@/components/access-notice";
+import { SaveBar } from "@/components/save-bar";
 
 export const Route = createFileRoute("/life-groups")({
   head: () => ({
@@ -115,7 +116,8 @@ function LifeGroupsPage() {
             <span className="font-medium">Life_Groups</span> tab in Google Sheets.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SaveBar inline label="Save groups" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -358,6 +360,7 @@ function LifeGroupsPage() {
               )}
             </div>
           </section>
+          <DialogFooter><SaveBar inline label="Save group" /></DialogFooter>
           </DialogContent>
         </Dialog>
       ))}
