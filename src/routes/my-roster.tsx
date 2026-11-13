@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BirthdayInput } from "@/components/birthday-input";
 import { Calendar } from "@/components/ui/calendar";
+import { SaveBar } from "@/components/save-bar";
 
 export const Route = createFileRoute("/my-roster")({
   validateSearch: (s: Record<string, unknown>) => ({ id: typeof s.id === "string" ? s.id : "" }),

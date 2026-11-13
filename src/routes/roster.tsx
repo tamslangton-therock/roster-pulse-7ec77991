@@ -76,6 +76,7 @@ import {
 } from "@/lib/user-access";
 import { orderAreasByPick } from "@/lib/roster-grid";
 import { AccessNotice } from "@/components/access-notice";
+import { SaveBar } from "@/components/save-bar";
 
 // Zod schema for URL search parameters
 const rosterSearchSchema = z.object({
@@ -1643,7 +1644,8 @@ function BlackoutManagementDialog({
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end gap-2 pt-2">
+              <SaveBar inline label="Save away dates" />
               <Button variant="outline" size="sm" onClick={onClose}>
                 Done
               </Button>
@@ -1855,7 +1857,8 @@ function ClashDialog({
                 Allow as exception (approved assignment)
               </label>
             )}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {live.some((a) => canEditSlot(a.label)) && <SaveBar inline />}
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close
               </Button>
