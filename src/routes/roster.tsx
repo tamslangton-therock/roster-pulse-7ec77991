@@ -738,9 +738,7 @@ function LiveRosterPage() {
                           setAreaFilter(
                             on
                               ? areaFilter.filter((x) => x !== a)
-                              : allAreas.filter(
-                                  (x) => x === a || areaFilter.includes(x),
-                                )
+                              : [...areaFilter, a]
                           )
                         }
                       />
