@@ -276,9 +276,11 @@ function LiveRosterPage() {
     () => buildAllowedSet(allowedClashes),
     [allowedClashes]
   );
+  // Clashes are always computed across ALL areas, even when the view is
+  // filtered to specific areas — a double-booking anywhere must still warn.
   const clashes = useMemo(
-    () => detectClashes(filteredAssignments, allowedSet),
-    [filteredAssignments, allowedSet]
+    () => detectClashes(assignments, allowedSet),
+    [assignments, allowedSet]
   );
 
   const clashKey = useMemo(() => {
@@ -371,7 +373,9 @@ function LiveRosterPage() {
     const visibleDatesSet = new Set(shownDates);
     const volDateCounts = new Map<string, Map<string, number>>();
 
-    for (const a of filteredAssignments) {
+    // Stats also use the full assignment list so clash/blackout warnings
+    // stay accurate when the view is filtered to specific areas.
+    for (const a of assignments) {
       if (!visibleDatesSet.has(a.date)) continue;
       const key = a.person_name.toLowerCase();
 
@@ -405,7 +409,7 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, shownDates, blackoutsMap, clashKey]);
+  }, [assignments, shownDates, blackoutsMap, clashKey]);
 
   // Double booked count & Blackout clashes count
   const doubleBookedVolunteersCount = useMemo(() => {
@@ -555,7 +559,9 @@ function LiveRosterPage() {
     >();
 
     for (const d of dates) {
-      const dayAssignments = filteredAssignments.filter((a) => a.date === d);
+      // Full assignment list: the Clashes column must surface cross-area
+      // double-bookings even when the view is filtered to specific areas.
+      const dayAssignments = assignments.filter((a) => a.date === d);
       const personMap = new Map<string, Assignment[]>();
 
       for (const a of dayAssignments) {
@@ -592,7 +598,7 @@ function LiveRosterPage() {
     }
 
     return map;
-  }, [filteredAssignments, dates, blackoutsMap, allowedSet]);
+  }, [assignments, dates, blackoutsMap, allowedSet]);
 
   const copyShareableLink = () => {
     const url = window.location.href;
