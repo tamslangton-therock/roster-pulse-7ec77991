@@ -276,9 +276,11 @@ function LiveRosterPage() {
     () => buildAllowedSet(allowedClashes),
     [allowedClashes]
   );
+  // Clashes are always computed across ALL areas, even when the view is
+  // filtered to specific areas — a double-booking anywhere must still warn.
   const clashes = useMemo(
-    () => detectClashes(filteredAssignments, allowedSet),
-    [filteredAssignments, allowedSet]
+    () => detectClashes(assignments, allowedSet),
+    [assignments, allowedSet]
   );
 
   const clashKey = useMemo(() => {
@@ -371,7 +373,9 @@ function LiveRosterPage() {
     const visibleDatesSet = new Set(shownDates);
     const volDateCounts = new Map<string, Map<string, number>>();
 
-    for (const a of filteredAssignments) {
+    // Stats also use the full assignment list so clash/blackout warnings
+    // stay accurate when the view is filtered to specific areas.
+    for (const a of assignments) {
       if (!visibleDatesSet.has(a.date)) continue;
       const key = a.person_name.toLowerCase();
 
