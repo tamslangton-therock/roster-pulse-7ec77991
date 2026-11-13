@@ -1238,34 +1238,44 @@ function LiveRosterPage() {
                                 }}
                                 className={cn(
                                   "text-left rounded-md border p-2 text-xs transition-colors",
-                                  c.isBlackoutClash
-                                    ? "border-purple-500/40 bg-purple-500/15"
-                                    : "border-red-500/40 bg-red-500/15",
+                                  c.resolved
+                                    ? "border-emerald-500/40 bg-emerald-500/15"
+                                    : c.isBlackoutClash
+                                      ? "border-purple-500/40 bg-purple-500/15"
+                                      : "border-red-500/40 bg-red-500/15",
                                   !isShareView && "hover:opacity-80 cursor-pointer"
                                 )}
                               >
                                 <div className="flex items-center gap-1.5 font-semibold">
-                                  {c.isBlackoutClash ? (
+                                  {c.resolved ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                  ) : c.isBlackoutClash ? (
                                     <CalendarX className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
                                   ) : (
                                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
                                   )}
                                   <span
                                     className={
-                                      c.isBlackoutClash
-                                        ? "text-purple-700 dark:text-purple-300"
-                                        : "text-red-700 dark:text-red-300"
+                                      c.resolved
+                                        ? "text-emerald-700 dark:text-emerald-300"
+                                        : c.isBlackoutClash
+                                          ? "text-purple-700 dark:text-purple-300"
+                                          : "text-red-700 dark:text-red-300"
                                     }
                                   >
                                     {c.person}
                                   </span>
                                 </div>
                                 <div className="mt-1 text-[11px] opacity-90 space-y-0.5">
-                                  {c.isBlackoutClash && (
+                                  {c.resolved ? (
+                                    <div className="font-semibold text-emerald-700 dark:text-emerald-300">
+                                      ✓ Exception approved
+                                    </div>
+                                  ) : c.isBlackoutClash ? (
                                     <div className="font-semibold text-purple-700 dark:text-purple-300">
                                       ⚠ Blackout Date Conflict
                                     </div>
-                                  )}
+                                  ) : null}
                                   <div>
                                     <span className="font-medium">Roles:</span>{" "}
                                     {c.roles.join(", ")}
@@ -1402,8 +1412,10 @@ function StatusCellBadge({
   paused,
   isClash,
   overridden,
+  resolvedOnDate,
   totalWorkload,
   clashDatesCount,
+  resolvedClashCount,
   isDoubleBookedOnDate,
   isBlackoutOnDate,
   isShareView,
@@ -1421,8 +1433,10 @@ function StatusCellBadge({
   paused: boolean;
   isClash: boolean;
   overridden?: boolean;
+  resolvedOnDate?: boolean;
   totalWorkload: number;
   clashDatesCount: number;
+  resolvedClashCount?: number;
   isDoubleBookedOnDate: boolean;
   isBlackoutOnDate: boolean;
   isShareView?: boolean;
@@ -1436,6 +1450,9 @@ function StatusCellBadge({
   onManageBlackouts: () => void;
 }) {
   const getBadgeStyle = () => {
+    if (resolvedOnDate && (isClash || isBlackoutOnDate)) {
+      return "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40";
+    }
     if (isBlackoutOnDate) {
       return "bg-purple-500/20 text-purple-800 dark:text-purple-300 border-purple-500/40 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(168,85,247,0.08)_5px,rgba(168,85,247,0.08)_10px)]";
     }
@@ -1446,7 +1463,7 @@ function StatusCellBadge({
       return "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/40";
     }
     if (isClash && overridden) {
-      return "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/40";
+      return "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40";
     }
     switch (status) {
       case "reminder_sent":
@@ -1462,6 +1479,8 @@ function StatusCellBadge({
   };
 
   const getIcon = () => {
+    if (resolvedOnDate && (isClash || isBlackoutOnDate))
+      return <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />;
     if (isBlackoutOnDate)
       return <CalendarX className="h-3 w-3 text-purple-600 shrink-0" />;
     if (paused) return <Pause className="h-3 w-3 text-amber-600 shrink-0" />;
@@ -1484,7 +1503,7 @@ function StatusCellBadge({
       className={cn(
         "group flex items-center justify-between rounded-md border px-2 py-1 text-xs transition-colors shadow-xs",
         getBadgeStyle(),
-        isDoubleBookedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
+        isDoubleBookedOnDate && !resolvedOnDate && "ring-2 ring-red-500/60 bg-red-500/15"
       )}
       style={
         subTeam && !paused && !isClash && !isBlackoutOnDate
@@ -1497,7 +1516,7 @@ function StatusCellBadge({
         disabled={isShareView || (!canEdit && !isClash && !isBlackoutOnDate)}
         onClick={() => {
           if (isShareView) return;
-          if ((isClash && !overridden) || isBlackoutOnDate) {
+          if (isClash || isBlackoutOnDate) {
             onSelectClash();
           } else {
             if (!canEdit) return;
@@ -1530,6 +1549,18 @@ function StatusCellBadge({
           >
             <AlertTriangle className="h-2.5 w-2.5" />
             {clashDatesCount}
+          </span>
+        )}
+
+        {clashDatesCount === 0 && resolvedClashCount && resolvedClashCount > 0 && (
+          <span
+            className="flex items-center gap-0.5 px-1 py-0.2 text-[10px] rounded-full bg-emerald-600 text-white font-bold shrink-0 print:hidden"
+            title={`Exception approved on ${resolvedClashCount} date${
+              resolvedClashCount > 1 ? "s" : ""
+            }`}
+          >
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            {resolvedClashCount}
           </span>
         )}
 
@@ -1855,7 +1886,9 @@ function ClashDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {detail.isBlackout ? (
+                {allOverride ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                ) : detail.isBlackout ? (
                   <CalendarX className="h-5 w-5 text-purple-600" />
                 ) : (
                   <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -1872,6 +1905,13 @@ function ClashDialog({
             {detail.isBlackout && (
               <div className="rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-800 dark:text-purple-300 p-3 text-xs font-medium">
                 ⚠ {detail.person} has marked this date as unavailable / blacked out.
+              </div>
+            )}
+
+            {allOverride && (
+              <div className="rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 p-3 text-xs font-medium">
+                ✓ Exception approved — this conflict is handled and shows green on
+                the roster.
               </div>
             )}
 
