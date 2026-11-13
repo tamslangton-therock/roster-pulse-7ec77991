@@ -705,8 +705,8 @@ function LiveRosterPage() {
                 <Layers className="h-4 w-4" />
                 {areaFilter.length === 0
                   ? "All areas"
-                  : areaFilter.length === 1
-                    ? areaFilter[0]
+                  : areaFilter.length <= 2
+                    ? areaFilter.join(" · ")
                     : `${areaFilter.length} areas`}
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </Button>
