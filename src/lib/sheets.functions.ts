@@ -92,10 +92,14 @@ function invalidateAfterWrite(path: string) {
 // load costs ~2 Sheets requests instead of 25+.
 let snapshot: { at: number; tabs: Map<string, string[][]> } | null = null;
 let snapshotInFlight: Promise<Map<string, string[][]> | null> | null = null;
+// Bumped on every write so a batchGet that started before the write can't
+// re-cache pre-write values (e.g. a just-approved clash exception).
+let writeGeneration = 0;
 
 async function loadSnapshot(): Promise<Map<string, string[][]> | null> {
   if (snapshot && Date.now() - snapshot.at < DATA_TTL_MS) return snapshot.tabs;
   if (snapshotInFlight) return snapshotInFlight;
+  const startedGen = writeGeneration;
   snapshotInFlight = (async () => {
     try {
       const meta = await gwFetch(
@@ -107,7 +111,7 @@ async function loadSnapshot(): Promise<Map<string, string[][]> | null> {
       const data = await gwFetchRaw(`/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${qs}`);
       const tabs = new Map<string, string[][]>();
       titles.forEach((t, i) => tabs.set(t, (data.valueRanges?.[i]?.values ?? []) as string[][]));
-      snapshot = { at: Date.now(), tabs };
+      if (startedGen === writeGeneration) snapshot = { at: Date.now(), tabs };
       return tabs;
     } catch (err) {
       console.warn("[sheets] snapshot failed, falling back to single reads", err);
@@ -155,7 +159,11 @@ async function readFromSnapshot(path: string): Promise<any | undefined> {
 async function gwFetch(path: string, init: RequestInit = {}): Promise<any> {
   const method = (init.method ?? "GET").toUpperCase();
   if (method !== "GET") {
+    writeGeneration++;
+    snapshot = null;
+    snapshotInFlight = null;
     const result = await gwFetchRaw(path, init);
+    writeGeneration++;
     snapshot = null;
     invalidateAfterWrite(path);
     return result;
