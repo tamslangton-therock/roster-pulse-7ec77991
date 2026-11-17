@@ -1130,7 +1130,7 @@ function LiveRosterPage() {
                                     }
                                     onSelectSwap={() => setSwapTarget(a)}
                                     onSelectClash={() => {
-                                      const items = filteredAssignments.filter(
+                                      const items = assignments.filter(
                                         (x) =>
                                           x.date === a.date &&
                                           x.person_name.toLowerCase() === key
@@ -1223,7 +1223,7 @@ function LiveRosterPage() {
                                 disabled={isShareView}
                                 onClick={() => {
                                   if (isShareView) return;
-                                  const items = filteredAssignments.filter(
+                                  const items = assignments.filter(
                                     (x) =>
                                       x.date === d &&
                                       x.person_name.toLowerCase() ===
