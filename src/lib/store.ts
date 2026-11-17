@@ -494,6 +494,23 @@ function scheduleUserAccessSync() {
   userAccessTimer = setTimeout(run, 800);
 }
 
+/** Approved clash exceptions persist in Health_Config as `date::label::person` keys. */
+const APPROVED_EXCEPTIONS_KEY = "approved_exceptions";
+const overrideKey = (a: { date: string; label: string; person_name: string }) =>
+  `${a.date}::${a.label}::${a.person_name.trim().toLowerCase()}`;
+export function approvedExceptionsConfig(assignments: Assignment[]): Record<string, string> {
+  const keys = assignments.filter((a) => a.is_override && a.person_name).map(overrideKey).sort();
+  return { [APPROVED_EXCEPTIONS_KEY]: JSON.stringify(keys) };
+}
+export function parseApprovedExceptions(config: Record<string, string>): Set<string> {
+  try {
+    const v = JSON.parse(config[APPROVED_EXCEPTIONS_KEY] || "[]");
+    return new Set(Array.isArray(v) ? v.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
 let healthConfigTimer: ReturnType<typeof setTimeout> | null = null;
 let healthConfigInFlight = false;
 
@@ -516,6 +533,7 @@ function scheduleHealthConfigSync() {
            config: {
              ...healthConfigRows(state.healthSettings, state.healthLabels),
              ...birthdayTemplatesConfig(state.birthdayTemplates),
+             ...approvedExceptionsConfig(state.assignments),
            },
          },
       });
@@ -776,6 +794,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
       const slots: SlotDef[] = liveGrid.slots?.length ? liveGrid.slots : ROSTER_SLOTS;
       const slotByLabel = new Map(slots.map((s) => [s.label, s]));
       const assignments: Assignment[] = [];
+      const approvedOverrides = parseApprovedExceptions(healthConfigRowsIn);
       const rosterMeta: RosterState["rosterMeta"] = {};
       for (const row of gridRows) {
         rosterMeta[row.date] = {
@@ -793,7 +812,9 @@ export const useRoster = create<RosterState>()((set, get) => ({
             role: slot.role || slot.area,
             label,
             person_name: person,
-            is_override: false,
+            is_override: approvedOverrides.has(
+              overrideKey({ date: row.date, label, person_name: person }),
+            ),
             notes: "",
             status: statuses[`${row.date}::${label}`] ?? "pending",
           });
@@ -969,6 +990,7 @@ export const useRoster = create<RosterState>()((set, get) => ({
       ),
     }));
     scheduleRosterSync();
+    scheduleHealthConfigSync();
   },
 
   // --- LIVE ROSTER GRID ---
