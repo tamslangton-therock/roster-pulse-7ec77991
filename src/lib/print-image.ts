@@ -19,16 +19,44 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
   const { area, rangeLabel, dates, slots, cellMap, colorFor, slotSuffix } = data;
 
   const scale = 2; // crisp on phone screens
-  const W = 1600;
   const P = 48;
   const dateColW = 210;
-  const colW = (W - P * 2 - dateColW) / Math.max(slots.length, 1);
 
   const scratch = document.createElement("canvas").getContext("2d")!;
-  scratch.font = `600 26px ${FONT}`;
 
-  // Pre-wrap names so we know each row's height.
-  const wrap = (text: string, max: number): string[] => {
+  // Size each column to its content so narrow rosters don't leave dead space
+  // on the right. Width = longest name or header in the column, with padding.
+  const colWFor = (s: SlotDef): number => {
+    const num = slotSuffix(s);
+    const header = `${s.role || s.area}${num ? ` ${num}` : ""}`;
+    scratch.font = `700 22px ${FONT}`;
+    let need = scratch.measureText(header).width + 32;
+    scratch.font = `600 22px ${FONT}`;
+    for (const d of dates) {
+      const p = cellMap[d]?.[s.label];
+      if (p) need = Math.max(need, scratch.measureText(p).width + 56);
+    }
+    return Math.min(380, Math.max(170, Math.ceil(need)));
+  };
+  const colWs = slots.map(colWFor);
+  const colX = (i: number) => P + dateColW + colWs.slice(0, i).reduce((a, b) => a + b, 0);
+
+  // Canvas width hugs the table; the title gets room too.
+  scratch.font = `700 44px ${FONT}`;
+  const titleW = scratch.measureText(`${area} Team Roster`).width;
+  const tableW = dateColW + colWs.reduce((a, b) => a + b, 0);
+  const W = Math.min(2200, Math.ceil(Math.max(tableW, titleW) + P * 2));
+  // If capped, shrink columns proportionally so the table still fits.
+  if (tableW + P * 2 > W) {
+    const f = (W - P * 2 - dateColW) / Math.max(colWs.reduce((a, b) => a + b, 0), 1);
+    for (let i = 0; i < colWs.length; i++) colWs[i] = Math.max(140, Math.floor(colWs[i]! * f));
+  }
+  const colW = (i: number) => colWs[i] ?? 170;
+
+  // Pre-wrap names so we know each row's height. Font must match what will be
+  // drawn, or the measurement wraps text that would have fitted on one line.
+  const wrap = (text: string, max: number, font = `600 22px ${FONT}`): string[] => {
+    scratch.font = font;
     const words = text.split(" ");
     const lines: string[] = [];
     let line = "";
@@ -50,9 +78,9 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
   const rowsH = dates.reduce((sum, d) => {
     const maxLines = Math.max(
       1,
-      ...slots.map((s) => {
+      ...slots.map((s, i) => {
         const p = cellMap[d]?.[s.label];
-        return p ? wrap(p, colW - 40).length : 1;
+        return p ? wrap(p, colW(i) - 40).length : 1;
       }),
     );
     return sum + Math.max(rowH, maxLines * pillLineH + 28);
@@ -95,7 +123,7 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
   ctx.font = `700 24px ${FONT}`;
   ctx.fillText("Sunday", P + 8, y + 34);
   slots.forEach((s, i) => {
-    const x = P + dateColW + i * colW;
+    const x = colX(i);
     ctx.strokeStyle = "#e8e5dd";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -106,16 +134,16 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
     const label = `${s.role || s.area}${num ? ` ${num}` : ""}`;
     ctx.fillStyle = "#181f2a";
     ctx.font = `700 22px ${FONT}`;
-    const lines = wrap(label, colW - 16).slice(0, 2);
+    const lines = wrap(label, colW(i) - 16, `700 22px ${FONT}`).slice(0, 2);
     lines.forEach((l, li) => ctx.fillText(l, x + 10, y + 30 + li * 26 - (lines.length > 1 ? 8 : 0)));
   });
   y += headerH;
 
   // Date rows
   dates.forEach((d, rowIndex) => {
-    const cellLines = slots.map((s) => {
+    const cellLines = slots.map((s, i) => {
       const p = cellMap[d]?.[s.label];
-      return p ? wrap(p, colW - 40) : null;
+      return p ? wrap(p, colW(i) - 40) : null;
     });
     const maxLines = Math.max(1, ...cellLines.map((l) => l?.length ?? 1));
     const thisRowH = Math.max(rowH, maxLines * pillLineH + 28);
@@ -136,7 +164,7 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
     ctx.fillText(format(parseISO(d), "d MMM yyyy"), P + 8, y + 38);
 
     slots.forEach((s, i) => {
-      const x = P + dateColW + i * colW;
+      const x = colX(i);
       ctx.strokeStyle = "#e8e5dd";
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -154,7 +182,7 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
       const c = colorFor(person, s.label);
       ctx.font = `600 22px ${FONT}`;
       const textW = Math.max(...lines.map((l) => ctx.measureText(l).width));
-      const pillW = Math.min(colW - 16, textW + 24);
+      const pillW = Math.min(colW(i) - 16, textW + 24);
       const pillH = lines.length * pillLineH + 10;
       ctx.fillStyle = c.bg;
       ctx.strokeStyle = c.border;
