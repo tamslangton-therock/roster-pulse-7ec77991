@@ -8,8 +8,6 @@ export interface RosterImageData {
   slots: SlotDef[];
   /** date -> slot label -> person name */
   cellMap: Record<string, Record<string, string>>;
-  people: string[];
-  subTeams: { name: string; color: { bg: string; border: string; text: string } }[];
   colorFor: (person: string, slotLabel?: string) => { bg: string; border: string; text: string };
   slotSuffix: (s: SlotDef) => string;
 }
@@ -18,7 +16,7 @@ const FONT = "system-ui, -apple-system, Segoe UI, sans-serif";
 
 /** Renders the printable team roster table as a PNG blob for pasting into WhatsApp. */
 export function renderRosterImage(data: RosterImageData): Promise<Blob> {
-  const { area, rangeLabel, dates, slots, cellMap, people, subTeams, colorFor, slotSuffix } = data;
+  const { area, rangeLabel, dates, slots, cellMap, colorFor, slotSuffix } = data;
 
   const scale = 2; // crisp on phone screens
   const W = 1600;
@@ -59,9 +57,7 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
     );
     return sum + Math.max(rowH, maxLines * pillLineH + 28);
   }, 0);
-  const peopleH = people.length ? 56 + Math.ceil(people.length / 6) * 44 : 0;
-  const subTeamsH = subTeams.length ? 56 + Math.ceil(subTeams.length / 5) * 44 : 0;
-  const H = P + titleH + headerH + rowsH + peopleH + subTeamsH + P;
+  const H = P + titleH + headerH + rowsH + P;
 
   const canvas = document.createElement("canvas");
   canvas.width = W * scale;
@@ -175,64 +171,6 @@ export function renderRosterImage(data: RosterImageData): Promise<Blob> {
 
     y += thisRowH;
   });
-
-  // Team members legend
-  if (people.length) {
-    y += 40;
-    ctx.fillStyle = "#5d6571";
-    ctx.font = `700 20px ${FONT}`;
-    ctx.fillText("TEAM MEMBERS", P, y);
-    y += 16;
-    let x = P;
-    ctx.font = `600 22px ${FONT}`;
-    for (const p of people) {
-      const c = colorFor(p);
-      const pillW = ctx.measureText(p).width + 24;
-      if (x + pillW > W - P) {
-        x = P;
-        y += 44;
-      }
-      ctx.fillStyle = c.bg;
-      ctx.strokeStyle = c.border;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(x, y, pillW, 34, 8);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = c.text;
-      ctx.fillText(p, x + 12, y + 24);
-      x += pillW + 10;
-    }
-    y += 34;
-  }
-
-  // Sub-teams legend
-  if (subTeams.length) {
-    y += 40;
-    ctx.fillStyle = "#5d6571";
-    ctx.font = `700 20px ${FONT}`;
-    ctx.fillText("SUB-TEAMS", P, y);
-    y += 16;
-    let x = P;
-    ctx.font = `600 22px ${FONT}`;
-    for (const st of subTeams) {
-      const pillW = ctx.measureText(st.name).width + 24;
-      if (x + pillW > W - P) {
-        x = P;
-        y += 44;
-      }
-      ctx.fillStyle = st.color.bg;
-      ctx.strokeStyle = st.color.border;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(x, y, pillW, 34, 8);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = st.color.text;
-      ctx.fillText(st.name, x + 12, y + 24);
-      x += pillW + 10;
-    }
-  }
 
   return new Promise((res, rej) =>
     canvas.toBlob((b) => (b ? res(b) : rej(new Error("No image"))), "image/png"),

@@ -523,8 +523,6 @@ function PrintRosterPage() {
       dates: shownDates,
       slots,
       cellMap,
-      people,
-      subTeams: areaSubTeams,
       colorFor,
       slotSuffix,
     });
