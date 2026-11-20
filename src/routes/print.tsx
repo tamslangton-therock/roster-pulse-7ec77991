@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { z } from "zod";
-import { CalendarDays, Download, FileText, Printer, Users } from "lucide-react";
+import { CalendarDays, Copy, Download, FileText, Printer, Users } from "lucide-react";
+import { toast } from "sonner";
 import { SundayDocs } from "@/components/sunday-docs";
 import { useRoster } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import type { SlotDef } from "@/lib/roster-grid";
 import { occupiedPrintSlots } from "@/lib/print-slots";
+import { renderRosterImage } from "@/lib/print-image";
 import { AccessNotice } from "@/components/access-notice";
 
 import { teamColor, resolveSubTeamColor } from "@/lib/person-colors";
@@ -65,6 +67,7 @@ function PrintRosterPage() {
   const layoutSlots = useRoster((s) => s.slots);
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isCopyingImage, setIsCopyingImage] = useState(false);
 
   const areas = useMemo(() => {
     const set = new Set<string>(layoutSlots.map((s) => s.area));
@@ -506,6 +509,48 @@ function PrintRosterPage() {
     }
   };
 
+  // Draw the same roster table as a PNG and put it on the clipboard so it can
+  // be pasted straight into a WhatsApp chat. Falls back to saving the image
+  // when the browser won't copy images (older phones).
+  const copyImage = async () => {
+    if (!canExport || isCopyingImage) return;
+    setIsCopyingImage(true);
+    const fileName = `${area.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "team"}-roster.png`;
+    // Start drawing inside the tap so iPhone Safari still allows the copy.
+    const blobPromise = renderRosterImage({
+      area,
+      rangeLabel,
+      dates: shownDates,
+      slots,
+      cellMap,
+      people,
+      subTeams: areaSubTeams,
+      colorFor,
+      slotSuffix,
+    });
+    try {
+      if (navigator.clipboard && "ClipboardItem" in window) {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
+        toast.success("Image copied — open WhatsApp and paste it into the chat.");
+        return;
+      }
+      throw new Error("no clipboard");
+    } catch {
+      try {
+        const blob = await blobPromise;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        toast.success("Couldn't copy here, so the image was saved instead.");
+      } catch {
+        toast.error("Couldn't make the roster image.");
+      }
+    } finally {
+      setIsCopyingImage(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6 print:p-0 print:space-y-0">
       <style>{`
@@ -612,6 +657,10 @@ function PrintRosterPage() {
           <Button onClick={exportPdf} disabled={!canExport || isExporting}>
             <Download className="h-4 w-4 mr-1.5" />
             {isExporting ? "Building PDF…" : "Download PDF"}
+          </Button>
+          <Button variant="outline" onClick={copyImage} disabled={!canExport || isCopyingImage}>
+            <Copy className="h-4 w-4 mr-1.5" />
+            {isCopyingImage ? "Copying…" : "Copy as image"}
           </Button>
           <Button variant="outline" onClick={() => window.print()} disabled={!canExport}>
             <Printer className="h-4 w-4 mr-1.5" />
